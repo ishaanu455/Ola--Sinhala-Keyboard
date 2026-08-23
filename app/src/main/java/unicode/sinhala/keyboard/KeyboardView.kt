@@ -159,17 +159,17 @@ class KeyboardView(
             val timeSinceLastDown = currentTimeMillis - lastBackspaceDownTime
             delay(
                 when {
-                    // Repeat speed curve — tuned to feel like Gboard:
-                    //   initial delay 300 ms (was 500) so first repeat fires sooner,
-                    //   ramps up to max speed after ~2 s of holding.
-                    timeSinceLastDown > 5000 -> 20L
-                    timeSinceLastDown > 4000 -> 24L
-                    timeSinceLastDown > 3000 -> 32L
-                    timeSinceLastDown > 2000 -> 48L
-                    timeSinceLastDown > 1000 -> 72L
-                    timeSinceLastDown > 500  -> 110L
-                    timeSinceLastDown > 300  -> 200L
-                    else                     -> 300L
+                    // Floor lowered from the old 4L/8L (up to 250 taps/sec) — that was
+                    // firing InputConnection deletes + vibration faster than the
+                    // framework/host app could keep up with, which is what showed up
+                    // as backspace "hanging" or eating keystrokes on longer holds.
+                    timeSinceLastDown > 5000 -> 24L
+                    timeSinceLastDown > 4000 -> 32L
+                    timeSinceLastDown > 3000 -> 40L
+                    timeSinceLastDown > 2000 -> 56L
+                    timeSinceLastDown > 1000 -> 80L
+                    timeSinceLastDown > 500 -> 128L
+                    else -> 500L
                 }
             )
             // clickListener.functionClick() touches the InputConnection and the
