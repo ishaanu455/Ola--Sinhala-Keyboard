@@ -24,6 +24,12 @@ class SuggestionEngine(private val context: Context) {
         private const val TAG = "SuggestionEngine"
         private const val ENGLISH_FILE = "english.json"
         private const val SINHALA_FILE = "sinhala.json"
+
+        // How much one prior "previousWord -> this word" occurrence is worth,
+        // in the same units as UserWordFrequency's recency-decayed score. Tuned
+        // so a couple of bigram hits can pull a rarer word above a merely
+        // frequent one, without letting a single coincidental pairing dominate.
+        private const val BIGRAM_BOOST_WEIGHT = 3.0
     }
 
     suspend fun initializeIfNeeded() {
@@ -78,7 +84,7 @@ class SuggestionEngine(private val context: Context) {
         }
     }
 
-    suspend fun suggest(prefix: String, limit: Int = 5): List<String> {
+    suspend fun suggest(prefix: String, limit: Int = 5, previousWord: String? = null): List<String> {
         if (!initialized.get()) initializeIfNeeded()
 
         val cleanedPrefix = prefix.trim()
@@ -87,6 +93,12 @@ class SuggestionEngine(private val context: Context) {
         val lang = LanguageDetector.detectLanguage(cleanedPrefix)
         val queryPrefix = if (lang == LanguageDetector.Language.SINHALA) cleanedPrefix else cleanedPrefix.lowercase()
         val trie = if (lang == LanguageDetector.Language.SINHALA) sinhalaTrie else englishTrie
+
+        // Normalize the previous word the same way words get normalized when
+        // learned, so it actually matches what's stored in the bigram map.
+        val normalizedPreviousWord = previousWord?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            if (lang == LanguageDetector.Language.SINHALA) Normalizer.normalize(it, Normalizer.Form.NFC) else it.lowercase()
+        }
 
         // Gather more candidates than we'll show, so frequency-based ranking has
         // room to reorder — otherwise a frequent word buried deep in the dictionary
@@ -101,9 +113,15 @@ class SuggestionEngine(private val context: Context) {
         merged.addAll(learnedCandidates)
         merged.addAll(dictionaryCandidates)
 
-        // Rank: user's own typing frequency first, then shorter words, then alphabetical.
+        // Rank: recency-weighted typing frequency, boosted when this candidate has
+        // followed the previous word before (bigram), then shorter words, then
+        // alphabetical.
         val ranked = merged.sortedWith(
-            compareByDescending<String> { UserWordFrequency.getFrequency(context, it) }
+            compareByDescending<String> {
+                val freqScore = UserWordFrequency.getScore(context, it)
+                val bigramBoost = UserBigramFrequency.getFollowCount(context, normalizedPreviousWord, it) * BIGRAM_BOOST_WEIGHT
+                freqScore + bigramBoost
+            }
                 .thenBy { it.length }
                 .thenBy { it }
         )
@@ -111,14 +129,27 @@ class SuggestionEngine(private val context: Context) {
         return ranked.take(limit)
     }
 
-    /** Call when the user accepts a suggestion or finishes typing a word — learns it locally. */
-    fun recordAccepted(word: String, lang: LanguageDetector.Language) {
+    /**
+     * Call when the user accepts a suggestion or finishes typing a word — learns it
+     * locally. [previousWord] (the word right before this one, if any) also feeds
+     * the bigram model so the next-word prediction has context to work with.
+     */
+    fun recordAccepted(word: String, lang: LanguageDetector.Language, previousWord: String? = null) {
         val normalized = if (lang == LanguageDetector.Language.SINHALA) {
             Normalizer.normalize(word, Normalizer.Form.NFC)
         } else {
             word.lowercase()
         }
         UserWordFrequency.learn(context, normalized)
+
+        if (!previousWord.isNullOrBlank()) {
+            val normalizedPrev = if (lang == LanguageDetector.Language.SINHALA) {
+                Normalizer.normalize(previousWord, Normalizer.Form.NFC)
+            } else {
+                previousWord.lowercase()
+            }
+            UserBigramFrequency.learn(context, normalizedPrev, normalized)
+        }
     }
 
     /**

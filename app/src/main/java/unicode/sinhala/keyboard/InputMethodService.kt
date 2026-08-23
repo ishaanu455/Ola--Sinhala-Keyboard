@@ -505,7 +505,8 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 if (token.isEmpty()) {
                     topBarController?.showNormal()
                 } else {
-                    requestSuggestionsForToken(token)
+                    val previousWord = textBefore.dropLast(token.length).trimEnd().takeLastWhile { !it.isWhitespace() }
+                    requestSuggestionsForToken(token, previousWord)
                 }
             } catch (_: Throwable) {}
         }
@@ -557,8 +558,9 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         return false
     }
 
-    // Helper to request suggestions for a token
-    private fun requestSuggestionsForToken(token: String) {
+    // Helper to request suggestions for a token. previousWord is the word right
+    // before the one being typed (if any) — feeds the bigram next-word boost.
+    private fun requestSuggestionsForToken(token: String, previousWord: String = "") {
         if (!suggestionsEnabled || isInPasswordField()) {
             topBarController?.showNormal()
             return
@@ -571,7 +573,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             suggestionJob?.cancel()
             suggestionJob = serviceScope.launch(kotlinx.coroutines.Dispatchers.Default) {
                 try {
-                    val sList = suggestionEngine?.suggest(Normalizer.normalize(t, Normalizer.Form.NFC), 5)
+                    val sList = suggestionEngine?.suggest(Normalizer.normalize(t, Normalizer.Form.NFC), 5, previousWord)
                         ?: emptyList()
                     // isActive check: if cancelled while suggest() was running, don't
                     // push a now-stale result to the UI.
@@ -629,7 +631,8 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                     ?.getTextBeforeCursor(50, 0)
                     ?.toString() ?: ""
                 val token = textBefore.takeLastWhile { !it.isWhitespace() }
-                requestSuggestionsForToken(token)
+                val previousWord = textBefore.dropLast(token.length).trimEnd().takeLastWhile { !it.isWhitespace() }
+                requestSuggestionsForToken(token, previousWord)
             } catch (_: Throwable) {}
         }
 
@@ -656,6 +659,8 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         val after = ic.getTextAfterCursor(100, 0)?.toString() ?: ""
         val tokenStart = before.lastIndexOfAny(charArrayOf(' ', '\n', '\t')).let { if (it < 0) 0 else it + 1 }
         val token = before.substring(tokenStart)
+        // Word before the one being replaced — feeds the bigram model below.
+        val previousWordForBigram = before.substring(0, tokenStart).trimEnd().takeLastWhile { !it.isWhitespace() }
         // delete token
         for (i in 0 until token.codePointCount(0, token.length)) {
             ic.deleteSurroundingTextInCodePoints(1, 0)
@@ -678,7 +683,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         // record acceptance
         serviceScope.launch {
             val lang = LanguageDetector.detectLanguage(suggestion)
-            suggestionEngine?.recordAccepted(suggestion, lang)
+            suggestionEngine?.recordAccepted(suggestion, lang, previousWordForBigram)
         }
 
         // Hide suggestions now that the word is complete (word + space), same as pressing space.
@@ -1535,11 +1540,14 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     private fun learnLastTypedWord(ic: android.view.inputmethod.InputConnection?) {
         try {
             val textBefore = ic?.getTextBeforeCursor(60, 0)?.toString() ?: ""
-            val justTypedWord = textBefore.trimEnd().takeLastWhile { !it.isWhitespace() }
+            val trimmedEnd = textBefore.trimEnd()
+            val justTypedWord = trimmedEnd.takeLastWhile { !it.isWhitespace() }
             if (justTypedWord.length >= 2) {
                 val lang = LanguageDetector.detectLanguage(justTypedWord)
+                // Word before this one — feeds the bigram next-word model.
+                val previousWord = trimmedEnd.dropLast(justTypedWord.length).trimEnd().takeLastWhile { !it.isWhitespace() }
                 serviceScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                    suggestionEngine?.recordAccepted(justTypedWord, lang)
+                    suggestionEngine?.recordAccepted(justTypedWord, lang, previousWord)
                 }
             }
         } catch (_: Throwable) {}

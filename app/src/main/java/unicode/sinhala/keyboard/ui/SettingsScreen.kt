@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ime.suggest.UserDataBackup
 import kotlinx.coroutines.launch
 import unicode.sinhala.com.BuildConfig
 import unicode.sinhala.com.R
@@ -142,6 +143,9 @@ fun SettingsScreen() {
             onCheckedChange = { clipboardEnabled.value = it }
         )
 
+        SettingsCategory(title = "පුද්ගලික ශබ්දකෝෂය")
+        DictionaryBackupSection()
+
         SettingsCategory(title = "Support")
 
         PreferenceItem(
@@ -164,6 +168,79 @@ fun SettingsScreen() {
         PreferenceItem(
             title = "Version",
             summary = BuildConfig.VERSION_NAME
+        )
+    }
+}
+
+/**
+ * Lets the user back up their learned-word data (typing frequency + next-word
+ * associations) to a JSON file, and restore it later — e.g. after switching
+ * phones. Nothing is sent anywhere automatically; export/import only happen
+ * when the user explicitly picks a file via the system picker. Import merges
+ * additively into whatever's already on the device rather than replacing it.
+ */
+@Composable
+private fun DictionaryBackupSection() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var resultMessage by remember { mutableStateOf<String?>(null) }
+    var resultIsError by remember { mutableStateOf(false) }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val ok = UserDataBackup.export(context, uri)
+            resultIsError = !ok
+            resultMessage = if (ok) "සුරැකුම සාර්ථකයි" else "සුරැකීම අසාර්ථක විය"
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val ok = UserDataBackup.import(context, uri)
+            resultIsError = !ok
+            resultMessage = if (ok) "ප්‍රතිසාධනය සාර්ථකයි" else "ෆයිල් එක කියවීමට නොහැකි විය"
+        }
+    }
+
+    Text(
+        text = "ඔබ නිතර ටයිප් කරන වචන මතක තබාගැනීම mobile එකේම විතරයි - වෙන කොහෙටවත් යන්නෙ නෑ. " +
+            "phone එකක් මාරු කරද්දී හෝ backup එකක් විදියට මේ දත්ත JSON file එකකට export/import කරගන්න පුළුවන්.",
+        fontSize = 12.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+    )
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+    ) {
+        OutlinedButton(onClick = {
+            resultMessage = null
+            exportLauncher.launch("fox_keyboard_dictionary_backup.json")
+        }) {
+            Text("Export")
+        }
+        Spacer(modifier = Modifier.padding(start = 8.dp))
+        OutlinedButton(onClick = {
+            resultMessage = null
+            importLauncher.launch(arrayOf("application/json", "*/*"))
+        }) {
+            Text("Import")
+        }
+    }
+
+    resultMessage?.let { message ->
+        Text(
+            text = message,
+            fontSize = 13.sp,
+            color = if (resultIsError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
         )
     }
 }
