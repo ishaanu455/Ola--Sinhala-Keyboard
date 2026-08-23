@@ -958,18 +958,6 @@ class KeyboardView(
                 rowHeight * 4 + (if (showNumberRow) numRowHeight(rowHeight) else 0)
 
             activeFontStyle = initialFontStyle
-            fontStyleAdapter = FontStyleAdapter { style ->
-                activeFontStyle = style
-                clickListener.fontStyleSelected(style)
-                updateFontsIconBadge()
-                // Auto-back to keyboard once a style (or "None") is picked, same as
-                // the plan's UX flow - no separate confirm step needed.
-                toggleFontStyleView(false)
-            }
-            fontStyleAdapter.setActiveStyle(activeFontStyle)
-            binding.fontStyleView.fontStyleList.layoutManager = LinearLayoutManager(context)
-            binding.fontStyleView.fontStyleList.adapter = fontStyleAdapter
-            updateFontsIconBadge()
 
             fun toggleFontStyleView(visible: Boolean) {
                 binding.keyboardRows.visibility = if (visible) View.GONE else View.VISIBLE
@@ -1007,6 +995,19 @@ class KeyboardView(
                 }
                 updateRecentEmojiRowVisibility()
             }
+
+            fontStyleAdapter = FontStyleAdapter { style ->
+                activeFontStyle = style
+                clickListener.fontStyleSelected(style)
+                updateFontsIconBadge()
+                // Auto-back to keyboard once a style (or "None") is picked, same as
+                // the plan's UX flow - no separate confirm step needed.
+                toggleFontStyleView(false)
+            }
+            fontStyleAdapter.setActiveStyle(activeFontStyle)
+            binding.fontStyleView.fontStyleList.layoutManager = LinearLayoutManager(context)
+            binding.fontStyleView.fontStyleList.adapter = fontStyleAdapter
+            updateFontsIconBadge()
 
             binding.btnFonts.setOnClickListener { toggleFontStyleView(!isFontStylePanelOpen) }
 
