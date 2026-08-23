@@ -952,11 +952,11 @@ class KeyboardView(
             this.closeTextSelectPanelFn = { toggleTextSelectView(false) }
 
             // --- Fonts (fancy-text style picker) panel logic ---
-            // Wired exactly like the clipboard panel above: same panel-height rule,
-            // same single fixed back-arrow icon, same one-RecyclerView content.
-            binding.fontStyleView.root.layoutParams.height =
-                rowHeight * 4 + (if (showNumberRow) numRowHeight(rowHeight) else 0)
-
+            // Wired exactly like the clipboard panel above. Height is handled by
+            // applyPanelHeights() (called again below) rather than set manually here,
+            // so it stays in sync with the recent-emoji-row compensation the other
+            // panels get - setting it manually here left this panel a bit shorter
+            // than the others whenever the recent-emoji strip was showing.
             activeFontStyle = initialFontStyle
 
             fun toggleFontStyleView(visible: Boolean) {
@@ -1005,13 +1005,17 @@ class KeyboardView(
                 toggleFontStyleView(false)
             }
             fontStyleAdapter.setActiveStyle(activeFontStyle)
-            binding.fontStyleView.fontStyleList.layoutManager = LinearLayoutManager(context)
+            binding.fontStyleView.fontStyleList.layoutManager =
+                StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL).apply {
+                    gapStrategy = StaggeredGridLayoutManager.GAP_HANDLING_NONE
+                }
             binding.fontStyleView.fontStyleList.adapter = fontStyleAdapter
             updateFontsIconBadge()
 
             binding.btnFonts.setOnClickListener { toggleFontStyleView(!isFontStylePanelOpen) }
 
             this.closeFontStylePanelFn = { toggleFontStyleView(false) }
+            applyPanelHeights()
         } catch (t: Throwable) {
             Log.e("KeyboardView", "Error during KeyboardView init configuration", t)
 
@@ -1216,6 +1220,7 @@ class KeyboardView(
         // added back on top, or the panel would come up short by exactly that much.
         val textSelectExtra = if (isTextSelectPanelOpen) binding.topBar.layoutParams.height else 0
         binding.textSelectView.root.layoutParams.height = panelHeight + textSelectExtra
+        binding.fontStyleView.root.layoutParams.height = panelHeight
     }
 
     private fun updateRecentEmojiRowVisibility() {
@@ -1339,10 +1344,18 @@ class KeyboardView(
     /** Purple-circle badge on btn_fonts (same treatment as the clipboard's
      *  btn_clip_clear) so it's obvious at a glance that a style is active,
      *  without having to open the panel to check. */
+    /** Purple-circle badge on btn_fonts (same treatment as the clipboard's
+     *  btn_clip_clear) so it's obvious at a glance that a style is active, without
+     *  having to open the panel to check. Restores the icon's normal circular
+     *  background (from @style/TopBarIcon, same as the clipboard/emoji/text-select
+     *  icons) rather than clearing it, so the icon isn't left flat/backgroundless
+     *  once a style is picked and then turned back off. */
     private fun updateFontsIconBadge() {
         val active = activeFontStyle != FontStyle.NONE
-        binding.btnFonts.background = if (active)
-            AppCompatResources.getDrawable(context, R.drawable.bg_clip_purple_circle) else null
+        binding.btnFonts.background = AppCompatResources.getDrawable(
+            context,
+            if (active) R.drawable.bg_clip_purple_circle else R.drawable.bg_top_bar_icon_circle
+        )
     }
 
     /** Closes the emoji panel (e.g. when the input field changes or the keyboard is reopened). */

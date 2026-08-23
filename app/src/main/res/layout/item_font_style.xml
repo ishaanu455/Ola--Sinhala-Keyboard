@@ -1,45 +1,58 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginHorizontal="6dp"
-    android:layout_marginVertical="3dp"
-    android:orientation="horizontal"
-    android:gravity="center_vertical"
-    android:background="@drawable/bg_clip_card"
-    android:paddingHorizontal="14dp"
-    android:paddingVertical="12dp"
+    android:layout_marginVertical="4dp"
     android:clickable="true"
     android:focusable="true">
 
-    <TextView
-        android:id="@+id/font_style_sample"
-        android:layout_width="0dp"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:textSize="16sp"
-        android:textColor="?attr/foreground"
-        android:maxLines="1"
-        android:ellipsize="end"
-        tools:text="𝐒𝐚𝐦𝐩𝐥𝐞" />
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:background="@drawable/bg_clip_card"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="14dp">
 
-    <TextView
-        android:id="@+id/font_style_name"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="10dp"
-        android:layout_marginEnd="10dp"
-        android:textSize="12sp"
-        android:textColor="?attr/foreground_2"
-        tools:text="Bold" />
+        <TextView
+            android:id="@+id/font_style_sample"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textSize="18sp"
+            android:textColor="?attr/foreground"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="𝐒𝐚𝐦𝐩𝐥𝐞" />
 
+        <TextView
+            android:id="@+id/font_style_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center"
+            android:textSize="12sp"
+            android:textColor="?attr/foreground_2"
+            tools:text="Bold" />
+
+    </LinearLayout>
+
+    <!-- Same corner-badge treatment as item_clipboard_clip.xml's pin badge -->
     <ImageView
         android:id="@+id/font_style_check"
         android:layout_width="20dp"
         android:layout_height="20dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="6dp"
+        android:padding="4dp"
+        android:background="@drawable/bg_clip_purple_circle"
         android:src="@drawable/ic_check"
+        android:tint="@android:color/white"
+        android:scaleType="centerInside"
         android:visibility="gone"
         android:contentDescription="@string/font_style_active" />
 
-</LinearLayout>
+</FrameLayout>
