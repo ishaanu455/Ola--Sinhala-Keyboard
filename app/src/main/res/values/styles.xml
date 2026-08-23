@@ -13,6 +13,15 @@
         <item name="android:padding">6dp</item>
         <item name="android:scaleType">centerInside</item>
         <item name="android:background">@drawable/bg_top_bar_icon_circle</item>
+        <!-- btn_clipboard is the first focusable view in the IME window, so on
+             newer Android versions the system auto-assigns it "default focus"
+             the moment the keyboard opens and draws its own square focus-highlight
+             rectangle behind the round bg_top_bar_icon_circle background - that's
+             the box artifact. This attribute (API 26+, silently ignored below
+             that) turns that system rectangle off for every top-bar icon, while
+             leaving the round pressed/normal states from bg_top_bar_icon_circle
+             untouched. -->
+        <item name="android:defaultFocusHighlightEnabled">false</item>
     </style>
 
 </resources>

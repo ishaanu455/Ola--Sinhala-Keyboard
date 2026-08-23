@@ -587,6 +587,61 @@ class KeyboardView(
             // Click the first category (Recent) to load it by default
             (emojiCategories.getChildAt(0) as? ImageView)?.performClick()
 
+            // Swiping left/right on the emoji grid itself (not just tapping the
+            // tab strip) moves to the next/previous category tab. GridLayoutManager
+            // only ever scrolls the grid vertically, so a horizontal drag is
+            // otherwise unused by the RecyclerView - safe to read it here via
+            // onInterceptTouchEvent without ever intercepting (returning true),
+            // which means normal vertical scrolling/tapping on emoji cells is
+            // completely unaffected.
+            fun switchEmojiCategory(direction: Int) {
+                val currentIndex = emojiCategories.children.indexOfFirst { it.background != null }
+                if (currentIndex == -1) return
+                val newIndex = (currentIndex + direction).coerceIn(0, emojiCategories.childCount - 1)
+                if (newIndex == currentIndex) return
+                val newTab = emojiCategories.getChildAt(newIndex) as? ImageView ?: return
+                newTab.performClick()
+                // Keep the newly-selected tab visible in the (horizontally
+                // scrollable) tab strip in case it scrolled out of view.
+                emojiCategoriesScroll.requestChildRectangleOnScreen(
+                    newTab,
+                    android.graphics.Rect(0, 0, newTab.width, newTab.height),
+                    false
+                )
+            }
+
+            val emojiSwipeDetector = android.view.GestureDetector(
+                contextThemeWrapper,
+                object : android.view.GestureDetector.SimpleOnGestureListener() {
+                    override fun onFling(
+                        e1: MotionEvent?,
+                        e2: MotionEvent,
+                        velocityX: Float,
+                        velocityY: Float
+                    ): Boolean {
+                        if (e1 == null) return false
+                        val diffX = e2.x - e1.x
+                        val diffY = e2.y - e1.y
+                        if (kotlin.math.abs(diffX) > kotlin.math.abs(diffY) &&
+                            kotlin.math.abs(diffX) > 100 &&
+                            kotlin.math.abs(velocityX) > 300
+                        ) {
+                            switchEmojiCategory(if (diffX < 0) 1 else -1)
+                            return true
+                        }
+                        return false
+                    }
+                }
+            )
+            emojiGrid.addOnItemTouchListener(object : RecyclerView.OnItemTouchListener {
+                override fun onInterceptTouchEvent(rv: RecyclerView, e: MotionEvent): Boolean {
+                    emojiSwipeDetector.onTouchEvent(e)
+                    return false
+                }
+                override fun onTouchEvent(rv: RecyclerView, e: MotionEvent) {}
+                override fun onRequestDisallowInterceptTouchEvent(disallow: Boolean) {}
+            })
+
             fun toggleEmojiView(visible: Boolean) {
                 binding.keyboardRows.visibility = if (visible) View.GONE else View.VISIBLE
                 binding.emojiView.root.visibility = if (visible) View.VISIBLE else View.GONE
