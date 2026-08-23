@@ -7,8 +7,8 @@ android {
     namespace "unicode.sinhala.com"
     defaultConfig {
         minSdkVersion 21
-        versionCode 76
-        versionName "1.1.66"
+        versionCode 77
+        versionName "1.1.67"
         targetSdkVersion 34
         vectorDrawables.useSupportLibrary = true
     }
