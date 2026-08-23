@@ -6,7 +6,7 @@ import android.content.SharedPreferences
 import unicode.sinhala.com.R
 
 object EmojiData {
-    val categories = mutableListOf("Recent", "Smileys", "People", "Animals", "Food", "Objects", "Symbols", "Flags")
+    val categories = mutableListOf("Recent", "Smileys", "People", "Animals", "Food", "Objects", "Symbols", "Flags", "Stylish")
 
     /** Vector icon shown in the category tab strip for each emoji category. */
     fun categoryIcon(category: String): Int = when (category) {
@@ -18,6 +18,7 @@ object EmojiData {
         "Objects" -> R.drawable.ic_cat_objects
         "Symbols" -> R.drawable.ic_cat_symbols
         "Flags" -> R.drawable.ic_cat_flags
+        "Stylish" -> R.drawable.ic_cat_stylish
         else -> R.drawable.ic_cat_smileys
     }
 
@@ -151,6 +152,46 @@ object EmojiData {
             // Oceania
             "🇦🇺","🇫🇯","🇰🇮","🇲🇭","🇫🇲","🇳🇷","🇳🇿","🇵🇼","🇵🇬","🇸🇧","🇹🇴","🇹🇻",
             "🇻🇺","🇼🇸"
+        ),
+
+        // Plain Unicode text symbols (not pictorial emoji) - always rendered with the
+        // system font regardless of the user's chosen emoji style (System/Twemoji/Custom),
+        // so this category works fully offline no matter which emoji pack is installed.
+        "Stylish" to listOf(
+            // Brackets
+            "「","」","『","』","【","】","〈","〉","《","》","〔","〕","〖","〗","〘","〙","〚","〛",
+            "❨","❩","❪","❫","❬","❭","❮","❯","❰","❱","⟨","⟩","⟪","⟫","⦇","⦈","⸢","⸣","⸤","⸥",
+
+            // Checkmarks & crosses
+            "✓","✔","✕","✖","✗","✘","☑","☒","☓","⛝","✅","❌","❎","⭕","➕","➖","➗","✳","✴",
+
+            // Currency
+            "$","¢","£","¤","¥","֏","؋","₠","₡","₢","₣","₤","₥","₦","₧","₨","₩","₪","₫","€",
+            "₭","₮","₯","₰","₱","₲","₳","₴","₵","₶","₷","₸","₹","₺","₻","₼","₽","₾","₿",
+
+            // Hearts
+            "♡","♥","❥","❦","❧","💕","❣","꧁","꧂",
+
+            // Bullets & dividers
+            "•","◦","‣","⁃","∙","○","●","◉","◎","◐","◑","◒","◓","▪","▫","■","□","▲","△","▼","▽",
+            "◆","◇","◈","★","☆","✦","✧","✩","✪","✫","✬","✭","✮","✯","✰","⋆","─","━","═","╌","┄",
+
+            // Math
+            "+","−","×","÷","=","≠","≈","≤","≥","±","∓","∞","√","∛","∑","∏","∫","∂","∇","∆",
+            "%","‰","π","°","′","″","∴","∵","∝","∈","∉","⊂","⊃","∪","∩","∀","∃","⊕","⊗","⊥",
+
+            // Punctuation & misc marks
+            "¡","¿","‽","§","¶","†","‡","·","…","‹","›","«","»","©","®","™","№","℅","℗","℠",
+            "‾","¯","˜","´","`","^","~","※","⁂","⁎","⁑",
+
+            // Quotes
+            "‘","’","“","”","‚","„","‛","‟",
+
+            // Arrows
+            "←","↑","→","↓","↔","↕","↖","↗","↘","↙","⇐","⇑","⇒","⇓","⇔","⇕","➔","➜","➝","➤",
+
+            // Crowns / royal / stylish-name favorites
+            "♛","♚","♔","♕","☬"
         )
 
     )
