@@ -1398,8 +1398,15 @@ class KeyboardView(
      *  once a style is picked and then turned back off. */
     private fun updateFontsIconBadge() {
         val active = activeFontStyle != FontStyle.NONE
+        // Must resolve against themedContext (the ContextThemeWrapper that has the
+        // custom Light/Dark theme applied), not the raw `context` - bg_top_bar_icon_circle
+        // references ?attr/keyFunction/?attr/keyFunctionPressed, which are only defined
+        // on the custom theme. Resolving them against the raw context silently failed
+        // to produce a visible color, which is why btn_fonts's circular background
+        // (and its back-arrow state, since it's the same ImageView) never showed up
+        // even though the XML style/background were both correct.
         binding.btnFonts.background = AppCompatResources.getDrawable(
-            context,
+            themedContext,
             if (active) R.drawable.bg_clip_purple_circle else R.drawable.bg_top_bar_icon_circle
         )
     }
