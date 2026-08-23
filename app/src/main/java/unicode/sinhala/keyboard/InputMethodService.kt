@@ -735,11 +735,15 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                                     }
 
                                     CHAR.ALPAPRAANA_CAYANNA.code -> {
-                                        output =
-                                            CHAR.MAHAAPRAANA_CAYANNA.text + CHAR.SIGN_AL_LAKUNA.text
-                                        erasePreviousChars = 2
-                                        tLastLetter = CHAR.MAHAAPRAANA_CAYANNA
-                                        tLastChar = CHAR.SIGN_AL_LAKUNA
+                                        // "ch" should stay as ච් (al-lakuna form), not upgrade
+                                        // to the rare aspirated ඡ - unlike t/d/s, ච has no
+                                        // separate retroflex/dental/plain-sh pair, so "h" here
+                                        // is just absorbed: no visible change, state unchanged,
+                                        // so a following "a" still reveals plain ච (not ඡ).
+                                        output = ""
+                                        erasePreviousChars = 0
+                                        tLastLetter = mLastLetter
+                                        tLastChar = mLastChar
                                     }
 
                                     CHAR.ALPAPRAANA_JAYANNA.code -> {
