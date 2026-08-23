@@ -547,6 +547,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             keyboardView.closeClipboardPanel()
             keyboardView.closeEmojiPanel()
             keyboardView.closeTextSelectPanel()
+            keyboardView.closeFontStylePanel()
         }
     }
 
@@ -569,6 +570,8 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             keyboardView.closeClipboardPanel()
             keyboardView.closeEmojiPanel()
             keyboardView.closeTextSelectPanel()
+            keyboardView.closeFontStylePanel()
+            keyboardView.resetEmojiPanelState()
         }
         // Also drop any leftover suggestion bar/state from the previous field or app -
         // otherwise a suggestion chip computed for the old text stays on screen after

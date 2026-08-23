@@ -134,6 +134,7 @@
             <ImageView
                 android:id="@+id/btn_fonts"
                 style="@style/TopBarIcon"
+                android:background="@drawable/bg_top_bar_icon_circle"
                 android:src="@drawable/ic_fonts"
                 android:tint="?attr/foreground"
                 android:contentDescription="@string/font_style_title"/>

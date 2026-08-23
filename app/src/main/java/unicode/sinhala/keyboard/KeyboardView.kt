@@ -138,6 +138,11 @@ class KeyboardView(
     private var isClipboardPanelOpen = false
     private var closeClipboardPanelFn: (() -> Unit)? = null
     private var closeEmojiPanelFn: (() -> Unit)? = null
+    // Resets the emoji panel back to its defaults (Recent tab selected, recent-emoji
+    // strip scrolled to the start) - invoked when the keyboard is fully hidden/reopened
+    // so the user doesn't land back on whatever category or scroll position they left
+    // it on last time. See resetEmojiPanelState().
+    private var resetEmojiPanelStateFn: (() -> Unit)? = null
     private var isTextSelectPanelOpen = false
     private var closeTextSelectPanelFn: (() -> Unit)? = null
     // True while the Fonts ("fancy text" style picker) panel is open.
@@ -745,6 +750,30 @@ class KeyboardView(
 
             this.closeEmojiPanelFn = { toggleEmojiView(false) }
 
+            // Resets the emoji panel back to its defaults: the "Recent" tab
+            // re-selected (and its data reloaded) and the category tab strip's
+            // scroll position reset to the start - so that hiding the keyboard
+            // and coming back to the emoji tab later doesn't leave whatever
+            // category/scroll-position was last picked. Invoked from
+            // InputMethodService.resetKeyboardState() on true keyboard hide,
+            // not on every panel open/close within the same session.
+            this.resetEmojiPanelStateFn = {
+                val firstChild = emojiCategories.getChildAt(0) as? ImageView
+                if (firstChild != null) {
+                    for (child in emojiCategories.children) child.background = null
+                    firstChild.background = AppCompatResources.getDrawable(
+                        contextThemeWrapper,
+                        R.drawable.key_background_pressed
+                    )
+                }
+                emojiAdapter.updateEmojis(EmojiData.emojis["Recent"] ?: emptyList())
+                emojiCategoriesScroll.scrollTo(0, 0)
+                // Recent-emoji quick-strip above the keys: also reset to the start,
+                // rather than staying scrolled to wherever the user last dragged a
+                // swap to (see recentEmojiRow drag/reorder handling above).
+                binding.recentEmojiRow.scrollToPosition(0)
+            }
+
             // --- Clipboard panel logic ---
             binding.btnClipboard.isVisible = clipboardEnabled
 
@@ -778,7 +807,24 @@ class KeyboardView(
 
             // Tapping empty space in the clipboard list (not on any clip card) collapses
             // whichever clip currently has its pin/share/delete row expanded.
+            // Plain click listener only fires when the RecyclerView itself gets the
+            // click with nothing else consuming the touch first, which isn't
+            // reliable with a StaggeredGridLayoutManager - blank space taps could
+            // land without ever calling this. Use an item-touch listener instead:
+            // on ACTION_UP, if there's no child view under the touch point, the tap
+            // landed on blank space, so collapse whichever clip's share/delete/pin
+            // row is currently expanded.
             binding.clipboardView.clipboardList.setOnClickListener { clipboardAdapter.collapse() }
+            binding.clipboardView.clipboardList.addOnItemTouchListener(object : RecyclerView.OnItemTouchListener {
+                override fun onInterceptTouchEvent(rv: RecyclerView, e: MotionEvent): Boolean {
+                    if (e.action == MotionEvent.ACTION_UP && rv.findChildViewUnder(e.x, e.y) == null) {
+                        clipboardAdapter.collapse()
+                    }
+                    return false
+                }
+                override fun onTouchEvent(rv: RecyclerView, e: MotionEvent) {}
+                override fun onRequestDisallowInterceptTouchEvent(disallow: Boolean) {}
+            })
 
             // Clear-all now lives as a purple circular icon in the keyboard's top_bar
             // (next to btn_clipboard) instead of a second header row inside the panel,
@@ -1149,7 +1195,7 @@ class KeyboardView(
     /** True while any of the emoji/clipboard/text-select panels is open. The IME uses
      *  this to skip its own suggestion-bar refresh (which otherwise fights with the
      *  panel-specific icon visibility below by forcing btnEmoji/btnClipboard back on). */
-    val isAnyPanelOpen: Boolean get() = isEmojiPanelOpen || isClipboardPanelOpen || isTextSelectPanelOpen
+    val isAnyPanelOpen: Boolean get() = isEmojiPanelOpen || isClipboardPanelOpen || isTextSelectPanelOpen || isFontStylePanelOpen
 
     /** top_bar_icon_row is normally wrap_content so its icons stay bunched together
      *  at the row's start. While the clipboard or emoji panel is open, one of its
@@ -1361,6 +1407,14 @@ class KeyboardView(
     /** Closes the emoji panel (e.g. when the input field changes or the keyboard is reopened). */
     fun closeEmojiPanel() {
         if (isEmojiPanelOpen) closeEmojiPanelFn?.invoke()
+    }
+
+    /** Resets the emoji panel to its defaults (Recent tab + start scroll position).
+     *  Called from InputMethodService.resetKeyboardState() when the keyboard is
+     *  fully hidden, so the next time the user opens the emoji tab (or the
+     *  recent-emoji strip) it doesn't resume wherever they last left it. */
+    fun resetEmojiPanelState() {
+        resetEmojiPanelStateFn?.invoke()
     }
 
     /** Closes the text-select panel (e.g. when the input field changes or the keyboard is reopened). */
