@@ -4,6 +4,9 @@
     <string name="wijesekara">විජේසේකර</string>
     <string name="singlish">සිංග්‍රීසි</string>
     <string name="backspace">Backspace</string>
+    <string name="font_style_title">Fonts</string>
+    <string name="font_style_active">Active</string>
+    <string name="font_style_english_only_note">Works best with English - Sinhala letters don\'t have styled Unicode variants, so they type normally even while a style is active.</string>
     <string name="clipboard_title">Clipboard</string>
     <string name="clipboard_clear">Clear</string>
     <string name="clipboard_empty">No clips yet. Copy some text to see it here.</string>

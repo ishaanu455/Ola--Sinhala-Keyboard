@@ -51,7 +51,8 @@ class KeyboardView(
     private var showRecentEmojiRow: Boolean = false,
     private var showNumberRow: Boolean = true,
     private val emojiStyle: EmojiStyle = EmojiStyle.SYSTEM,
-    private var clipboardEnabled: Boolean = true
+    private var clipboardEnabled: Boolean = true,
+    private var initialFontStyle: FontStyle = FontStyle.NONE
 ) : LinearLayout(context) {
 
     companion object {
@@ -115,6 +116,7 @@ class KeyboardView(
         fun textSelectPasteClick()
         fun textSelectAllClick()
         fun textSelectMove(direction: TextSelectDirection, extend: Boolean, byWord: Boolean = false)
+        fun fontStyleSelected(style: FontStyle)
     }
 
     interface SwipeListener {
@@ -138,6 +140,14 @@ class KeyboardView(
     private var closeEmojiPanelFn: (() -> Unit)? = null
     private var isTextSelectPanelOpen = false
     private var closeTextSelectPanelFn: (() -> Unit)? = null
+    // True while the Fonts ("fancy text" style picker) panel is open.
+    private var isFontStylePanelOpen = false
+    private var closeFontStylePanelFn: (() -> Unit)? = null
+    private lateinit var fontStyleAdapter: FontStyleAdapter
+    // The "fancy text" style currently applied to freshly-typed Latin text. Read by
+    // InputMethodService via [currentFontStyle] so it knows what to pass into
+    // FontStyleData.convert() on every commit.
+    private var activeFontStyle: FontStyle = FontStyle.NONE
     // Whether the cursor cluster is currently extending a selection (the
     // "Select" toggle in the middle of the cluster) rather than just moving
     // the cursor. Purely UI state - InputMethodService reads it as a param on
@@ -671,6 +681,7 @@ class KeyboardView(
                 binding.emojiView.root.visibility = if (visible) View.VISIBLE else View.GONE
                 if (visible) binding.clipboardView.root.visibility = View.GONE
                 if (visible) binding.textSelectView.root.visibility = View.GONE
+                if (visible) binding.fontStyleView.root.visibility = View.GONE
                 // While the emoji panel is open, its own back arrow is the only exit
                 // control needed - the clipboard/text-select toggle icons next to it
                 // would just be dead weight, so hide them and bring back a proper
@@ -680,6 +691,7 @@ class KeyboardView(
                 binding.btnClipboard.visibility =
                     if (visible) View.GONE else (if (clipboardEnabled) View.VISIBLE else View.GONE)
                 binding.btnTextSelect.visibility = if (visible) View.GONE else View.VISIBLE
+                binding.btnFonts.visibility = if (visible) View.GONE else View.VISIBLE
                 // The category tab strip moves onto this same row, right after the
                 // fixed btn_emoji back arrow, and the row itself switches to
                 // width=0dp/weight=1 so the strip has the rest of the line to expand
@@ -704,6 +716,7 @@ class KeyboardView(
                 if (visible) {
                     isClipboardPanelOpen = false
                     isTextSelectPanelOpen = false
+                    isFontStylePanelOpen = false
                 }
                 // This was the missing piece causing two bugs at once: the emoji
                 // panel's own back arrow (btn_emoji) reads isEmojiPanelOpen to decide
@@ -799,6 +812,7 @@ class KeyboardView(
                 binding.clipboardView.root.visibility = if (visible) View.VISIBLE else View.GONE
                 if (visible) binding.emojiView.root.visibility = View.GONE
                 if (visible) binding.textSelectView.root.visibility = View.GONE
+                if (visible) binding.fontStyleView.root.visibility = View.GONE
                 // Same idea as the emoji panel above: while the clipboard panel is
                 // open, hide the emoji/text-select toggle icons and swap in the same
                 // proper full-arrow "back" icon instead of the plain chevron.
@@ -814,6 +828,7 @@ class KeyboardView(
                 setTopBarIconRowExpanded(visible)
                 binding.btnEmoji.visibility = if (visible) View.GONE else View.VISIBLE
                 binding.btnTextSelect.visibility = if (visible) View.GONE else View.VISIBLE
+                binding.btnFonts.visibility = if (visible) View.GONE else View.VISIBLE
                 if (isEmojiPanelOpen) {
                     binding.btnEmoji.setImageResource(R.drawable.ic_emoji)
                     binding.emojiCategoriesScroll.isVisible = false
@@ -824,6 +839,7 @@ class KeyboardView(
                 if (visible) {
                     isEmojiPanelOpen = false
                     isTextSelectPanelOpen = false
+                    isFontStylePanelOpen = false
                 }
                 updateRecentEmojiRowVisibility()
                 if (visible) refreshClipboardList()
@@ -865,6 +881,7 @@ class KeyboardView(
                 binding.topBar.visibility = if (visible) View.GONE else View.VISIBLE
                 if (visible) binding.emojiView.root.visibility = View.GONE
                 if (visible) binding.clipboardView.root.visibility = View.GONE
+                if (visible) binding.fontStyleView.root.visibility = View.GONE
                 binding.btnTextSelect.setImageResource(if (visible) R.drawable.ic_keyboard_arrow_left else R.drawable.ic_text_select)
                 if (isEmojiPanelOpen) {
                     binding.btnEmoji.setImageResource(R.drawable.ic_emoji)
@@ -888,6 +905,7 @@ class KeyboardView(
                 if (visible) {
                     isEmojiPanelOpen = false
                     isClipboardPanelOpen = false
+                    isFontStylePanelOpen = false
                 } else {
                     // Selection mode shouldn't survive a close - reopening should
                     // always start with a plain, non-extending cursor.
@@ -932,6 +950,67 @@ class KeyboardView(
             binding.btnTextSelect.setOnClickListener { toggleTextSelectView(!isTextSelectPanelOpen) }
 
             this.closeTextSelectPanelFn = { toggleTextSelectView(false) }
+
+            // --- Fonts (fancy-text style picker) panel logic ---
+            // Wired exactly like the clipboard panel above: same panel-height rule,
+            // same single fixed back-arrow icon, same one-RecyclerView content.
+            binding.fontStyleView.root.layoutParams.height =
+                rowHeight * 4 + (if (showNumberRow) numRowHeight(rowHeight) else 0)
+
+            activeFontStyle = initialFontStyle
+            fontStyleAdapter = FontStyleAdapter { style ->
+                activeFontStyle = style
+                clickListener.fontStyleSelected(style)
+                updateFontsIconBadge()
+                // Auto-back to keyboard once a style (or "None") is picked, same as
+                // the plan's UX flow - no separate confirm step needed.
+                toggleFontStyleView(false)
+            }
+            fontStyleAdapter.setActiveStyle(activeFontStyle)
+            binding.fontStyleView.fontStyleList.layoutManager = LinearLayoutManager(context)
+            binding.fontStyleView.fontStyleList.adapter = fontStyleAdapter
+            updateFontsIconBadge()
+
+            fun toggleFontStyleView(visible: Boolean) {
+                binding.keyboardRows.visibility = if (visible) View.GONE else View.VISIBLE
+                binding.fontStyleView.root.visibility = if (visible) View.VISIBLE else View.GONE
+                if (visible) binding.emojiView.root.visibility = View.GONE
+                if (visible) binding.clipboardView.root.visibility = View.GONE
+                if (visible) binding.textSelectView.root.visibility = View.GONE
+                binding.btnFonts.setImageResource(if (visible) R.drawable.ic_arrow_back else R.drawable.ic_fonts)
+                binding.btnClipboard.visibility =
+                    if (visible) View.GONE else (if (clipboardEnabled) View.VISIBLE else View.GONE)
+                binding.btnEmoji.visibility = if (visible) View.GONE else View.VISIBLE
+                binding.btnTextSelect.visibility = if (visible) View.GONE else View.VISIBLE
+                setTopBarIconRowExpanded(visible)
+                if (isEmojiPanelOpen) {
+                    binding.btnEmoji.setImageResource(R.drawable.ic_emoji)
+                    binding.emojiCategoriesScroll.isVisible = false
+                }
+                if (isClipboardPanelOpen) {
+                    binding.btnClipboard.setImageResource(R.drawable.ic_clipboard)
+                    binding.btnClipClear.isVisible = false
+                    binding.btnClipFilter.isVisible = false
+                    binding.clipboardRowSpacer.isVisible = false
+                    clipboardAdapter.collapse()
+                    clipboardAdapter.exitSelectionMode()
+                    clipFilterPopup?.dismiss()
+                    currentClipFilter = ClipFilter.ALL
+                }
+                if (isTextSelectPanelOpen) binding.btnTextSelect.isSelected = false
+                isFontStylePanelOpen = visible
+                if (visible) {
+                    isEmojiPanelOpen = false
+                    isClipboardPanelOpen = false
+                    isTextSelectPanelOpen = false
+                    fontStyleAdapter.setActiveStyle(activeFontStyle)
+                }
+                updateRecentEmojiRowVisibility()
+            }
+
+            binding.btnFonts.setOnClickListener { toggleFontStyleView(!isFontStylePanelOpen) }
+
+            this.closeFontStylePanelFn = { toggleFontStyleView(false) }
         } catch (t: Throwable) {
             Log.e("KeyboardView", "Error during KeyboardView init configuration", t)
 
@@ -1141,7 +1220,7 @@ class KeyboardView(
     private fun updateRecentEmojiRowVisibility() {
         val recent = EmojiData.emojis["Recent"] ?: emptyList()
         binding.recentEmojiRow.visibility =
-            if (showRecentEmojiRow && recent.isNotEmpty() && !isEmojiPanelOpen && !isClipboardPanelOpen && !isTextSelectPanelOpen) View.VISIBLE else View.GONE
+            if (showRecentEmojiRow && recent.isNotEmpty() && !isEmojiPanelOpen && !isClipboardPanelOpen && !isTextSelectPanelOpen && !isFontStylePanelOpen) View.VISIBLE else View.GONE
         // Whether the strip just appeared or disappeared, re-sync the panel heights
         // so the keyboard's total height never jumps when a panel opens/closes.
         applyPanelHeights()
@@ -1245,6 +1324,24 @@ class KeyboardView(
     /** Closes the clipboard panel (e.g. right after a paste, or when the input field changes). */
     fun closeClipboardPanel() {
         if (isClipboardPanelOpen) closeClipboardPanelFn?.invoke()
+    }
+
+    /** Closes the Fonts panel (mirrors closeClipboardPanel). */
+    fun closeFontStylePanel() {
+        if (isFontStylePanelOpen) closeFontStylePanelFn?.invoke()
+    }
+
+    /** The style InputMethodService should currently apply to freshly-typed Latin
+     *  text - read on every commit via FontStyleData.convert(). */
+    fun currentFontStyle(): FontStyle = activeFontStyle
+
+    /** Purple-circle badge on btn_fonts (same treatment as the clipboard's
+     *  btn_clip_clear) so it's obvious at a glance that a style is active,
+     *  without having to open the panel to check. */
+    private fun updateFontsIconBadge() {
+        val active = activeFontStyle != FontStyle.NONE
+        binding.btnFonts.background = if (active)
+            AppCompatResources.getDrawable(context, R.drawable.bg_clip_purple_circle) else null
     }
 
     /** Closes the emoji panel (e.g. when the input field changes or the keyboard is reopened). */

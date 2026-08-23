@@ -125,6 +125,19 @@
                 android:tint="?attr/foreground"
                 android:contentDescription="@string/text_select_title"/>
 
+            <!-- Pinned last in the row. Doubles as the Fonts panel's back arrow
+                 (see KeyboardView.kt toggleFontStyleView) - it never changes
+                 position, only its icon/content-description. Gets a purple-circle
+                 background (matching btn_clip_clear's treatment) while a style
+                 other than "None" is active, so it's obvious at a glance without
+                 opening the panel. -->
+            <ImageView
+                android:id="@+id/btn_fonts"
+                style="@style/TopBarIcon"
+                android:src="@drawable/ic_fonts"
+                android:tint="?attr/foreground"
+                android:contentDescription="@string/font_style_title"/>
+
         </LinearLayout>
 
     </LinearLayout>
@@ -613,6 +626,11 @@
         <include
             android:id="@+id/text_select_view"
             layout="@layout/text_select_layout"
+            android:visibility="gone" />
+
+        <include
+            android:id="@+id/font_style_view"
+            layout="@layout/font_style_layout"
             android:visibility="gone" />
     </FrameLayout>
 </LinearLayout>

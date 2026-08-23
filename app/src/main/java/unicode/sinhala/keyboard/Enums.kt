@@ -24,6 +24,31 @@ enum class EmojiStyle(val id: String, val displayName: String) {
         fun fromId(id: String?): EmojiStyle = entries.find { it.id == id } ?: SYSTEM
     }
 }
+/**
+ * "Fancy text" Unicode character-swap style (see FontStyleData). Only affects Latin
+ * letters/digits - Sinhala text always passes through unstyled regardless of which
+ * style is active. NONE means plain typing, no conversion applied.
+ */
+enum class FontStyle(val id: String, val displayName: String, val sample: String) {
+    NONE("none", "None (Default)", "Sample"),
+    BOLD("bold", "Bold", "𝐒𝐚𝐦𝐩𝐥𝐞"),
+    ITALIC("italic", "Italic", "𝑆𝑎𝑚𝑝𝑙𝑒"),
+    SCRIPT("script", "Script", "𝒮𝒶𝓂𝓅𝓁ℯ"),
+    FRAKTUR("fraktur", "Fraktur", "𝔖𝔞𝔪𝔭𝔩𝔢"),
+    DOUBLE_STRUCK("double_struck", "Double-struck", "𝕊𝕒𝕞𝕡𝕝𝕖"),
+    MONOSPACE("monospace", "Monospace", "𝚂𝚊𝚖𝚙𝚕𝚎"),
+    CIRCLED("circled", "Circled", "Ⓢⓐⓜⓟⓛⓔ"),
+    FULLWIDTH("fullwidth", "Fullwidth", "Ｓａｍｐｌｅ"),
+    SMALL_CAPS("small_caps", "Small Caps", "sᴀᴍᴘʟᴇ"),
+    SUPERSCRIPT("superscript", "Superscript", "ˢᵃᵐᵖˡᵉ"),
+    UNDERLINE("underline", "Underline", "S̲a̲m̲p̲l̲e̲"),
+    STRIKETHROUGH("strikethrough", "Strikethrough", "S̶a̶m̶p̶l̶e̶");
+
+    companion object {
+        fun fromId(id: String?): FontStyle = entries.find { it.id == id } ?: NONE
+    }
+}
+
 enum class CHAR(val code: Int, val text: String) {
     /** අ | 3461 */
     AYANNA(3461, "අ"),

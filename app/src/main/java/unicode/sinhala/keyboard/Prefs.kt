@@ -77,6 +77,13 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean("clipboard_enabled", true)
         set(value) = prefs.edit().putBoolean("clipboard_enabled", value).apply()
 
+    /** The "fancy text" style currently applied to freshly-typed Latin text (see
+     *  FontStyleData). Persisted so it survives the keyboard closing/reopening,
+     *  same as emojiStyle above. */
+    var fontStyle: FontStyle
+        get() = FontStyle.fromId(prefs.getString("font_style", FontStyle.NONE.id))
+        set(value) = prefs.edit().putString("font_style", value.id).apply()
+
     fun getKeyboardLayout(): KeyboardLayout {
         return when {
             layoutWijesekara -> KeyboardLayout.WIJESEKARA
@@ -175,6 +182,16 @@ class Prefs(context: Context) {
         fun getClipboardEnabled(context: Context): Boolean {
             val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
             return prefs.getBoolean("clipboard_enabled", true)
+        }
+
+        fun getFontStyle(context: Context): FontStyle {
+            val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
+            return FontStyle.fromId(prefs.getString("font_style", FontStyle.NONE.id))
+        }
+
+        fun setFontStyle(context: Context, style: FontStyle) {
+            context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
+                .edit().putString("font_style", style.id).apply()
         }
 
         // New helper: return the list of enabled layouts in priority order

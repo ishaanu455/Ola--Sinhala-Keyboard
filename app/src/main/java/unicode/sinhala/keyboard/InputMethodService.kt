@@ -325,8 +325,29 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             Prefs.getShowRecentEmojiRow(this),
             Prefs.getShowNumberRow(this),
             Prefs.getEmojiStyle(this),
-            Prefs.getClipboardEnabled(this)
+            Prefs.getClipboardEnabled(this),
+            Prefs.getFontStyle(this)
         )
+    }
+
+    /**
+     * Every freshly-typed-text commit routes through here instead of calling
+     * ic.commitText() directly, so the active "fancy text" style (see FontStyleData,
+     * KeyboardView.currentFontStyle) is applied consistently in one place rather than
+     * at each of the ~9 scattered call sites. Deliberately NOT used for: emoji commits
+     * (a style shouldn't touch an emoji/symbol tag), clipboard pastes (pasting existing
+     * text should preserve it exactly, not silently restyle it), the empty-string
+     * selection-delete, or backspace's history-based restore (that replays exactly what
+     * was committed before, which was already styled going in - restyling it again would
+     * double-apply combining marks like underline/strikethrough).
+     */
+    private fun commitStyled(ic: android.view.inputmethod.InputConnection, text: String) {
+        val style = if (::keyboardView.isInitialized) keyboardView.currentFontStyle() else FontStyle.NONE
+        ic.commitText(if (style != FontStyle.NONE) FontStyleData.convert(text, style) else text, 1)
+    }
+
+    override fun fontStyleSelected(style: FontStyle) {
+        Prefs.setFontStyle(this, style)
     }
 
     override fun onCreateInputView(): View {
@@ -616,7 +637,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 // plain text (e.g. switched to English mid-open-region) - commitText()
                 // replaces an open composing span rather than appending after it.
                 currentInputConnection?.finishComposingText()
-                currentInputConnection?.commitText(tag, 1)
+                currentInputConnection?.let { commitStyled(it, tag) }
             }
         }
 
@@ -682,7 +703,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             ic.deleteSurroundingTextInCodePoints(1, 0)
         }
         // commit suggestion, followed by a single space so the user can keep typing the next word
-        ic.commitText("$suggestion ", 1)
+        commitStyled(ic, "$suggestion ")
 
         // Mirror the normal space-bar bookkeeping, since we just committed a space too.
         lastChar = null
@@ -1168,7 +1189,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                     // so commitText() doesn't replace the composing span unexpectedly
                     // in apps that track the composing region separately (e.g. Chrome).
                     if (output.isNotEmpty()) ic.finishComposingText()
-                    ic.commitText(output, 1)
+                    commitStyled(ic, output)
                 }
 
                 // Record how to undo this exact keystroke, so BACKSPACE can walk back
@@ -1336,7 +1357,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 // finishComposingText() first - commitText() replaces an open
                 // composing region instead of appending after it.
                 ic.finishComposingText()
-                ic.commitText(toCommit, 1)
+                commitStyled(ic, toCommit)
             } catch (t: Throwable) {
                 Log.e("IME", "number commit failed", t)
             }
@@ -1510,7 +1531,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 // without this, pressing space right after a long-vowel keystroke wipes
                 // out the composing character instead of finalizing + adding the space.
                 ic.finishComposingText()
-                ic.commitText(toCommit, 1)
+                commitStyled(ic, toCommit)
 
             } catch (t: Throwable) {
                 Log.e("IME", "specialClick commit failed", t)
@@ -1571,7 +1592,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             // finishComposingText() first - commitText() replaces an open
             // composing region instead of appending after it.
             ic.finishComposingText()
-            ic.commitText(char, 1)
+            commitStyled(ic, char)
             vibrate()
         } catch (t: Throwable) {
             Log.e("IME", "longPressSecondaryClick commit failed", t)
