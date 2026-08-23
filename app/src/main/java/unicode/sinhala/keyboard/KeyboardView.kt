@@ -211,7 +211,16 @@ class KeyboardView(
                 }
 
                 MotionEvent.ACTION_MOVE -> {
-                    if (!startIgnoreSwipe && !touchStartedInRecentEmojiRow) {
+                    // Swipe-to-erase/cursor is a typing-row gesture and makes no
+                    // sense (and must not compete with a panel's own gestures -
+                    // e.g. the emoji grid's left/right category swipe) whenever
+                    // keyboardRows is hidden in favour of the emoji/clipboard/
+                    // text-select panel. Guarding on keyboardRows' own visibility
+                    // (rather than a single row's bounds like touchStartedInRecentEmojiRow)
+                    // covers the whole panel area, not just part of it.
+                    val panelShowing = ::binding.isInitialized &&
+                        binding.keyboardRows.visibility != View.VISIBLE
+                    if (!startIgnoreSwipe && !touchStartedInRecentEmojiRow && !panelShowing) {
                         val distanceFromDownX: Float = swipeStepStartX - ev.x
 
                         if (swipeToErase && ev.y < rowHeight * 4 && distanceFromDownX > swipeStepDistance)
@@ -613,6 +622,8 @@ class KeyboardView(
             val emojiSwipeDetector = android.view.GestureDetector(
                 contextThemeWrapper,
                 object : android.view.GestureDetector.SimpleOnGestureListener() {
+                    override fun onDown(e: MotionEvent): Boolean = true
+
                     override fun onFling(
                         e1: MotionEvent?,
                         e2: MotionEvent,
