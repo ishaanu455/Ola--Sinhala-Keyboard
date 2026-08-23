@@ -1402,28 +1402,27 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                     val topStep = if (!hasPositionChanged()) inputHistory.removeLastOrNull() else null
                     if (topStep != null) {
                         try {
-                            if (topStep.myWasComposable) {
-                                // The step being undone left its region open (not yet
-                                // finalized) - swap that same region back to the previous
-                                // glyph with one call, exactly mirroring how doubling a
-                                // vowel forward swaps it (see singlishInput). Don't call
-                                // finishComposingText() first here, or there'd be no open
-                                // region left to swap.
-                                ic.setComposingText(topStep.restoreText, 1)
-                                if (topStep.restoreText.isEmpty()) ic.finishComposingText()
-                            } else {
-                                // The step being undone was already finalized (plain
-                                // commitText) - erase exactly what it added and put back
-                                // what was there before it, as one atomic batch edit so
-                                // there's no visible in-between state.
-                                ic.beginBatchEdit()
-                                try {
-                                    ic.finishComposingText()
-                                    ic.deleteSurroundingText(topStep.myOutput.length, 0)
-                                    if (topStep.restoreText.isNotEmpty()) ic.commitText(topStep.restoreText, 1)
-                                } finally {
-                                    ic.endBatchEdit()
-                                }
+                            // Always finalize any open composing region first - this is a
+                            // safe no-op if the region was already closed. We can't trust
+                            // topStep.myWasComposable to mean the region is STILL open here:
+                            // an arbitrary amount of time (and host-app behaviour, e.g. its
+                            // own autocorrect/spellcheck finalizing spans) can happen between
+                            // the keystroke that opened it and this backspace press. Assuming
+                            // it was still open and calling setComposingText() directly was
+                            // the bug - when the region had already been closed by the host
+                            // app, that call INSERTED text at the cursor instead of replacing
+                            // anything, which is why backspace was making text longer
+                            // (ඌ -> ඌඋ -> ඌඌ) instead of shorter. Explicit delete-then-insert
+                            // has no such ambiguity regardless of region state, so it's used
+                            // for every revert now, batched so it's still a single atomic
+                            // edit from the host app's point of view.
+                            ic.beginBatchEdit()
+                            try {
+                                ic.finishComposingText()
+                                ic.deleteSurroundingText(topStep.myOutput.length, 0)
+                                if (topStep.restoreText.isNotEmpty()) ic.commitText(topStep.restoreText, 1)
+                            } finally {
+                                ic.endBatchEdit()
                             }
                             lastChar = topStep.restoreLastChar
                             lastLetter = topStep.restoreLastLetter
