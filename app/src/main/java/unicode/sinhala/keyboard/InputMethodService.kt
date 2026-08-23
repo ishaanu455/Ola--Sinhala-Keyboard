@@ -1158,16 +1158,25 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 // through it step by step instead of just deleting raw codepoints.
                 val previousTop = inputHistory.lastOrNull()
                 val historyEntry: InputStep? = when {
-                    erasePreviousChars == 0 && previousTop != null && previousTop.myWasComposable ->
+                    erasePreviousChars == 0 && composable && previousTop != null && previousTop.myWasComposable ->
                         // This step replaced the still-open region from the previous
-                        // keystroke wholesale (e.g. o -> oo) with no erase at all -
-                        // undo = swap that same region back to what it held before.
+                        // keystroke wholesale (e.g. o -> oo) with no erase at all - it must
+                        // ALSO be composable itself (i.e. this step used setComposingText to
+                        // do the replacing, not commitText appending after finalizing the
+                        // old region) or this classification is wrong. That mismatch was
+                        // the bug: "koo" + a third "o" finalizes the long-o region as-is and
+                        // appends a fresh ඔ after it (no further doubling exists past diga
+                        // aela-pilla) - erasePreviousChars is 0 there too, but nothing got
+                        // replaced, so treating it as a region-swap made backspace put an
+                        // extra character back INTO the field instead of just deleting the
+                        // fresh ඔ (කෝඔ -> කෝෝ instead of the correct කෝ).
                         InputStep(output, composable, previousTop.myOutput, mLastChar, mLastLetter, pendingGaettaBase)
 
                     erasePreviousChars == 0 ->
-                        // Fresh append after an already-finalized glyph (or the very
-                        // first character) - nothing to put back, undo just deletes
-                        // this step's own output.
+                        // Fresh append with nothing replaced - either after an already-
+                        // finalized glyph, the very first character, or (as above) a step
+                        // that just finalized whatever open region existed and appended
+                        // after it. Either way undo just deletes this step's own output.
                         InputStep(output, composable, "", mLastChar, mLastLetter, pendingGaettaBase)
 
                     previousTop != null && erasePreviousChars <= previousTop.myOutput.length ->
