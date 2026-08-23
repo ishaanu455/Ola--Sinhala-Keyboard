@@ -1027,7 +1027,16 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         if (ic != null) {
             ic.beginBatchEdit()
             try {
-                if (erasePreviousChars > 0) erasePrevious(erasePreviousChars)
+                // If a previous keystroke left an open composing region (setComposingText)
+                // and this keystroke needs to erase characters before committing,
+                // we must finalize the composing region first. Otherwise, Android's
+                // deleteSurroundingText() interacts badly with the open composing span
+                // and can erase the wrong characters (e.g. kombuwa/matra disappearing).
+                // finishComposingText() is a safe no-op when no region is open.
+                if (erasePreviousChars > 0) {
+                    ic.finishComposingText()
+                    erasePrevious(erasePreviousChars)
+                }
                 if (composable) {
                     // Leave this as an open composing region instead of finalizing it -
                     // if the next key doubles the vowel, we just swap this region's
@@ -1038,6 +1047,10 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                     // InputConnection.commitText() contract, so no extra cleanup needed.
                     ic.setComposingText(output, 1)
                 } else {
+                    // Also finalize any open composing region before a plain commit,
+                    // so commitText() doesn't replace the composing span unexpectedly
+                    // in apps that track the composing region separately (e.g. Chrome).
+                    if (output.isNotEmpty()) ic.finishComposingText()
                     ic.commitText(output, 1)
                 }
             } catch (t: Throwable) {
