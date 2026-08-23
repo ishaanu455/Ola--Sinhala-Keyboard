@@ -65,6 +65,85 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     private val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
 
 
+    // --- Backspace history, for step-by-step Sinhala revert (e.g. තෝ -> තො -> ත් -> "") ---
+    // Unicode has NO nested relationship between - and ‍- "ො" (short o) and "ෝ" (long o)
+    // are two entirely separate codepoints, not one built on top of the other. So a plain
+    // "delete 1 codepoint" can never walk through the intermediate steps a user expects;
+    // the only way is to remember what each keystroke actually did and reverse it.
+    private data class InputStep(
+        val myOutput: String,          // exactly what this keystroke placed on screen
+        val myWasComposable: Boolean,  // true if myOutput was left as an open composing
+                                        // region (setComposingText) rather than committed
+        val restoreText: String,       // what to put back in myOutput's place on undo
+        val restoreLastChar: CHAR?,
+        val restoreLastLetter: CHAR?,
+        val restorePendingGaettaBase: CHAR?
+    )
+
+    private val inputHistory = ArrayDeque<InputStep>()
+
+    /**
+     * Deletes one grapheme cluster backwards from the cursor, without any step-by-step
+     * history. Used when there's no usable [inputHistory] entry to revert to: plain
+     * English text, the cursor moved, a field/app switch, or a conjunct wide enough
+     * (e.g. the 4-unit gaetta-pilla cluster) that singlishInput() didn't try to make it
+     * individually revertible.
+     */
+    private fun performRawBackspaceDelete(ic: android.view.inputmethod.InputConnection) {
+        try {
+            // Always finalize any open composing region first.
+            // If we don't, deleteSurroundingText can interact badly
+            // with the composing span and erase the wrong characters
+            // (e.g. kombuwa, ispilla, papilla disappearing instead of
+            // the character before them).
+            ic.finishComposingText()
+
+            // Read up to 3 chars before cursor so we can detect
+            // Sinhala grapheme clusters that span multiple code units.
+            // We avoid getSelectedText() here (IPC call on every
+            // backspace tick) — instead we check whether there IS a
+            // selection by comparing the extraction cursor positions,
+            // which the framework already has cached locally.
+            val selected = ic.getSelectedText(0)
+            if (!selected.isNullOrEmpty()) {
+                // Selection present — delete the whole selection at once.
+                ic.commitText("", 1)
+            } else {
+                // No selection — delete one grapheme cluster backwards.
+                // Read enough chars to cover a kombuwa cluster:
+                //   kombuwa (ෙ U+0DD9) sits BEFORE the consonant visually
+                //   but AFTER it in the string — so "මෙ" in memory is
+                //   ම (U+0DB8) + ෙ (U+0DD9). One codepoint = one delete.
+                //   BUT rakaransaya / hal-kirima conjuncts can be
+                //   consonant + ZWJ + RAYANNA + al-lakuna = 4 units.
+                //   We walk back looking for a ZWJ right before the
+                //   cluster and delete the whole thing if found.
+                val before = ic.getTextBeforeCursor(4, 0)?.toString() ?: ""
+                when {
+                    // Rakaransaya / yansaya cluster: ends with al-lakuna
+                    // preceded by ZWJ — delete 4 units at once so the
+                    // whole conjunct disappears in one backspace.
+                    before.length >= 4 &&
+                    before[before.length - 4] == CHAR.ZERO_WIDTH_JOINER.text[0] -> {
+                        ic.deleteSurroundingText(4, 0)
+                    }
+                    // ZWJ right before cursor (e.g. partial conjunct)
+                    before.length >= 1 &&
+                    before[before.length - 1] == CHAR.ZERO_WIDTH_JOINER.text[0] -> {
+                        ic.deleteSurroundingText(1, 0)
+                    }
+                    else -> {
+                        // Default: delete one codepoint (handles surrogate
+                        // pairs = emoji correctly too).
+                        ic.deleteSurroundingTextInCodePoints(1, 0)
+                    }
+                }
+            }
+        } catch (t: Throwable) {
+            Log.e("IME", "BACKSPACE operation failed", t)
+        }
+    }
+
     private var userInvokedInputMethodPicker = false
 
     // Cached once instead of calling getSystemService() on every single key press /
@@ -594,6 +673,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         positionFlag = ""
         mComposing = ""
         tComposing = ""
+        inputHistory.clear()
 
         // record acceptance
         serviceScope.launch {
@@ -648,6 +728,13 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         if (!hasPositionChanged()) {
             mLastChar = lastChar
             mLastLetter = lastLetter
+        }
+
+        if (mLastChar == null && mLastLetter == null) {
+            // Cursor moved, or this is the very first character of a fresh word -
+            // any history from before belongs to a different position and would be
+            // wrong to revert into now.
+            inputHistory.clear()
         }
 
         lastChar = null
@@ -1066,6 +1153,49 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                     if (output.isNotEmpty()) ic.finishComposingText()
                     ic.commitText(output, 1)
                 }
+
+                // Record how to undo this exact keystroke, so BACKSPACE can walk back
+                // through it step by step instead of just deleting raw codepoints.
+                val previousTop = inputHistory.lastOrNull()
+                val historyEntry: InputStep? = when {
+                    erasePreviousChars == 0 && previousTop != null && previousTop.myWasComposable ->
+                        // This step replaced the still-open region from the previous
+                        // keystroke wholesale (e.g. o -> oo) with no erase at all -
+                        // undo = swap that same region back to what it held before.
+                        InputStep(output, composable, previousTop.myOutput, mLastChar, mLastLetter, pendingGaettaBase)
+
+                    erasePreviousChars == 0 ->
+                        // Fresh append after an already-finalized glyph (or the very
+                        // first character) - nothing to put back, undo just deletes
+                        // this step's own output.
+                        InputStep(output, composable, "", mLastChar, mLastLetter, pendingGaettaBase)
+
+                    previousTop != null && erasePreviousChars <= previousTop.myOutput.length ->
+                        // This step erased a suffix of the previous keystroke's output
+                        // (e.g. swapping out just the al-lakuna) - undo restores that
+                        // exact suffix, leaving whatever came before it untouched.
+                        InputStep(
+                            output,
+                            composable,
+                            previousTop.myOutput.substring(previousTop.myOutput.length - erasePreviousChars),
+                            mLastChar,
+                            mLastLetter,
+                            pendingGaettaBase
+                        )
+
+                    else ->
+                        // Erase reaches further back than one tracked keystroke can
+                        // account for (e.g. the 4-unit gaetta-pilla conjunct, which
+                        // spans two earlier keystrokes) - don't guess; let backspace
+                        // fall back to the existing whole-cluster delete here.
+                        null
+                }
+                if (historyEntry != null) {
+                    inputHistory.addLast(historyEntry)
+                    if (inputHistory.size > 64) inputHistory.removeFirst()
+                } else {
+                    inputHistory.clear()
+                }
             } catch (t: Throwable) {
                 Log.e("IME", "singlishInput commit failed", t)
             } finally {
@@ -1269,66 +1399,58 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
 
             Function.BACKSPACE -> {
                 if (ic != null) {
-                    try {
-                        // Always finalize any open composing region first.
-                        // If we don't, deleteSurroundingText can interact badly
-                        // with the composing span and erase the wrong characters
-                        // (e.g. kombuwa, ispilla, papilla disappearing instead of
-                        // the character before them).
-                        ic.finishComposingText()
-
-                        // Read up to 3 chars before cursor so we can detect
-                        // Sinhala grapheme clusters that span multiple code units.
-                        // We avoid getSelectedText() here (IPC call on every
-                        // backspace tick) — instead we check whether there IS a
-                        // selection by comparing the extraction cursor positions,
-                        // which the framework already has cached locally.
-                        val selected = ic.getSelectedText(0)
-                        if (!selected.isNullOrEmpty()) {
-                            // Selection present — delete the whole selection at once.
-                            ic.commitText("", 1)
-                        } else {
-                            // No selection — delete one grapheme cluster backwards.
-                            // Read enough chars to cover a kombuwa cluster:
-                            //   kombuwa (ෙ U+0DD9) sits BEFORE the consonant visually
-                            //   but AFTER it in the string — so "මෙ" in memory is
-                            //   ම (U+0DB8) + ෙ (U+0DD9). One codepoint = one delete.
-                            //   BUT rakaransaya / hal-kirima conjuncts can be
-                            //   consonant + ZWJ + RAYANNA + al-lakuna = 4 units.
-                            //   We walk back looking for a ZWJ right before the
-                            //   cluster and delete the whole thing if found.
-                            val before = ic.getTextBeforeCursor(4, 0)?.toString() ?: ""
-                            when {
-                                // Rakaransaya / yansaya cluster: ends with al-lakuna
-                                // preceded by ZWJ — delete 4 units at once so the
-                                // whole conjunct disappears in one backspace.
-                                before.length >= 4 &&
-                                before[before.length - 4] == CHAR.ZERO_WIDTH_JOINER.text[0] -> {
-                                    ic.deleteSurroundingText(4, 0)
-                                }
-                                // ZWJ right before cursor (e.g. partial conjunct)
-                                before.length >= 1 &&
-                                before[before.length - 1] == CHAR.ZERO_WIDTH_JOINER.text[0] -> {
-                                    ic.deleteSurroundingText(1, 0)
-                                }
-                                else -> {
-                                    // Default: delete one codepoint (handles surrogate
-                                    // pairs = emoji correctly too).
-                                    ic.deleteSurroundingTextInCodePoints(1, 0)
+                    val topStep = if (!hasPositionChanged()) inputHistory.removeLastOrNull() else null
+                    if (topStep != null) {
+                        try {
+                            if (topStep.myWasComposable) {
+                                // The step being undone left its region open (not yet
+                                // finalized) - swap that same region back to the previous
+                                // glyph with one call, exactly mirroring how doubling a
+                                // vowel forward swaps it (see singlishInput). Don't call
+                                // finishComposingText() first here, or there'd be no open
+                                // region left to swap.
+                                ic.setComposingText(topStep.restoreText, 1)
+                                if (topStep.restoreText.isEmpty()) ic.finishComposingText()
+                            } else {
+                                // The step being undone was already finalized (plain
+                                // commitText) - erase exactly what it added and put back
+                                // what was there before it, as one atomic batch edit so
+                                // there's no visible in-between state.
+                                ic.beginBatchEdit()
+                                try {
+                                    ic.finishComposingText()
+                                    ic.deleteSurroundingText(topStep.myOutput.length, 0)
+                                    if (topStep.restoreText.isNotEmpty()) ic.commitText(topStep.restoreText, 1)
+                                } finally {
+                                    ic.endBatchEdit()
                                 }
                             }
+                            lastChar = topStep.restoreLastChar
+                            lastLetter = topStep.restoreLastLetter
+                            pendingGaettaPillaBase = topStep.restorePendingGaettaBase
+                            positionFlag = ic.getTextBeforeCursor(5, 0)?.toString() ?: ""
+                        } catch (t: Throwable) {
+                            Log.e("IME", "history-based BACKSPACE revert failed, falling back", t)
+                            performRawBackspaceDelete(ic)
+                            lastChar = null
+                            lastLetter = null
+                            positionFlag = ""
+                            mComposing = ""
+                            inputHistory.clear()
                         }
-                    } catch (t: Throwable) {
-                        Log.e("IME", "BACKSPACE operation failed", t)
+                    } else {
+                        // No usable history for this position (plain English text,
+                        // cursor moved, app/field switch, or a conjunct that's too
+                        // complex to revert step-by-step) - same raw delete as before.
+                        performRawBackspaceDelete(ic)
+                        lastChar = null
+                        lastLetter = null
+                        positionFlag = ""
+                        mComposing = ""
                     }
                 } else {
                     Log.w("IME", "currentInputConnection is null in BACKSPACE")
                 }
-
-                lastChar = null
-                lastLetter = null
-                positionFlag = ""
-                mComposing = ""
             }
             Function.PANEL -> {
 
@@ -1386,6 +1508,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             lastChar = null
             lastLetter = null
             positionFlag = ""
+            inputHistory.clear()
             // hide suggestions on space/punctuation
             topBarController?.showNormal()
             debouncer?.cancel()
