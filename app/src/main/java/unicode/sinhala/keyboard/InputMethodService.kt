@@ -606,6 +606,20 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     private fun hasPositionChanged(): Boolean =
         currentInputConnection.getTextBeforeCursor(5, 0)?.toString() != positionFlag
 
+    // Vowel signs/letters that can still be "doubled" into a longer form by a
+    // matching second keystroke (e.g. short-o ො + o -> long-o ෝ). When the output
+    // this keystroke produces is one of these, we commit it as *composing* text
+    // instead of final text - so if the next key really is the matching doubler,
+    // we can swap the composing region's content directly (one InputConnection
+    // call) instead of erase-then-commit (two calls), which is what caused the
+    // visible "jump"/flicker when finishing characters like මෝ.
+    private val doublableVowelCodes = setOf(
+        CHAR.KETTI_AEDA_PILLA.code, CHAR.KETTI_IS_PILLA.code, CHAR.KETTI_PAA_PILLA.code,
+        CHAR.KOMBUVA.code, CHAR.KOMBUVA_HAA_AELA_PILLA.code,
+        CHAR.AYANNA.code, CHAR.AEYANNA.code, CHAR.IYANNA.code, CHAR.UYANNA.code,
+        CHAR.EYANNA.code, CHAR.OYANNA.code
+    )
+
     private fun singlishInput(input: String) {
         var output = ""
         var erasePreviousChars = 0
@@ -613,6 +627,10 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         var mLastLetter: CHAR? = null
         var tLastChar: CHAR? = null
         var tLastLetter: CHAR? = null
+        // Set to true by the branches below when this keystroke's output is either
+        // (a) a short vowel that might still be doubled, or (b) the doubled result
+        // itself replacing an already-open composing region.
+        var composable = false
 
         if (!hasPositionChanged()) {
             mLastChar = lastChar
@@ -638,7 +656,12 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
 
         if (mLastChar == null || mLastChar == CHAR.EMPTY) {
             if (input == "z" || input == "Z") tLastChar = CHAR.MARK_SANYAKA
-            else newLetter()
+            else {
+                newLetter()
+                // Fresh word starting with a bare vowel letter (e.g. "e" -> එ) -
+                // keep it open in case the next key doubles it (e.g. "ee" -> ඒ).
+                if (singlishChar.code in doublableVowelCodes) composable = true
+            }
         } else {
             when {
                 input == "z" || input == "Z" -> tLastChar = CHAR.MARK_SANYAKA
@@ -827,6 +850,10 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                                                     output += sign.text
                                                     tLastChar = sign
                                                     erasePreviousChars = 1
+                                                    // Short matra just attached to the consonant
+                                                    // (e.g. ම් -> මො) - keep it open in case the
+                                                    // next key doubles it (e.g. -> මෝ).
+                                                    if (sign.code in doublableVowelCodes) composable = true
                                                 } else output = singlishChar.text
                                             }
                                         }
@@ -842,24 +869,29 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 mLastChar.type == CharType.PILI -> {
                     when {
                         mLastChar.code == CHAR.KETTI_AEDA_PILLA.code && singlishChar.code == CHAR.AYANNA.code -> {
+                            // Composing region already holds the short matra (KETTI_AEDA_PILLA) -
+                            // just swap its content, no erase needed (avoids the double
+                            // reorder/flicker that a separate erase+commit would cause).
                             output = CHAR.DIGA_AEDA_PILLA.text
-                            erasePreviousChars = 1
                             tLastChar = CHAR.DIGA_AEDA_PILLA
+                            composable = true
                         }
 
                         mLastChar.code == CHAR.KETTI_IS_PILLA.code && singlishChar.code == CHAR.IYANNA.code -> {
                             output = CHAR.DIGA_IS_PILLA.text
-                            erasePreviousChars = 1
                             tLastChar = CHAR.DIGA_IS_PILLA
+                            composable = true
                         }
 
                         mLastChar.code == CHAR.KETTI_PAA_PILLA.code && singlishChar.code == CHAR.UYANNA.code -> {
                             output = CHAR.DIGA_PAA_PILLA.text
-                            erasePreviousChars = 1
                             tLastChar = CHAR.DIGA_PAA_PILLA
+                            composable = true
                         }
 
                         mLastChar.code == CHAR.GAETTA_PILLA.code && singlishChar.code == CHAR.IYANNA.code -> {
+                            // Vocalic-r lengthening (කෘ -> කෲ) is out of scope for the
+                            // composing-text fix for now - keeps the original erase+commit path.
                             output = CHAR.DIGA_GAETTA_PILLA.text
                             erasePreviousChars = 1
                             tLastChar = CHAR.DIGA_GAETTA_PILLA
@@ -867,14 +899,14 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
 
                         mLastChar.code == CHAR.KOMBUVA.code && singlishChar.code == CHAR.EYANNA.code -> {
                             output = CHAR.DIGA_KOMBUVA.text
-                            erasePreviousChars = 1
                             tLastChar = CHAR.DIGA_KOMBUVA
+                            composable = true
                         }
 
                         mLastChar.code == CHAR.KOMBUVA_HAA_AELA_PILLA.code && singlishChar.code == CHAR.OYANNA.code -> {
                             output = CHAR.KOMBUVA_HAA_DIGA_AELA_PILLA.text
-                            erasePreviousChars = 1
                             tLastChar = CHAR.KOMBUVA_HAA_DIGA_AELA_PILLA
+                            composable = true
                         }
 
                         mLastChar.code == CHAR.GAETTA_PILLA.code && singlishChar.code == CHAR.UYANNA.code -> {
@@ -908,20 +940,20 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                                 when (singlishChar.code) {
                                     CHAR.AYANNA.code -> {
                                         output = CHAR.AAYANNA.text
-                                        erasePreviousChars = 1
                                         tLastLetter = CHAR.AAYANNA
+                                        composable = true
                                     }
 
                                     CHAR.IYANNA.code -> {
                                         output = CHAR.AIYANNA.text
-                                        erasePreviousChars = 1
                                         tLastLetter = CHAR.AIYANNA
+                                        composable = true
                                     }
 
                                     CHAR.UYANNA.code -> {
                                         output = CHAR.AUYANNA.text
-                                        erasePreviousChars = 1
                                         tLastLetter = CHAR.AUYANNA
+                                        composable = true
                                     }
 
                                     else -> newLetter()
@@ -931,28 +963,30 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                             CHAR.AEYANNA -> {
                                 if (singlishChar.code == CHAR.AYANNA.code) {
                                     output = CHAR.AEEYANNA.text
-                                    erasePreviousChars = 1
                                     tLastLetter = CHAR.AEEYANNA
+                                    composable = true
                                 } else newLetter()
                             }
 
                             CHAR.IYANNA -> {
                                 if (singlishChar.code == CHAR.IYANNA.code) {
                                     output = CHAR.IIYANNA.text
-                                    erasePreviousChars = 1
                                     tLastLetter = CHAR.IIYANNA
+                                    composable = true
                                 } else newLetter()
                             }
 
                             CHAR.UYANNA -> {
                                 if (singlishChar.code == CHAR.UYANNA.code) {
                                     output = CHAR.UUYANNA.text
-                                    erasePreviousChars = 1
                                     tLastLetter = CHAR.UUYANNA
+                                    composable = true
                                 } else newLetter()
                             }
 
                             CHAR.IRUYANNA -> {
+                                // Vocalic-r lengthening is out of scope for the composing-text
+                                // fix for now - keeps the original erase+commit path.
                                 if (singlishChar.code == CHAR.IYANNA.code) {
                                     output = CHAR.IRUUYANNA.text
                                     erasePreviousChars = 1
@@ -963,16 +997,16 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                             CHAR.EYANNA -> {
                                 if (singlishChar.code == CHAR.EYANNA.code) {
                                     output = CHAR.EEYANNA.text
-                                    erasePreviousChars = 1
                                     tLastLetter = CHAR.EEYANNA
+                                    composable = true
                                 } else newLetter()
                             }
 
                             CHAR.OYANNA -> {
                                 if (singlishChar.code == CHAR.OYANNA.code) {
                                     output = CHAR.OOYANNA.text
-                                    erasePreviousChars = 1
                                     tLastLetter = CHAR.OOYANNA
+                                    composable = true
                                 } else newLetter()
                             }
 
@@ -994,7 +1028,18 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             ic.beginBatchEdit()
             try {
                 if (erasePreviousChars > 0) erasePrevious(erasePreviousChars)
-                ic.commitText(output, 1)
+                if (composable) {
+                    // Leave this as an open composing region instead of finalizing it -
+                    // if the next key doubles the vowel, we just swap this region's
+                    // content directly (see the composable branches above) instead of
+                    // erasing and re-committing, which removes the visible flicker.
+                    // Committing anything else afterwards (a different letter, space,
+                    // punctuation, etc.) auto-finishes this region per the
+                    // InputConnection.commitText() contract, so no extra cleanup needed.
+                    ic.setComposingText(output, 1)
+                } else {
+                    ic.commitText(output, 1)
+                }
             } catch (t: Throwable) {
                 Log.e("IME", "singlishInput commit failed", t)
             } finally {
