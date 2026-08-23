@@ -1,11 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Empty circular checkbox outline, shown on every clip while multi-select mode
      is active but that clip is NOT yet selected - so it's clear up front which
-     clips are selectable, instead of only showing an indicator after a tap. -->
+     clips are selectable, instead of only showing an indicator after a tap.
+
+     Deliberately does NOT reuse ?attr/border: that attribute is the keyboard's
+     "borderless keys" toggle and is set to fully transparent by every *NoBorder
+     theme variant, which made this checkbox invisible (not just plain) for
+     anyone using that style. A soft neutral fill plus a solid ring, independent
+     of that theme attribute, reads clearly as an empty checkbox in both light
+     and dark themes regardless of the border-key setting. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="oval">
-    <solid android:color="@android:color/transparent" />
+    <solid android:color="#25808080" />
     <stroke
         android:width="1.5dp"
-        android:color="?attr/border" />
+        android:color="#99808080" />
 </shape>

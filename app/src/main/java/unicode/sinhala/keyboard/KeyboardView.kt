@@ -677,12 +677,14 @@ class KeyboardView(
                     binding.btnClipboard.setImageResource(R.drawable.ic_clipboard)
                     binding.btnClipClear.isVisible = false
                     binding.clipboardRowSpacer.isVisible = false
+                    // Leaving the clipboard panel this way (switching straight to
+                    // emoji) bypasses toggleClipboardView(false), so it needs the
+                    // same cleanup - otherwise a clip's pin/share/delete row (or an
+                    // in-progress selection) reappears already expanded next time
+                    // the clipboard panel is opened.
+                    clipboardAdapter.collapse()
+                    clipboardAdapter.exitSelectionMode()
                 }
-                if (isTextSelectPanelOpen) binding.btnTextSelect.isSelected = false
-
-                // Hide the quick "Recent" strip while the full picker (which has its own
-                // Recent tab) is open; restore it per the user's Settings choice on close.
-                isEmojiPanelOpen = visible
                 if (visible) {
                     isClipboardPanelOpen = false
                     isTextSelectPanelOpen = false
@@ -831,6 +833,10 @@ class KeyboardView(
                     binding.btnClipboard.setImageResource(R.drawable.ic_clipboard)
                     binding.btnClipClear.isVisible = false
                     binding.clipboardRowSpacer.isVisible = false
+                    // Same reasoning as toggleEmojiView above - this path bypasses
+                    // toggleClipboardView(false) too.
+                    clipboardAdapter.collapse()
+                    clipboardAdapter.exitSelectionMode()
                 }
                 if (visible && (isEmojiPanelOpen || isClipboardPanelOpen)) setTopBarIconRowExpanded(false)
 

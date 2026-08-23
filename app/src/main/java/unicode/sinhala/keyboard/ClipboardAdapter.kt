@@ -140,7 +140,14 @@ class ClipboardAdapter(
             }
             holder.itemView.setOnLongClickListener { true }
         } else {
-            holder.itemView.setOnClickListener { actions.onClipTap(item) }
+            holder.itemView.setOnClickListener {
+                // A different clip's pin/share/delete row (expanded via long-press)
+                // shouldn't linger once another clip is tapped - previously this
+                // only collapsed when tapping empty list space, so tapping straight
+                // from one clip to another left the first one's icons stuck open.
+                if (expandedId != null && expandedId != item.id) collapse()
+                actions.onClipTap(item)
+            }
             holder.itemView.setOnLongClickListener {
                 val previousExpandedId = expandedId
                 expandedId = if (expandedId == item.id) null else item.id
