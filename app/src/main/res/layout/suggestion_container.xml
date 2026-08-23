@@ -12,7 +12,9 @@
         android:layout_weight="1"
         android:tag="suggest_0"
         android:gravity="center"
-        android:textSize="14sp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textSize="18sp"
         android:visibility="gone" />
 
     <TextView
@@ -22,7 +24,9 @@
         android:layout_weight="1"
         android:tag="suggest_1"
         android:gravity="center"
-        android:textSize="14sp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textSize="18sp"
         android:visibility="gone" />
 
     <TextView
@@ -32,7 +36,33 @@
         android:layout_weight="1"
         android:tag="suggest_2"
         android:gravity="center"
-        android:textSize="14sp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textSize="18sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/suggestion_4"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:tag="suggest_3"
+        android:gravity="center"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textSize="18sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/suggestion_5"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:tag="suggest_4"
+        android:gravity="center"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textSize="18sp"
         android:visibility="gone" />
 
 </LinearLayout>

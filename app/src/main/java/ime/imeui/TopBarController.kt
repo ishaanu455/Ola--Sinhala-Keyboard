@@ -38,7 +38,7 @@ class TopBarController(
         emojiButton?.visibility = View.GONE
         clipboardButton?.visibility = View.GONE
         suggestionContainer?.visibility = View.VISIBLE
-        for (i in 0 until 3) {
+        for (i in suggestionTextViews.indices) {
             val tv = suggestionTextViews.getOrNull(i)
             val text = suggestions.getOrNull(i) ?: ""
             if (tv != null) {
