@@ -1,6 +1,7 @@
 package unicode.sinhala.keyboard
 
 import android.content.Context
+import android.util.Patterns
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -9,8 +10,48 @@ data class ClipItem(
     val id: Long,
     val text: String,
     val timestamp: Long,
-    var pinned: Boolean = false
-)
+    var pinned: Boolean = false,
+    /** Bumped every time this clip is pasted (see [ClipboardData.markUsed]) - backs the
+     *  "Frequently used" filter. Never touched by a plain copy. */
+    val useCount: Int = 0,
+    /** Set to the paste time each time this clip is pasted - backs the "Recently used"
+     *  filter. 0 means it's been copied but never pasted. */
+    val lastUsedTimestamp: Long = 0L
+) {
+    /** True if [text] is (close to) nothing but a phone number - digits/spacing/punctuation
+     *  only, of plausible phone-number length. Deliberately conservative so a sentence that
+     *  merely contains a number doesn't get miscategorised. */
+    val isMobileNumber: Boolean
+        get() {
+            val t = text.trim()
+            if (t.isEmpty()) return false
+            val digitsOnly = t.filter { it.isDigit() }
+            if (digitsOnly.length < 7 || digitsOnly.length > 15) return false
+            return t.all { it.isDigit() || it in "+-() ." }
+        }
+
+    val isEmail: Boolean
+        get() = Patterns.EMAIL_ADDRESS.matcher(text.trim()).matches()
+
+    val isLink: Boolean
+        get() {
+            val t = text.trim()
+            if (t.isEmpty()) return false
+            return Patterns.WEB_URL.matcher(t).matches()
+        }
+}
+
+/** Which subset/order of clip history the clipboard panel is currently showing,
+ *  chosen from the "Filter clips" dropdown (btn_clip_filter). */
+enum class ClipFilter {
+    ALL,
+    RECENT_COPY,
+    RECENT_USED,
+    FREQUENTLY_USED,
+    MOBILE_NUMBERS,
+    EMAILS,
+    LINKS
+}
 
 /**
  * Stores clipboard history in SharedPreferences as a JSON array.
@@ -43,7 +84,9 @@ object ClipboardData {
                         id = o.getLong("id"),
                         text = o.getString("text"),
                         timestamp = o.getLong("timestamp"),
-                        pinned = o.optBoolean("pinned", false)
+                        pinned = o.optBoolean("pinned", false),
+                        useCount = o.optInt("useCount", 0),
+                        lastUsedTimestamp = o.optLong("lastUsedTimestamp", 0L)
                     )
                 )
             }
@@ -56,6 +99,26 @@ object ClipboardData {
     fun all(): List<ClipItem> = clips.sortedWith(
         compareByDescending<ClipItem> { it.pinned }.thenByDescending { it.timestamp }
     )
+
+    /** Applies a [ClipFilter] on top of the usual pinned-first ordering. Pinned/unpinned
+     *  grouping (done by ClipboardAdapter) still applies to whatever this returns - a
+     *  filter narrows/reorders the list, it never bypasses pin status. */
+    fun filtered(filter: ClipFilter): List<ClipItem> {
+        val base = all()
+        return when (filter) {
+            ClipFilter.ALL -> base
+            ClipFilter.RECENT_COPY -> base // `all()` is already newest-copy-first
+            ClipFilter.RECENT_USED -> base
+                .filter { it.lastUsedTimestamp > 0L }
+                .sortedWith(compareByDescending<ClipItem> { it.pinned }.thenByDescending { it.lastUsedTimestamp })
+            ClipFilter.FREQUENTLY_USED -> base
+                .filter { it.useCount > 0 }
+                .sortedWith(compareByDescending<ClipItem> { it.pinned }.thenByDescending { it.useCount })
+            ClipFilter.MOBILE_NUMBERS -> base.filter { it.isMobileNumber }
+            ClipFilter.EMAILS -> base.filter { it.isEmail }
+            ClipFilter.LINKS -> base.filter { it.isLink }
+        }
+    }
 
     /** Add newly-copied text to the top of history. Ignores blanks and exact duplicates of the latest clip. */
     fun add(context: Context, text: String) {
@@ -89,6 +152,16 @@ object ClipboardData {
         save(context)
     }
 
+    /** Records a paste of this clip - bumps [ClipItem.useCount] and refreshes
+     *  [ClipItem.lastUsedTimestamp]. Backs the "Recently used" / "Frequently used"
+     *  filters; a plain copy never calls this, only an actual paste does. */
+    fun markUsed(context: Context, id: Long) {
+        val item = clips.find { it.id == id } ?: return
+        val idx = clips.indexOf(item)
+        clips[idx] = item.copy(useCount = item.useCount + 1, lastUsedTimestamp = System.currentTimeMillis())
+        save(context)
+    }
+
     fun delete(context: Context, id: Long) {
         clips.removeAll { it.id == id }
         save(context)
@@ -116,6 +189,8 @@ object ClipboardData {
             o.put("text", c.text)
             o.put("timestamp", c.timestamp)
             o.put("pinned", c.pinned)
+            o.put("useCount", c.useCount)
+            o.put("lastUsedTimestamp", c.lastUsedTimestamp)
             arr.put(o)
         }
         context.getSharedPreferences("prefs", Context.MODE_PRIVATE)

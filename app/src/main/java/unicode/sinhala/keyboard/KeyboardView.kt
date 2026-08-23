@@ -15,7 +15,9 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.PopupWindow
 import android.widget.TextView
+import androidx.core.widget.ImageViewCompat
 import androidx.core.view.children
 import androidx.core.view.isVisible
 import androidx.appcompat.content.res.AppCompatResources
@@ -189,6 +191,16 @@ class KeyboardView(
     private lateinit var recentEmojiAdapter: EmojiAdapter
     private lateinit var clipboardAdapter: ClipboardAdapter
 
+    /** Which clip subset btn_clip_filter currently has selected - reset to ALL whenever
+     *  the clipboard panel closes so it always reopens unfiltered. */
+    private var currentClipFilter: ClipFilter = ClipFilter.ALL
+    private var clipFilterPopup: PopupWindow? = null
+    /** Set once in init{} - the themed context (light/dark + border variant) every
+     *  panel is inflated with. Kept around so views built later, like the clip-filter
+     *  dropdown, pick up the same theme attrs (?attr/clipCard etc.) instead of the
+     *  IME service's own untouched context. */
+    private lateinit var themedContext: Context
+
     private var swipeStepStartX: Float = 0F
     private val swipeStepDistance: Float = resources.displayMetrics.widthPixels / 15f
     private var startIgnoreSwipe = false
@@ -301,6 +313,7 @@ class KeyboardView(
         }
 
         val contextThemeWrapper = ContextThemeWrapper(context, style)
+        themedContext = contextThemeWrapper
 
         try {
             binding =
@@ -676,6 +689,7 @@ class KeyboardView(
                 if (isClipboardPanelOpen) {
                     binding.btnClipboard.setImageResource(R.drawable.ic_clipboard)
                     binding.btnClipClear.isVisible = false
+                    binding.btnClipFilter.isVisible = false
                     binding.clipboardRowSpacer.isVisible = false
                     // Leaving the clipboard panel this way (switching straight to
                     // emoji) bypasses toggleClipboardView(false), so it needs the
@@ -684,6 +698,8 @@ class KeyboardView(
                     // the clipboard panel is opened.
                     clipboardAdapter.collapse()
                     clipboardAdapter.exitSelectionMode()
+                    clipFilterPopup?.dismiss()
+                    currentClipFilter = ClipFilter.ALL
                 }
                 if (visible) {
                     isClipboardPanelOpen = false
@@ -724,7 +740,10 @@ class KeyboardView(
             applyPanelHeights()
 
             clipboardAdapter = ClipboardAdapter(object : ClipboardAdapter.Actions {
-                override fun onClipTap(item: ClipItem) = clickListener.clipboardPasteClick(item.text)
+                override fun onClipTap(item: ClipItem) {
+                    ClipboardData.markUsed(context, item.id)
+                    clickListener.clipboardPasteClick(item.text)
+                }
                 override fun onClipPin(item: ClipItem) = clickListener.clipboardPinClick(item)
                 override fun onClipShare(item: ClipItem) = clickListener.clipboardShareClick(item)
                 override fun onClipDelete(item: ClipItem) = clickListener.clipboardDeleteClick(item)
@@ -758,6 +777,14 @@ class KeyboardView(
                 }
             }
 
+            // "Filter clips" dropdown - same purple circular icon as btn_clip_clear,
+            // right next to it. Lets the user narrow the panel down to just recently
+            // copied / recently used / frequently used clips, or clips that look like
+            // a mobile number, email, or link.
+            binding.btnClipFilter.setOnClickListener { anchor ->
+                showClipFilterMenu(anchor)
+            }
+
             fun toggleClipboardView(visible: Boolean) {
                 binding.keyboardRows.visibility = if (visible) View.GONE else View.VISIBLE
                 binding.clipboardView.root.visibility = if (visible) View.VISIBLE else View.GONE
@@ -768,11 +795,12 @@ class KeyboardView(
                 // proper full-arrow "back" icon instead of the plain chevron.
                 binding.btnClipboard.setImageResource(if (visible) R.drawable.ic_arrow_back else R.drawable.ic_clipboard)
                 binding.btnClipClear.isVisible = visible
+                binding.btnClipFilter.isVisible = visible
                 // The spacer between the fixed back arrow (btn_clipboard) and
-                // btn_clip_clear only shows up while the panel is open, and the row
-                // itself switches to width=0dp/weight=1 at the same time so the
-                // spacer can actually expand and push the trash icon to the row's
-                // far end (see setTopBarIconRowExpanded).
+                // btn_clip_clear/btn_clip_filter only shows up while the panel is
+                // open, and the row itself switches to width=0dp/weight=1 at the
+                // same time so the spacer can actually expand and push the trash/
+                // filter icons to the row's far end (see setTopBarIconRowExpanded).
                 binding.clipboardRowSpacer.isVisible = visible
                 setTopBarIconRowExpanded(visible)
                 binding.btnEmoji.visibility = if (visible) View.GONE else View.VISIBLE
@@ -792,10 +820,14 @@ class KeyboardView(
                 if (visible) refreshClipboardList()
                 // Don't let a clip's expanded pin/share/delete row, or an in-progress
                 // selection, survive a close - the next time the panel opens (even for a
-                // different field/session) it should start fresh.
+                // different field/session) it should start fresh. Same idea for the
+                // filter dropdown: any open menu is dismissed and the filter itself
+                // resets to "All" so the panel always reopens unfiltered.
                 if (!visible) {
                     clipboardAdapter.collapse()
                     clipboardAdapter.exitSelectionMode()
+                    clipFilterPopup?.dismiss()
+                    currentClipFilter = ClipFilter.ALL
                 }
             }
 
@@ -832,11 +864,14 @@ class KeyboardView(
                 if (isClipboardPanelOpen) {
                     binding.btnClipboard.setImageResource(R.drawable.ic_clipboard)
                     binding.btnClipClear.isVisible = false
+                    binding.btnClipFilter.isVisible = false
                     binding.clipboardRowSpacer.isVisible = false
                     // Same reasoning as toggleEmojiView above - this path bypasses
                     // toggleClipboardView(false) too.
                     clipboardAdapter.collapse()
                     clipboardAdapter.exitSelectionMode()
+                    clipFilterPopup?.dismiss()
+                    currentClipFilter = ClipFilter.ALL
                 }
                 if (visible && (isEmojiPanelOpen || isClipboardPanelOpen)) setTopBarIconRowExpanded(false)
 
@@ -1107,10 +1142,88 @@ class KeyboardView(
     /** Re-reads clip history from [ClipboardData] and refreshes the open panel's list/empty state. */
     fun refreshClipboardList() {
         if (!::clipboardAdapter.isInitialized) return
-        val items = ClipboardData.all()
+        val items = ClipboardData.filtered(currentClipFilter)
         clipboardAdapter.submit(items)
         binding.clipboardView.clipboardEmpty.isVisible = items.isEmpty()
         binding.clipboardView.clipboardList.isVisible = items.isNotEmpty()
+        // "No clips yet" only makes sense with zero history overall - once a filter
+        // is narrowing things down, an empty result means "nothing matched", not
+        // "nothing's been copied".
+        if (items.isEmpty()) {
+            binding.clipboardView.clipboardEmpty.setText(
+                if (currentClipFilter == ClipFilter.ALL) R.string.clipboard_empty
+                else R.string.clipboard_empty_filtered
+            )
+        }
+        // Small purple dot badge on top of btn_clip_filter's icon, shown only while a
+        // non-default filter is active, so the user can tell at a glance the list is
+        // narrowed even after the dropdown itself has closed.
+        binding.btnClipFilter.background = AppCompatResources.getDrawable(
+            context,
+            if (currentClipFilter != ClipFilter.ALL) R.drawable.bg_clip_purple_circle_active
+            else R.drawable.bg_clip_purple_circle
+        )
+    }
+
+    /** Builds and shows the "Filter clips" dropdown anchored under [anchor] (btn_clip_filter). */
+    private fun showClipFilterMenu(anchor: View) {
+        clipFilterPopup?.dismiss()
+
+        val popupContent = LayoutInflater.from(themedContext)
+            .inflate(R.layout.popup_clip_filter, null)
+        val optionsContainer = popupContent.findViewById<LinearLayout>(R.id.clip_filter_options)
+
+        val options = listOf(
+            ClipFilter.ALL to R.string.clip_filter_all,
+            ClipFilter.RECENT_COPY to R.string.clip_filter_recent_copy,
+            ClipFilter.RECENT_USED to R.string.clip_filter_recent_used,
+            ClipFilter.FREQUENTLY_USED to R.string.clip_filter_frequent,
+            ClipFilter.MOBILE_NUMBERS to R.string.clip_filter_mobile,
+            ClipFilter.EMAILS to R.string.clip_filter_email,
+            ClipFilter.LINKS to R.string.clip_filter_link
+        )
+
+        val popup = PopupWindow(
+            popupContent,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            true
+        )
+        popup.isOutsideTouchable = true
+        popup.elevation = 8f
+
+        options.forEach { (filter, labelRes) ->
+            val row = LayoutInflater.from(themedContext)
+                .inflate(R.layout.item_clip_filter_option, optionsContainer, false)
+            val label = row.findViewById<TextView>(R.id.clip_filter_option_label)
+            val check = row.findViewById<ImageView>(R.id.clip_filter_option_check)
+
+            label.setText(labelRes)
+            val isActive = filter == currentClipFilter
+            check.visibility = if (isActive) View.VISIBLE else View.INVISIBLE
+            ImageViewCompat.setImageTintList(
+                check,
+                android.content.res.ColorStateList.valueOf(
+                    androidx.core.content.ContextCompat.getColor(context, R.color.clip_purple)
+                )
+            )
+            if (isActive) label.setTextColor(
+                androidx.core.content.ContextCompat.getColor(context, R.color.clip_purple)
+            )
+
+            row.setOnClickListener {
+                currentClipFilter = filter
+                refreshClipboardList()
+                popup.dismiss()
+            }
+            optionsContainer.addView(row)
+        }
+
+        clipFilterPopup = popup
+
+        // Anchor it hanging below-right of the filter icon, matching where a
+        // dropdown from a top-bar icon is expected to appear.
+        popup.showAsDropDown(anchor, 0, 4, Gravity.END)
     }
 
     /** Closes the clipboard panel (e.g. right after a paste, or when the input field changes). */

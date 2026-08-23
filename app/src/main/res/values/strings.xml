@@ -14,6 +14,15 @@
     <string name="clip_share">Share</string>
     <string name="clip_delete">Delete</string>
     <string name="clip_selected">Selected</string>
+    <string name="clip_filter_title">Filter clips</string>
+    <string name="clip_filter_all">All</string>
+    <string name="clip_filter_recent_copy">Recently copied</string>
+    <string name="clip_filter_recent_used">Recently used</string>
+    <string name="clip_filter_frequent">Frequently used</string>
+    <string name="clip_filter_mobile">Mobile numbers</string>
+    <string name="clip_filter_email">Emails</string>
+    <string name="clip_filter_link">Links</string>
+    <string name="clipboard_empty_filtered">No clips match this filter.</string>
     <string name="settings_clipboard_title">Clipboard manager</string>
     <string name="settings_clipboard_summary">Show a clipboard icon on the keyboard and keep a history of copied text</string>
     <string name="app_name1">Sinhala Keyboard</string>
