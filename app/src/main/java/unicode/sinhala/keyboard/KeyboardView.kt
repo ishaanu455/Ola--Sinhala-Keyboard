@@ -705,6 +705,15 @@ class KeyboardView(
                     isClipboardPanelOpen = false
                     isTextSelectPanelOpen = false
                 }
+                // This was the missing piece causing two bugs at once: the emoji
+                // panel's own back arrow (btn_emoji) reads isEmojiPanelOpen to decide
+                // whether to open or close, and updateRecentEmojiRowVisibility() reads
+                // it to hide the recent-emoji strip while a panel is open. Without this
+                // line isEmojiPanelOpen stayed false forever, so the back arrow always
+                // reopened the panel instead of closing it, and the recent-emoji strip
+                // never hid itself and sat floating above whichever category grid was
+                // showing.
+                isEmojiPanelOpen = visible
                 updateRecentEmojiRowVisibility()
 
                 // If showing emoji view, refresh Recent category as it might have changed
