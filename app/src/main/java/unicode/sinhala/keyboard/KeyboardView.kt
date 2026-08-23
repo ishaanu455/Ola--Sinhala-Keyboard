@@ -1192,11 +1192,18 @@ class KeyboardView(
             ClipFilter.LINKS to R.string.clip_filter_link
         )
 
+        // NOT focusable: a focusable popup opens as its own focused window, and inside
+        // an IME that makes Android think the keyboard's own window just lost focus -
+        // which fires onFinishInputView() and resets the whole keyboard straight back
+        // to the plain letters view the instant this button is tapped. Non-focusable
+        // still gets taps fine (isTouchable defaults to true) and still dismisses on
+        // an outside tap via isOutsideTouchable below - it just doesn't steal window
+        // focus from the keyboard.
         val popup = PopupWindow(
             popupContent,
             ViewGroup.LayoutParams.WRAP_CONTENT,
             ViewGroup.LayoutParams.WRAP_CONTENT,
-            true
+            false
         )
         popup.isOutsideTouchable = true
         popup.elevation = 8f
