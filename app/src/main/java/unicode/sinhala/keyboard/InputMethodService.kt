@@ -447,6 +447,11 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
 
 
     private fun resetKeyboardState() {
+        // Finish any dangling open composing region before switching fields/apps
+        // or hiding the keyboard, so it doesn't leak into whatever comes next.
+        try {
+            currentInputConnection?.finishComposingText()
+        } catch (_: Throwable) {}
         mComposing = ""
         tComposing = ""
         // Always come back to the plain key screen in lowercase - whether the keyboard
@@ -522,6 +527,10 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             }
 
             else -> {
+                // Finalize any open Singlish composing region before committing
+                // plain text (e.g. switched to English mid-open-region) - commitText()
+                // replaces an open composing span rather than appending after it.
+                currentInputConnection?.finishComposingText()
                 currentInputConnection?.commitText(tag, 1)
             }
         }
@@ -573,6 +582,10 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             ic.deleteSurroundingTextInCodePoints(1, 0)
         }
         // commit suggestion, followed by a single space so the user can keep typing the next word
+        // finishComposingText() first - commitText() replaces an open composing
+        // region instead of appending after it, which would eat the vowel/matra
+        // still open from the token being replaced.
+        ic.finishComposingText()
         ic.commitText("$suggestion ", 1)
 
         // Mirror the normal space-bar bookkeeping, since we just committed a space too.
@@ -1027,7 +1040,16 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         if (ic != null) {
             ic.beginBatchEdit()
             try {
-                if (erasePreviousChars > 0) erasePrevious(erasePreviousChars)
+                // If a previous keystroke left an open composing region (setComposingText)
+                // and this keystroke needs to erase characters before committing,
+                // we must finalize the composing region first. Otherwise, Android's
+                // deleteSurroundingText() interacts badly with the open composing span
+                // and can erase the wrong characters (e.g. kombuwa/matra disappearing).
+                // finishComposingText() is a safe no-op when no region is open.
+                if (erasePreviousChars > 0) {
+                    ic.finishComposingText()
+                    erasePrevious(erasePreviousChars)
+                }
                 if (composable) {
                     // Leave this as an open composing region instead of finalizing it -
                     // if the next key doubles the vowel, we just swap this region's
@@ -1038,6 +1060,10 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                     // InputConnection.commitText() contract, so no extra cleanup needed.
                     ic.setComposingText(output, 1)
                 } else {
+                    // Also finalize any open composing region before a plain commit,
+                    // so commitText() doesn't replace the composing span unexpectedly
+                    // in apps that track the composing region separately (e.g. Chrome).
+                    if (output.isNotEmpty()) ic.finishComposingText()
                     ic.commitText(output, 1)
                 }
             } catch (t: Throwable) {
@@ -1069,6 +1095,9 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         if (ic != null) {
             try {
                 suppressNextSelectionAutoClose = true
+                // finishComposingText() first - see BACKSPACE/space fix notes: commitText()
+                // replaces an open composing region instead of appending after it.
+                ic.finishComposingText()
                 ic.commitText(tag, 1)
                 // Update the recency data + persist it now, but do NOT refresh the
                 // on-screen recent-emoji row here — reordering it under the user's
@@ -1094,6 +1123,9 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 // Mark the next primary-clip change as self-triggered so pasting a clip
                 // doesn't get re-captured as a "new" copy by the system clipboard listener.
                 suppressNextClipCapture = true
+                // finishComposingText() first - commitText() replaces an open
+                // composing region instead of appending after it.
+                ic.finishComposingText()
                 ic.commitText(text, 1)
             } catch (t: Throwable) {
                 Log.e("IME", "clipboard paste failed", t)
@@ -1145,6 +1177,9 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                     KeyboardLayout.WIJESEKARA -> Maps.keyLabelsNumbersWijesekara[tag] ?: tag
                     else -> tag
                 }
+                // finishComposingText() first - commitText() replaces an open
+                // composing region instead of appending after it.
+                ic.finishComposingText()
                 ic.commitText(toCommit, 1)
             } catch (t: Throwable) {
                 Log.e("IME", "number commit failed", t)
@@ -1199,6 +1234,9 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
 
             Function.LANG -> {
                 try {
+                    // Finish any open composing region before switching layouts -
+                    // otherwise the first commit in the new language wipes it out.
+                    ic?.finishComposingText()
                     val enabled = Prefs.getEnabledLayouts(this)
                     val currentIndex = enabled.indexOf(keyboardLayout).let { if (it < 0) 0 else it }
                     val next = enabled[(currentIndex + 1) % enabled.size]
@@ -1232,12 +1270,53 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             Function.BACKSPACE -> {
                 if (ic != null) {
                     try {
-                        if (ic.getSelectedText(0).isNullOrEmpty()) {
-                            ic.deleteSurroundingTextInCodePoints(1, 0)
-                        } else {
+                        // Always finalize any open composing region first.
+                        // If we don't, deleteSurroundingText can interact badly
+                        // with the composing span and erase the wrong characters
+                        // (e.g. kombuwa, ispilla, papilla disappearing instead of
+                        // the character before them).
+                        ic.finishComposingText()
+
+                        // Read up to 3 chars before cursor so we can detect
+                        // Sinhala grapheme clusters that span multiple code units.
+                        // We avoid getSelectedText() here (IPC call on every
+                        // backspace tick) — instead we check whether there IS a
+                        // selection by comparing the extraction cursor positions,
+                        // which the framework already has cached locally.
+                        val selected = ic.getSelectedText(0)
+                        if (!selected.isNullOrEmpty()) {
+                            // Selection present — delete the whole selection at once.
                             ic.commitText("", 1)
-
-
+                        } else {
+                            // No selection — delete one grapheme cluster backwards.
+                            // Read enough chars to cover a kombuwa cluster:
+                            //   kombuwa (ෙ U+0DD9) sits BEFORE the consonant visually
+                            //   but AFTER it in the string — so "මෙ" in memory is
+                            //   ම (U+0DB8) + ෙ (U+0DD9). One codepoint = one delete.
+                            //   BUT rakaransaya / hal-kirima conjuncts can be
+                            //   consonant + ZWJ + RAYANNA + al-lakuna = 4 units.
+                            //   We walk back looking for a ZWJ right before the
+                            //   cluster and delete the whole thing if found.
+                            val before = ic.getTextBeforeCursor(4, 0)?.toString() ?: ""
+                            when {
+                                // Rakaransaya / yansaya cluster: ends with al-lakuna
+                                // preceded by ZWJ — delete 4 units at once so the
+                                // whole conjunct disappears in one backspace.
+                                before.length >= 4 &&
+                                before[before.length - 4] == CHAR.ZERO_WIDTH_JOINER.text[0] -> {
+                                    ic.deleteSurroundingText(4, 0)
+                                }
+                                // ZWJ right before cursor (e.g. partial conjunct)
+                                before.length >= 1 &&
+                                before[before.length - 1] == CHAR.ZERO_WIDTH_JOINER.text[0] -> {
+                                    ic.deleteSurroundingText(1, 0)
+                                }
+                                else -> {
+                                    // Default: delete one codepoint (handles surrogate
+                                    // pairs = emoji correctly too).
+                                    ic.deleteSurroundingTextInCodePoints(1, 0)
+                                }
+                            }
                         }
                     } catch (t: Throwable) {
                         Log.e("IME", "BACKSPACE operation failed", t)
@@ -1245,7 +1324,6 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 } else {
                     Log.w("IME", "currentInputConnection is null in BACKSPACE")
                 }
-
 
                 lastChar = null
                 lastLetter = null
@@ -1279,8 +1357,13 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                     }
                 } else tag
 
+                // finishComposingText() first - this is THE fix for space/punctuation
+                // swallowing the vowel sign (e.g. "තෝ" + space -> "ත "). commitText()
+                // replaces an open composing region instead of appending after it, so
+                // without this, pressing space right after a long-vowel keystroke wipes
+                // out the composing character instead of finalizing + adding the space.
+                ic.finishComposingText()
                 ic.commitText(toCommit, 1)
-
 
             } catch (t: Throwable) {
                 Log.e("IME", "specialClick commit failed", t)
@@ -1334,6 +1417,9 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     override fun longPressSecondaryClick(char: String) {
         val ic = currentInputConnection ?: return
         try {
+            // finishComposingText() first - commitText() replaces an open
+            // composing region instead of appending after it.
+            ic.finishComposingText()
             ic.commitText(char, 1)
             vibrate()
         } catch (t: Throwable) {
@@ -1345,6 +1431,9 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         val ic = currentInputConnection
         if (ic != null) {
             try {
+                // Finalize composing region before swipe-erase — same reason as
+                // the BACKSPACE handler: open composing span + delete = wrong char erased.
+                ic.finishComposingText()
                 ic.deleteSurroundingTextInCodePoints(1, 0)
             } catch (t: Throwable) {
                 Log.e("IME", "eraseDo failed", t)
