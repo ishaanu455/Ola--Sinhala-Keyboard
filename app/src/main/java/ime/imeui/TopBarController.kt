@@ -12,7 +12,11 @@ class TopBarController(
     // Whether the clipboard icon should be shown at all when suggestions AREN'T
     // active - i.e. the user's Settings > clipboard toggle. Read lazily (not once at
     // construction time) since the pref can change while the keyboard stays open.
-    private val isClipboardEnabled: () -> Boolean = { true }
+    private val isClipboardEnabled: () -> Boolean = { true },
+    // The text-select ("cursor mode") icon at the far end of the top bar. Like
+    // emojiButton, it has to make room for the suggestion chips while they're
+    // showing, and come back once they're gone.
+    private val textSelectButton: View? = null
 ) {
 
     private fun applyColors(tv: TextView?) {
@@ -27,6 +31,7 @@ class TopBarController(
     fun showNormal() {
         suggestionContainer?.visibility = View.GONE
         emojiButton?.visibility = View.VISIBLE
+        textSelectButton?.visibility = View.VISIBLE
         // Restore the clipboard icon only if the feature is actually enabled in
         // Settings - showSuggestions() hides it unconditionally while a suggestion
         // chip is up, so coming back to "normal" must respect the user's toggle
@@ -37,6 +42,7 @@ class TopBarController(
     fun showSuggestions(suggestions: List<String>, suggestionTextViews: List<TextView>, onClick: (String) -> Unit) {
         emojiButton?.visibility = View.GONE
         clipboardButton?.visibility = View.GONE
+        textSelectButton?.visibility = View.GONE
         suggestionContainer?.visibility = View.VISIBLE
         for (i in suggestionTextViews.indices) {
             val tv = suggestionTextViews.getOrNull(i)

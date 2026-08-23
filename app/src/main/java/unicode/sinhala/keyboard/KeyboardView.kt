@@ -944,6 +944,7 @@ class KeyboardView(
     val topBarView: LinearLayout get() = binding.topBar
     val emojiButtonView: ImageView get() = binding.btnEmoji
     val clipboardButtonView: ImageView get() = binding.btnClipboard
+    val textSelectButtonView: ImageView get() = binding.btnTextSelect
 
     /** True while any of the emoji/clipboard/text-select panels is open. The IME uses
      *  this to skip its own suggestion-bar refresh (which otherwise fights with the

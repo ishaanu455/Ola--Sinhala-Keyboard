@@ -345,8 +345,10 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 keyboardView.suggestionContainerView,
                 keyboardView.emojiButtonView,
                 Prefs.getDarkTheme(this),
-                keyboardView.clipboardButtonView
-            ) { Prefs.getClipboardEnabled(this) }
+                keyboardView.clipboardButtonView,
+                { Prefs.getClipboardEnabled(this) },
+                keyboardView.textSelectButtonView
+            )
             suggestionTextViews = keyboardView.getSuggestionTextViews()
 
             return keyboardView
@@ -417,8 +419,10 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                      keyboardView.suggestionContainerView,
                      keyboardView.emojiButtonView,
                      Prefs.getDarkTheme(this),
-                     keyboardView.clipboardButtonView
-                 ) { Prefs.getClipboardEnabled(this) }
+                     keyboardView.clipboardButtonView,
+                     { Prefs.getClipboardEnabled(this) },
+                     keyboardView.textSelectButtonView
+                 )
                  suggestionTextViews = keyboardView.getSuggestionTextViews()
              } catch (t: Throwable) {
                  Log.e("IME", "Failed to rebuild keyboard view for changed appearance settings", t)
@@ -654,6 +658,18 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
 
     private fun onSuggestionClicked(suggestion: String) {
         val ic = currentInputConnection ?: return
+
+        // finishComposingText() FIRST, before we read the surrounding text or try
+        // to delete anything. The current token is very often still an open
+        // composing region (e.g. mid-way through the Singlish transliteration for
+        // a matra like ඇ) - deleteSurroundingTextInCodePoints() on some apps'
+        // input connections (e.g. Telegram) does not reliably remove text that's
+        // still part of an open composing span, since the composing span is
+        // handled as a special, not-yet-final edit. Committing it first turns it
+        // into plain text, so the delete below actually removes it instead of
+        // leaving it in place and appending the suggestion right after it.
+        ic.finishComposingText()
+
         // Replace current token with suggestion
         val before = ic.getTextBeforeCursor(100, 0)?.toString() ?: ""
         val after = ic.getTextAfterCursor(100, 0)?.toString() ?: ""
@@ -666,10 +682,6 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             ic.deleteSurroundingTextInCodePoints(1, 0)
         }
         // commit suggestion, followed by a single space so the user can keep typing the next word
-        // finishComposingText() first - commitText() replaces an open composing
-        // region instead of appending after it, which would eat the vowel/matra
-        // still open from the token being replaced.
-        ic.finishComposingText()
         ic.commitText("$suggestion ", 1)
 
         // Mirror the normal space-bar bookkeeping, since we just committed a space too.
