@@ -368,7 +368,8 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 Prefs.getDarkTheme(this),
                 keyboardView.clipboardButtonView,
                 { Prefs.getClipboardEnabled(this) },
-                keyboardView.textSelectButtonView
+                keyboardView.textSelectButtonView,
+                keyboardView.fontsButtonView
             )
             suggestionTextViews = keyboardView.getSuggestionTextViews()
 
@@ -442,7 +443,8 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                      Prefs.getDarkTheme(this),
                      keyboardView.clipboardButtonView,
                      { Prefs.getClipboardEnabled(this) },
-                     keyboardView.textSelectButtonView
+                     keyboardView.textSelectButtonView,
+                     keyboardView.fontsButtonView
                  )
                  suggestionTextViews = keyboardView.getSuggestionTextViews()
              } catch (t: Throwable) {

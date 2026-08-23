@@ -16,7 +16,11 @@ class TopBarController(
     // The text-select ("cursor mode") icon at the far end of the top bar. Like
     // emojiButton, it has to make room for the suggestion chips while they're
     // showing, and come back once they're gone.
-    private val textSelectButton: View? = null
+    private val textSelectButton: View? = null,
+    // The Fonts ("Aa") icon - same deal as emojiButton/textSelectButton: it has to
+    // get out of the way while suggestion chips are showing (they used to overlap it),
+    // and come back once the chips are gone.
+    private val fontsButton: View? = null
 ) {
 
     private fun applyColors(tv: TextView?) {
@@ -32,6 +36,7 @@ class TopBarController(
         suggestionContainer?.visibility = View.GONE
         emojiButton?.visibility = View.VISIBLE
         textSelectButton?.visibility = View.VISIBLE
+        fontsButton?.visibility = View.VISIBLE
         // Restore the clipboard icon only if the feature is actually enabled in
         // Settings - showSuggestions() hides it unconditionally while a suggestion
         // chip is up, so coming back to "normal" must respect the user's toggle
@@ -43,6 +48,7 @@ class TopBarController(
         emojiButton?.visibility = View.GONE
         clipboardButton?.visibility = View.GONE
         textSelectButton?.visibility = View.GONE
+        fontsButton?.visibility = View.GONE
         suggestionContainer?.visibility = View.VISIBLE
         for (i in suggestionTextViews.indices) {
             val tv = suggestionTextViews.getOrNull(i)
