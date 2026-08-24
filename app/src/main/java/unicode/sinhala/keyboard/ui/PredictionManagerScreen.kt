@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ime.suggest.SinhalaCollation
 import ime.suggest.UserDictionary
 import ime.suggest.UserWordFrequency
 
@@ -60,8 +61,13 @@ fun PredictionManagerScreen(
     // Bumped after every add/delete so the lists below re-read from storage.
     var refreshToken by remember { mutableIntStateOf(0) }
 
-    val myPredictionWords = remember(refreshToken) { UserDictionary.getAll(context) }
-    val allUsageWords = remember(refreshToken) { UserWordFrequency.getAllWithCount(context) }
+    val myPredictionWords = remember(refreshToken) {
+        UserDictionary.getAll(context).sortedWith(SinhalaCollation.comparator)
+    }
+    val allUsageWords = remember(refreshToken) {
+        UserWordFrequency.getAllWithCount(context)
+            .sortedWith(Comparator { p1, p2 -> SinhalaCollation.compare(p1.first, p2.first) })
+    }
 
     var showAddDialog by remember { mutableStateOf(false) }
 
