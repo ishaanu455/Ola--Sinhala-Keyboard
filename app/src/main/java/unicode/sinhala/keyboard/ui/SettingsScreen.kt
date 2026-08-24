@@ -5,6 +5,10 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,6 +17,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Backspace
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Dialpad
+import androidx.compose.material.icons.filled.EmojiEmotions
+import androidx.compose.material.icons.filled.FormatSize
+import androidx.compose.material.icons.filled.Height
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.SwipeLeft
+import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -22,15 +41,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ime.suggest.UserDataBackup
 import kotlinx.coroutines.launch
 import unicode.sinhala.com.BuildConfig
-import unicode.sinhala.com.R
 import unicode.sinhala.keyboard.CustomFontManager
-import unicode.sinhala.keyboard.DonateActivity
 import unicode.sinhala.keyboard.EmojiDownloader
 import unicode.sinhala.keyboard.EmojiStyle
 import unicode.sinhala.keyboard.Prefs
@@ -38,148 +54,308 @@ import unicode.sinhala.keyboard.PredictionManagerActivity
 import unicode.sinhala.keyboard.ui.components.PreferenceItem
 import unicode.sinhala.keyboard.ui.components.RadioOptionPreference
 import unicode.sinhala.keyboard.ui.components.SettingsCategory
+import unicode.sinhala.keyboard.ui.components.SettingsMenuCard
+import unicode.sinhala.keyboard.ui.components.SettingsSubScreenHeader
 import unicode.sinhala.keyboard.ui.components.SliderPreference
 import unicode.sinhala.keyboard.ui.components.SwitchPreference
 
+/** One entry in the Settings home menu. Each maps to its own sub-screen below. */
+private enum class SettingsSection(val title: String, val summary: String) {
+    LANGUAGES("Languages", "Choose which keyboard layouts are available"),
+    APPEARANCE("Appearance", "Theme, dark mode, key borders"),
+    TYPING("Typing & Layout", "Size, height, vibration, swipe gestures"),
+    EMOJI("Emoji", "Emoji row and emoji style"),
+    CLIPBOARD("Clipboard", "Clipboard manager and history"),
+    DICTIONARY("Dictionary & Backup", "Learned words and backups"),
+    ABOUT("About", "Source code and version")
+}
+
+/**
+ * Settings home screen. Shows a modern, icon-led menu of sections instead of one
+ * long flat list - tapping a section opens its own sub-screen with a back arrow
+ * to return here. All labels are in English throughout, regardless of the
+ * device's Sinhala font settings, so the settings UI reads consistently.
+ */
 @Composable
 fun SettingsScreen() {
-    val context = LocalContext.current
-    val scrollState = rememberScrollState()
+    var currentSection by remember { mutableStateOf<SettingsSection?>(null) }
 
+    AnimatedContent(
+        targetState = currentSection,
+        transitionSpec = {
+            if (targetState != null) {
+                (slideInHorizontally { it } togetherWith slideOutHorizontally { -it })
+            } else {
+                (slideInHorizontally { -it } togetherWith slideOutHorizontally { it })
+            }
+        },
+        label = "settings_navigation"
+    ) { section ->
+        if (section == null) {
+            SettingsHome(onSectionSelected = { currentSection = it })
+        } else {
+            Column(modifier = Modifier.fillMaxSize()) {
+                SettingsSubScreenHeader(title = section.title, onBack = { currentSection = null })
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    when (section) {
+                        SettingsSection.LANGUAGES -> LanguagesSection()
+                        SettingsSection.APPEARANCE -> AppearanceSection()
+                        SettingsSection.TYPING -> TypingSection()
+                        SettingsSection.EMOJI -> EmojiSection()
+                        SettingsSection.CLIPBOARD -> ClipboardSection()
+                        SettingsSection.DICTIONARY -> DictionarySection()
+                        SettingsSection.ABOUT -> AboutSection()
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsHome(onSectionSelected: (SettingsSection) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(scrollState)
+            .verticalScroll(rememberScrollState())
+            .padding(vertical = 8.dp)
     ) {
-        SettingsCategory(title = "Languages")
-
-        val layoutEnglish = rememberBooleanPreference(context, "layout_english", true)
-        SwitchPreference(
-            title = "English",
-            checked = layoutEnglish.value,
-            onCheckedChange = { layoutEnglish.value = it }
+        SettingsMenuCard(
+            icon = Icons.Filled.Translate,
+            title = SettingsSection.LANGUAGES.title,
+            summary = SettingsSection.LANGUAGES.summary,
+            onClick = { onSectionSelected(SettingsSection.LANGUAGES) }
         )
-
-        val layoutWijesekara = rememberBooleanPreference(context, "layout_wijesekara", true)
-        SwitchPreference(
-            title = stringResource(R.string.wijesekara),
-            checked = layoutWijesekara.value,
-            onCheckedChange = { layoutWijesekara.value = it }
+        SettingsMenuCard(
+            icon = Icons.Filled.Palette,
+            title = SettingsSection.APPEARANCE.title,
+            summary = SettingsSection.APPEARANCE.summary,
+            onClick = { onSectionSelected(SettingsSection.APPEARANCE) }
         )
-
-        val layoutSinglish = rememberBooleanPreference(context, "layout_singlish", true)
-        SwitchPreference(
-            title = stringResource(R.string.singlish),
-            checked = layoutSinglish.value,
-            onCheckedChange = { layoutSinglish.value = it }
+        SettingsMenuCard(
+            icon = Icons.Filled.FormatSize,
+            title = SettingsSection.TYPING.title,
+            summary = SettingsSection.TYPING.summary,
+            onClick = { onSectionSelected(SettingsSection.TYPING) }
         )
-
-        SettingsCategory(title = "Appearance")
-
-        val automaticTheme = rememberBooleanPreference(context, "automatic_theme", true)
-        SwitchPreference(
-            title = "ස්වයංක්‍රීය තේමාව",
-            checked = automaticTheme.value,
-            onCheckedChange = { automaticTheme.value = it }
+        SettingsMenuCard(
+            icon = Icons.Filled.EmojiEmotions,
+            title = SettingsSection.EMOJI.title,
+            summary = SettingsSection.EMOJI.summary,
+            onClick = { onSectionSelected(SettingsSection.EMOJI) }
         )
-
-        val darkTheme = rememberBooleanPreference(context, "dark_theme", false)
-        if (!automaticTheme.value) {
-            SwitchPreference(
-                title = "අඳුරු වර්ණ",
-                checked = darkTheme.value,
-                onCheckedChange = { darkTheme.value = it }
-            )
-        }
-
-        val keyBorders = rememberBooleanPreference(context, "key_borders", true)
-        SwitchPreference(
-            title = "යතුරු මායිම්",
-            checked = keyBorders.value,
-            onCheckedChange = { keyBorders.value = it }
+        SettingsMenuCard(
+            icon = Icons.Filled.ContentPaste,
+            title = SettingsSection.CLIPBOARD.title,
+            summary = SettingsSection.CLIPBOARD.summary,
+            onClick = { onSectionSelected(SettingsSection.CLIPBOARD) }
         )
-
-        SettingsCategory(title = "Layout")
-
-        val showNumberRow = rememberBooleanPreference(context, "show_number_row", true)
-        SwitchPreference(
-            title = "අංක පේළිය පෙන්වන්න",
-            checked = showNumberRow.value,
-            onCheckedChange = { showNumberRow.value = it }
+        SettingsMenuCard(
+            icon = Icons.Filled.MenuBook,
+            title = SettingsSection.DICTIONARY.title,
+            summary = SettingsSection.DICTIONARY.summary,
+            onClick = { onSectionSelected(SettingsSection.DICTIONARY) }
         )
-
-        val heightPercentage = rememberIntPreference(context, "height_percentage", 100)
-        SliderPreference(
-            title = "උස",
-            value = heightPercentage.value,
-            range = 70f..190f,
-            onValueChange = { heightPercentage.value = it }
-        )
-
-        val textSize = rememberIntPreference(context, "text_size", 28)
-        SliderPreference(
-            title = "අකුරුවල ප්‍රමාණය",
-            value = textSize.value,
-            range = 20f..40f,
-            onValueChange = { textSize.value = it }
-        )
-
-        SettingsCategory(title = "Emoji")
-
-        val showRecentEmojiRow = rememberBooleanPreference(context, "show_recent_emoji_row", false)
-        SwitchPreference(
-            title = "පසුගිය ඉමෝජි පේළිය පෙන්වන්න",
-            checked = showRecentEmojiRow.value,
-            onCheckedChange = { showRecentEmojiRow.value = it }
-        )
-
-        EmojiStyleSection()
-
-        SettingsCategory(title = "Clipboard")
-
-        val clipboardEnabled = rememberBooleanPreference(context, "clipboard_enabled", true)
-        SwitchPreference(
-            title = "ක්ලිප්බෝඩ් කළමනාකරු",
-            checked = clipboardEnabled.value,
-            onCheckedChange = { clipboardEnabled.value = it }
-        )
-
-        SettingsCategory(title = "පුද්ගලික ශබ්දකෝෂය")
-
-        PreferenceItem(
-            title = "Prediction Manager",
-            summary = "ඔබ එකතු කළ සහ ටයිප් කළ වචන කළමනාකරණය කරන්න",
-            onClick = {
-                context.startActivity(Intent(context, PredictionManagerActivity::class.java))
-            }
-        )
-
-        DictionaryBackupSection()
-
-        SettingsCategory(title = "Support")
-
-        PreferenceItem(
-            title = "Buy Me a Coffee",
-            summary = "Support development",
-            onClick = {
-                context.startActivity(Intent(context, DonateActivity::class.java))
-            }
-        )
-
-        PreferenceItem(
-            title = "Source Code",
-            summary = "View on GitHub",
-            onClick = {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/xzunk/Foxkeyboard"))
-                context.startActivity(intent)
-            }
-        )
-
-        PreferenceItem(
-            title = "Version",
-            summary = BuildConfig.VERSION_NAME
+        SettingsMenuCard(
+            icon = Icons.Filled.Info,
+            title = SettingsSection.ABOUT.title,
+            summary = SettingsSection.ABOUT.summary,
+            onClick = { onSectionSelected(SettingsSection.ABOUT) }
         )
     }
+}
+
+@Composable
+private fun LanguagesSection() {
+    val context = LocalContext.current
+
+    val layoutEnglish = rememberBooleanPreference(context, "layout_english", true)
+    SwitchPreference(
+        title = "English",
+        checked = layoutEnglish.value,
+        onCheckedChange = { layoutEnglish.value = it }
+    )
+
+    val layoutWijesekara = rememberBooleanPreference(context, "layout_wijesekara", true)
+    SwitchPreference(
+        title = "Wijesekara",
+        summary = "Native Sinhala key layout",
+        checked = layoutWijesekara.value,
+        onCheckedChange = { layoutWijesekara.value = it }
+    )
+
+    val layoutSinglish = rememberBooleanPreference(context, "layout_singlish", true)
+    SwitchPreference(
+        title = "Singlish",
+        summary = "Type Sinhala using English letters",
+        checked = layoutSinglish.value,
+        onCheckedChange = { layoutSinglish.value = it }
+    )
+}
+
+@Composable
+private fun AppearanceSection() {
+    val context = LocalContext.current
+
+    val automaticTheme = rememberBooleanPreference(context, "automatic_theme", true)
+    SwitchPreference(
+        title = "Automatic Theme",
+        summary = "Follow the system's light/dark setting",
+        icon = Icons.Filled.DarkMode,
+        checked = automaticTheme.value,
+        onCheckedChange = { automaticTheme.value = it }
+    )
+
+    val darkTheme = rememberBooleanPreference(context, "dark_theme", false)
+    if (!automaticTheme.value) {
+        SwitchPreference(
+            title = "Dark Theme",
+            checked = darkTheme.value,
+            onCheckedChange = { darkTheme.value = it }
+        )
+    }
+
+    val keyBorders = rememberBooleanPreference(context, "key_borders", true)
+    SwitchPreference(
+        title = "Key Borders",
+        summary = "Show an outline around each key",
+        checked = keyBorders.value,
+        onCheckedChange = { keyBorders.value = it }
+    )
+}
+
+@Composable
+private fun TypingSection() {
+    val context = LocalContext.current
+
+    SettingsCategory(title = "Layout")
+
+    val showNumberRow = rememberBooleanPreference(context, "show_number_row", true)
+    SwitchPreference(
+        title = "Show Number Row",
+        icon = Icons.Filled.Dialpad,
+        checked = showNumberRow.value,
+        onCheckedChange = { showNumberRow.value = it }
+    )
+
+    val heightPercentage = rememberIntPreference(context, "height_percentage", 100)
+    SliderPreference(
+        title = "Keyboard Height",
+        icon = Icons.Filled.Height,
+        value = heightPercentage.value,
+        range = 70f..190f,
+        onValueChange = { heightPercentage.value = it }
+    )
+
+    val textSize = rememberIntPreference(context, "text_size", 28)
+    SliderPreference(
+        title = "Text Size",
+        icon = Icons.Filled.FormatSize,
+        value = textSize.value,
+        range = 20f..40f,
+        onValueChange = { textSize.value = it }
+    )
+
+    SettingsCategory(title = "Typing behavior")
+
+    // These three were fully wired into the keyboard already (see KeyboardView /
+    // InputMethodService, which both read them from Prefs) but had no toggle
+    // anywhere in Settings - there was no way to turn them off. Surfacing them
+    // here now.
+    val vibration = rememberBooleanPreference(context, "vibration", true)
+    SwitchPreference(
+        title = "Vibrate on Keypress",
+        icon = Icons.Filled.Vibration,
+        checked = vibration.value,
+        onCheckedChange = { vibration.value = it }
+    )
+
+    val swipeToErase = rememberBooleanPreference(context, "swipe_to_erase", true)
+    SwitchPreference(
+        title = "Swipe to Erase",
+        summary = "Swipe left on the top keys to delete words",
+        icon = Icons.Filled.Backspace,
+        checked = swipeToErase.value,
+        onCheckedChange = { swipeToErase.value = it }
+    )
+
+    val swipeToMoveCursor = rememberBooleanPreference(context, "swipe_to_move_cursor", true)
+    SwitchPreference(
+        title = "Swipe to Move Cursor",
+        summary = "Swipe left/right on the bottom keys to move the cursor",
+        icon = Icons.Filled.SwipeLeft,
+        checked = swipeToMoveCursor.value,
+        onCheckedChange = { swipeToMoveCursor.value = it }
+    )
+}
+
+@Composable
+private fun EmojiSection() {
+    val context = LocalContext.current
+
+    val showRecentEmojiRow = rememberBooleanPreference(context, "show_recent_emoji_row", false)
+    SwitchPreference(
+        title = "Show Recent Emoji Row",
+        checked = showRecentEmojiRow.value,
+        onCheckedChange = { showRecentEmojiRow.value = it }
+    )
+
+    EmojiStyleSection()
+}
+
+@Composable
+private fun ClipboardSection() {
+    val context = LocalContext.current
+
+    val clipboardEnabled = rememberBooleanPreference(context, "clipboard_enabled", true)
+    SwitchPreference(
+        title = "Clipboard Manager",
+        summary = "Show a clipboard icon on the keyboard and keep a history of copied text",
+        checked = clipboardEnabled.value,
+        onCheckedChange = { clipboardEnabled.value = it }
+    )
+}
+
+@Composable
+private fun DictionarySection() {
+    val context = LocalContext.current
+
+    PreferenceItem(
+        title = "Prediction Manager",
+        summary = "Manage words you've typed and added",
+        onClick = {
+            context.startActivity(Intent(context, PredictionManagerActivity::class.java))
+        }
+    )
+
+    DictionaryBackupSection()
+}
+
+@Composable
+private fun AboutSection() {
+    val context = LocalContext.current
+
+    PreferenceItem(
+        title = "Source Code",
+        summary = "View on GitHub",
+        icon = Icons.Filled.Code,
+        onClick = {
+            val intent = Intent(
+                Intent.ACTION_VIEW,
+                Uri.parse("https://github.com/ishaanu455/Foxkeyboard-Customized.git")
+            )
+            context.startActivity(intent)
+        }
+    )
+
+    PreferenceItem(
+        title = "Version",
+        summary = BuildConfig.VERSION_NAME
+    )
 }
 
 /**
@@ -204,7 +380,7 @@ private fun DictionaryBackupSection() {
         scope.launch {
             val ok = UserDataBackup.export(context, uri)
             resultIsError = !ok
-            resultMessage = if (ok) "සුරැකුම සාර්ථකයි" else "සුරැකීම අසාර්ථක විය"
+            resultMessage = if (ok) "Backup saved successfully" else "Backup failed"
         }
     }
 
@@ -215,13 +391,14 @@ private fun DictionaryBackupSection() {
         scope.launch {
             val ok = UserDataBackup.import(context, uri)
             resultIsError = !ok
-            resultMessage = if (ok) "ප්‍රතිසාධනය සාර්ථකයි" else "ෆයිල් එක කියවීමට නොහැකි විය"
+            resultMessage = if (ok) "Restore successful" else "Couldn't read that file"
         }
     }
 
     Text(
-        text = "ඔබ නිතර ටයිප් කරන වචන මතක තබාගැනීම mobile එකේම විතරයි - වෙන කොහෙටවත් යන්නෙ නෑ. " +
-            "phone එකක් මාරු කරද්දී හෝ backup එකක් විදියට මේ දත්ත JSON file එකකට export/import කරගන්න පුළුවන්.",
+        text = "The words you type are learned only on this device - they never go " +
+            "anywhere else. If you're switching phones or just want a backup, you can " +
+            "export/import this data as a JSON file.",
         fontSize = 12.sp,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)

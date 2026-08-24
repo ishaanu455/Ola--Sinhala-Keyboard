@@ -16,12 +16,15 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Blue,
+    primary = BluePrimaryDark,
     secondary = Yellow,
     tertiary = Light2,
     background = Night1,
     surface = Night2,
-    onPrimary = Light1,
+    // onPrimary pairs with `primary` above. Now that primary is the lighter
+    // BluePrimaryDark (not the dark Blue), text/icons drawn on top of it need to be
+    // dark again to stay readable - Light1 (near-white) would wash out against it.
+    onPrimary = Night1,
     onSecondary = Night1,
     onTertiary = Night1,
     onBackground = Light1,

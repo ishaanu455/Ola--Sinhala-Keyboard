@@ -3,6 +3,11 @@ package unicode.sinhala.keyboard.ui.theme
 import androidx.compose.ui.graphics.Color
 
 val Blue = Color(0xFF3956AA)
+// Lighter tint of Blue used only in dark theme. Material's own dark-theme guidance is to
+// raise a brand color's lightness in dark mode - the plain Blue above is dark enough that,
+// used as `primary` on a dark background (Night1), section headers and other primary-colored
+// text/icons were rendering with too little contrast to read (the "invisible header" bug).
+val BluePrimaryDark = Color(0xFF8FA8E8)
 val Light1 = Color(0xFFD9D9D9)
 val Light2 = Color(0xFFA6A6A6)
 val Night1 = Color(0xFF262626)
