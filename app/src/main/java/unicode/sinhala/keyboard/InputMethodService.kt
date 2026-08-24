@@ -500,6 +500,12 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
         Log.d("IME", "onFinishInputView called finishingInput=$finishingInput")
 
+        // Catches the one remaining gap: the user finishes a word then switches
+        // apps, taps into a different field, or dismisses the keyboard entirely
+        // without ever pressing space/punctuation/Enter. Without this, that last
+        // word would never get learned.
+        learnLastTypedWord(currentInputConnection)
+
         if (finishingInput) {
             resetKeyboardState()
         }
@@ -644,6 +650,18 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 currentInputConnection?.finishComposingText()
                 currentInputConnection?.let { commitStyled(it, tag) }
             }
+        }
+
+        // This same handler also fires for the symbols panel (?, !, @, /, etc. -
+        // the letter keys get remapped to show symbols while it's open), which
+        // ends the word before it exactly like space/comma/dot do on the main
+        // keyboard. Gate on "not a letter" so normal Singlish/Wijesekara/English
+        // letter taps (which are still composing a word) never trigger this -
+        // only an actual symbol commit does. Without this, a message finished
+        // with "?" or a symbols-panel character never had its last word learned.
+        val isWordBoundary = tag.isNotEmpty() && tag.none { it.isLetter() }
+        if (isWordBoundary) {
+            learnLastTypedWord(currentInputConnection)
         }
 
         // The character is already committed above, so the keypress itself is done -
