@@ -1597,16 +1597,47 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         try {
             val textBefore = ic?.getTextBeforeCursor(60, 0)?.toString() ?: ""
             val trimmedEnd = textBefore.trimEnd()
-            val justTypedWord = trimmedEnd.takeLastWhile { !it.isWhitespace() }
+            val rawToken = trimmedEnd.takeLastWhile { !it.isWhitespace() }
+            // This function runs AFTER the boundary character (comma/dot/?/! from the
+            // bottom row or the symbols panel) has already been committed, so rawToken
+            // still has that punctuation stuck on the end - e.g. "hello," or "hello?".
+            // Learning it as-is would fragment the same word into several distinct
+            // dictionary entries ("hello", "hello,", "hello?"), splitting its count
+            // instead of accumulating it. Strip trailing punctuation/symbols before
+            // learning, so only the pure word gets recorded.
+            val justTypedWord = stripTrailingPunctuation(rawToken)
             if (justTypedWord.length >= 2) {
                 val lang = LanguageDetector.detectLanguage(justTypedWord)
                 // Word before this one — feeds the bigram next-word model.
-                val previousWord = trimmedEnd.dropLast(justTypedWord.length).trimEnd().takeLastWhile { !it.isWhitespace() }
+                val previousWord = trimmedEnd.dropLast(rawToken.length).trimEnd().takeLastWhile { !it.isWhitespace() }
                 serviceScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                     suggestionEngine?.recordAccepted(justTypedWord, lang, previousWord)
                 }
             }
         } catch (_: Throwable) {}
+    }
+
+    /**
+     * Strips trailing punctuation/symbol characters (., ",", ?, !, @, closing
+     * brackets/quotes, etc.) from a token so only the pure word remains.
+     *
+     * Deliberately keeps anything in the Sinhala Unicode block (U+0D80-U+0DFF),
+     * not just Character.isLetterOrDigit(): Sinhala vowel signs, the virama
+     * (al-lakuna), and anusvara/visarga are combining marks - not letters by
+     * Unicode's own category - but they're a legitimate, non-optional part of a
+     * Sinhala word (e.g. the trailing "්" in a conjunct), so they must never be
+     * stripped even though a plain isLetterOrDigit() check would treat them the
+     * same as a stray punctuation mark.
+     */
+    private fun stripTrailingPunctuation(word: String): String {
+        var end = word.length
+        while (end > 0) {
+            val ch = word[end - 1]
+            val isSinhalaMark = ch.code in 0x0D80..0x0DFF
+            if (ch.isLetterOrDigit() || isSinhalaMark) break
+            end--
+        }
+        return word.substring(0, end)
     }
 
     override fun longPressSecondaryClick(char: String) {
