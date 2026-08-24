@@ -420,6 +420,11 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
          lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
          Log.d("IME", "onStartInputView called restarting=$restarting info=")
 
+         // New field/session starting - clear the last-learned-word guard so a
+         // coincidental text match with whatever was in the previous field can't
+         // suppress a legitimate learn in this one.
+         lastLearnedSnapshot = null
+
          // Reset to the default key screen (lowercase, no clipboard/emoji panel) every
          // time the keyboard is (re)shown - whether it was fully closed and reopened, or
          // the user just switched focus to a different field while it stayed up.
@@ -1593,6 +1598,17 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
      * just space, since users frequently finish a word by hitting Send directly (e.g.
      * in a DM) without ever typing a space or tapping a suggestion chip first.
      */
+    // The exact trailing text (see `trimmedEnd` below) that was learned last time
+    // learnLastTypedWord() ran. Guards against double-counting: this function fires
+    // from several independent triggers (space/punctuation, Enter/Send, symbols
+    // panel, and onFinishInputView when the keyboard/app closes) and simply learns
+    // whatever word currently sits before the cursor. If two of those triggers fire
+    // back-to-back with no new character typed in between - e.g. the user hits
+    // space and then immediately switches apps, or hits Send and the host app
+    // doesn't clear the field before onFinishInputView also runs - the same word
+    // would otherwise get learned twice for a single typing action.
+    private var lastLearnedSnapshot: String? = null
+
     private fun learnLastTypedWord(ic: android.view.inputmethod.InputConnection?) {
         try {
             val textBefore = ic?.getTextBeforeCursor(60, 0)?.toString() ?: ""
@@ -1607,6 +1623,13 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             // learning, so only the pure word gets recorded.
             val justTypedWord = stripTrailingPunctuation(rawToken)
             if (justTypedWord.length >= 2) {
+                if (trimmedEnd == lastLearnedSnapshot) {
+                    // Same trailing text as the last successful learn, with nothing new
+                    // typed in between - a duplicate trigger for the word we already
+                    // learned, not a new word. Skip it so the count doesn't double.
+                    return
+                }
+                lastLearnedSnapshot = trimmedEnd
                 val lang = LanguageDetector.detectLanguage(justTypedWord)
                 // Word before this one — feeds the bigram next-word model.
                 val previousWord = trimmedEnd.dropLast(rawToken.length).trimEnd().takeLastWhile { !it.isWhitespace() }
