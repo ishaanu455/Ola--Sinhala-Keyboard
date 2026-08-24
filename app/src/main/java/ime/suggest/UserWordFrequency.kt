@@ -132,6 +132,29 @@ object UserWordFrequency {
         return stat.count * decay
     }
 
+    /**
+     * Removes a single learned word entirely (e.g. the user deleting it from the
+     * "All Usage" tab of the Prediction Manager). No-op if the word isn't known.
+     */
+    fun remove(context: Context, word: String) {
+        val map = loadCache(context)
+        if (map.remove(word) != null) {
+            persist(context)
+        }
+    }
+
+    /**
+     * Every learned word with its raw typed count, alphabetically sorted — for the
+     * Prediction Manager's "All Usage" tab (a browsing/management view, so it's
+     * sorted for easy scanning rather than by recency-weighted score).
+     */
+    fun getAllWithCount(context: Context): List<Pair<String, Int>> {
+        val map = loadCache(context)
+        return map.entries
+            .map { it.key to it.value.count }
+            .sortedBy { it.first }
+    }
+
     /** Learned words matching a prefix, highest recency-weighted score first. */
     fun getByPrefix(context: Context, prefix: String, limit: Int): List<String> {
         if (prefix.isEmpty()) return emptyList()

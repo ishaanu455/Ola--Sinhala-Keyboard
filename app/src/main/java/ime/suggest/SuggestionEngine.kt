@@ -30,6 +30,12 @@ class SuggestionEngine(private val context: Context) {
         // so a couple of bigram hits can pull a rarer word above a merely
         // frequent one, without letting a single coincidental pairing dominate.
         private const val BIGRAM_BOOST_WEIGHT = 3.0
+
+        // Flat ranking boost for words the user manually added via the Prediction
+        // Manager's "My Prediction" list. Enough to lift a never-typed custom word
+        // above plain dictionary matches, without letting it permanently outrank a
+        // word the user actually types often.
+        private const val CUSTOM_WORD_BOOST = 1.5
     }
 
     suspend fun initializeIfNeeded() {
@@ -106,21 +112,25 @@ class SuggestionEngine(private val context: Context) {
         val candidatePoolSize = limit * 6
         val dictionaryCandidates = trie.getByPrefix(queryPrefix, candidatePoolSize)
         val learnedCandidates = UserWordFrequency.getByPrefix(context, queryPrefix, candidatePoolSize)
+        val customCandidates = UserDictionary.getByPrefix(context, queryPrefix, candidatePoolSize)
 
-        // Learned words go in first so they're never dropped before dictionary
-        // candidates when we later cap the pool.
+        // Custom (manually-added) and learned words go in first so they're never
+        // dropped before dictionary candidates when we later cap the pool.
         val merged = LinkedHashSet<String>()
+        merged.addAll(customCandidates)
         merged.addAll(learnedCandidates)
         merged.addAll(dictionaryCandidates)
+        val customSet = customCandidates.toHashSet()
 
         // Rank: recency-weighted typing frequency, boosted when this candidate has
-        // followed the previous word before (bigram), then shorter words, then
-        // alphabetical.
+        // followed the previous word before (bigram) or was manually added by the
+        // user, then shorter words, then alphabetical.
         val ranked = merged.sortedWith(
             compareByDescending<String> {
                 val freqScore = UserWordFrequency.getScore(context, it)
                 val bigramBoost = UserBigramFrequency.getFollowCount(context, normalizedPreviousWord, it) * BIGRAM_BOOST_WEIGHT
-                freqScore + bigramBoost
+                val customBoost = if (it in customSet) CUSTOM_WORD_BOOST else 0.0
+                freqScore + bigramBoost + customBoost
             }
                 .thenBy { it.length }
                 .thenBy { it }

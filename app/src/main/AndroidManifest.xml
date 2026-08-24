@@ -27,6 +27,10 @@
             android:name="unicode.sinhala.keyboard.DonateActivity"
             android:exported="false"
             android:parentActivityName="unicode.sinhala.keyboard.MainActivity" />
+        <activity
+            android:name="unicode.sinhala.keyboard.PredictionManagerActivity"
+            android:exported="false"
+            android:parentActivityName="unicode.sinhala.keyboard.MainActivity" />
         <service
             android:name="unicode.sinhala.keyboard.InputMethodService"
             android:exported="true"

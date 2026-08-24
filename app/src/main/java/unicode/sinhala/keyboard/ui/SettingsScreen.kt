@@ -34,6 +34,7 @@ import unicode.sinhala.keyboard.DonateActivity
 import unicode.sinhala.keyboard.EmojiDownloader
 import unicode.sinhala.keyboard.EmojiStyle
 import unicode.sinhala.keyboard.Prefs
+import unicode.sinhala.keyboard.PredictionManagerActivity
 import unicode.sinhala.keyboard.ui.components.PreferenceItem
 import unicode.sinhala.keyboard.ui.components.RadioOptionPreference
 import unicode.sinhala.keyboard.ui.components.SettingsCategory
@@ -144,6 +145,15 @@ fun SettingsScreen() {
         )
 
         SettingsCategory(title = "පුද්ගලික ශබ්දකෝෂය")
+
+        PreferenceItem(
+            title = "Prediction Manager",
+            summary = "ඔබ එකතු කළ සහ ටයිප් කළ වචන කළමනාකරණය කරන්න",
+            onClick = {
+                context.startActivity(Intent(context, PredictionManagerActivity::class.java))
+            }
+        )
+
         DictionaryBackupSection()
 
         SettingsCategory(title = "Support")

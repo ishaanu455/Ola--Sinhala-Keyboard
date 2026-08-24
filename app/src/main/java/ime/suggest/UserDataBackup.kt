@@ -2,6 +2,7 @@ package ime.suggest
 
 import android.content.Context
 import android.net.Uri
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -39,6 +40,10 @@ object UserDataBackup {
                 bigramObj.put(prev, nextObj)
             }
             root.put("bigrams", bigramObj)
+
+            val customWordsArr = JSONArray()
+            for (w in UserDictionary.snapshot(context)) customWordsArr.put(w)
+            root.put("customWords", customWordsArr)
 
             context.contentResolver.openOutputStream(uri)?.use { out ->
                 out.write(root.toString().toByteArray(Charsets.UTF_8))
@@ -92,8 +97,17 @@ object UserDataBackup {
                 UserBigramFrequency.mergeImport(context, data)
             }
 
-            // A file with neither section is malformed / not one of our backups.
-            wordsObj != null || bigramObj != null
+            val customWordsArr = root.optJSONArray("customWords")
+            if (customWordsArr != null) {
+                val words = ArrayList<String>(customWordsArr.length())
+                for (i in 0 until customWordsArr.length()) {
+                    words.add(customWordsArr.optString(i))
+                }
+                UserDictionary.mergeImport(context, words)
+            }
+
+            // A file with none of the known sections is malformed / not one of our backups.
+            wordsObj != null || bigramObj != null || customWordsArr != null
         } catch (_: Exception) {
             false
         }
