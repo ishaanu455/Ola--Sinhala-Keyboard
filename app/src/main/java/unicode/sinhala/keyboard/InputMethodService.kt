@@ -779,6 +779,15 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         CHAR.EYANNA.code, CHAR.OYANNA.code
     )
 
+    // Consonants whose bare (al-lakuna) form can still be swapped for a different
+    // consonant by a following "h" (retroflex/dental/plain-vs-aspirated pairs, e.g.
+    // ට් + h -> ත්, බ් + h -> භ්). Same flicker as the vowels above, and same fix:
+    // keep the freshly-typed consonant+al-lakuna as an open composing region so the
+    // "h" can swap it directly instead of erase(2)+commit.
+    private val hConvertibleConsonantCodes = setOf(
+        CHAR.ALPAPRAANA_TTAYANNA.code, CHAR.ALPAPRAANA_BAYANNA.code
+    )
+
     private fun singlishInput(input: String) {
         var output = ""
         var erasePreviousChars = 0
@@ -817,6 +826,9 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             if (singlishChar.type == CharType.WYANJANA) {
                 output += CHAR.SIGN_AL_LAKUNA.text
                 tLastChar = CHAR.SIGN_AL_LAKUNA
+                // Keep it open in case the next key is "h" and converts this into a
+                // different consonant (e.g. ට් -> ත්) - see hConvertibleConsonantCodes.
+                if (singlishChar.code in hConvertibleConsonantCodes) composable = true
             }
         }
 
@@ -876,11 +888,13 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                             if (mLastLetter != null) {
                                 when (mLastLetter.code) {
                                     CHAR.ALPAPRAANA_TTAYANNA.code -> {
+                                        // Composing region already holds ට් (2 units) -
+                                        // swap it directly for ත්, no erase needed.
                                         output =
                                             CHAR.ALPAPRAANA_TAYANNA.text + CHAR.SIGN_AL_LAKUNA.text
-                                        erasePreviousChars = 2
                                         tLastLetter = CHAR.ALPAPRAANA_TAYANNA
                                         tLastChar = CHAR.SIGN_AL_LAKUNA
+                                        composable = true
                                     }
 
                                     CHAR.MAHAAPRAANA_TTAYANNA.code -> {
@@ -968,11 +982,13 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                                     }
 
                                     CHAR.ALPAPRAANA_BAYANNA.code -> {
+                                        // Composing region already holds බ් (2 units) -
+                                        // swap it directly for භ්, no erase needed.
                                         output =
                                             CHAR.MAHAAPRAANA_BAYANNA.text + CHAR.SIGN_AL_LAKUNA.text
-                                        erasePreviousChars = 2
                                         tLastLetter = CHAR.MAHAAPRAANA_BAYANNA
                                         tLastChar = CHAR.SIGN_AL_LAKUNA
+                                        composable = true
                                     }
 
                                     CHAR.DANTAJA_SAYANNA.code -> {
