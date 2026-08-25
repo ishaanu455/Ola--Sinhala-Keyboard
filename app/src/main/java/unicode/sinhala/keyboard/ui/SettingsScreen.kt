@@ -3,6 +3,7 @@ package unicode.sinhala.keyboard.ui
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -79,6 +80,13 @@ private enum class SettingsSection(val title: String, val summary: String) {
 @Composable
 fun SettingsScreen() {
     var currentSection by remember { mutableStateOf<SettingsSection?>(null) }
+
+    // Without this, the device back button isn't consumed by the in-app settings
+    // navigation at all, so it falls through to the host Activity and closes the
+    // whole app instead of just returning to the Settings home list.
+    BackHandler(enabled = currentSection != null) {
+        currentSection = null
+    }
 
     AnimatedContent(
         targetState = currentSection,
@@ -317,6 +325,15 @@ private fun ClipboardSection() {
         summary = "Show a clipboard icon on the keyboard and keep a history of copied text",
         checked = clipboardEnabled.value,
         onCheckedChange = { clipboardEnabled.value = it }
+    )
+
+    PreferenceItem(
+        title = "Clips Manager",
+        summary = "Browse, pin, add or delete your saved clips",
+        icon = Icons.Filled.ContentPaste,
+        onClick = {
+            context.startActivity(Intent(context, unicode.sinhala.keyboard.ClipsManagerActivity::class.java))
+        }
     )
 }
 

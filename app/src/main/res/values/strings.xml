@@ -28,6 +28,16 @@
     <string name="clipboard_empty_filtered">No clips match this filter.</string>
     <string name="settings_clipboard_title">Clipboard manager</string>
     <string name="settings_clipboard_summary">Show a clipboard icon on the keyboard and keep a history of copied text</string>
+    <string name="clips_manager_title">Clips Manager</string>
+    <string name="clips_manager_summary">Browse, pin, add or delete your saved clips</string>
+    <string name="clips_manager_add_title">Add a clip</string>
+    <string name="clips_manager_add_hint">Type or paste text</string>
+    <string name="clips_manager_add_action">Add</string>
+    <string name="clips_manager_delete_confirm_title">Delete clips?</string>
+    <string name="clips_manager_delete_confirm_message">This will move %1$d selected clip(s) to the recycle bin. This can\'t be undone.</string>
+    <string name="clips_manager_delete_confirm_action">Delete</string>
+    <string name="clips_manager_cancel">Cancel</string>
+    <string name="clips_manager_empty">No clips yet. Copy some text or tap + to add one.</string>
     <string name="app_name1">Sinhala Keyboard</string>
     <string name="app_name_si1">සිංහල</string>
     <string name="keyboard_view">Keyboard</string>
