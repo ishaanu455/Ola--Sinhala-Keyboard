@@ -43,9 +43,22 @@
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
-            <!-- Pinned to the very start of the row. Doubles as the clipboard
-                 panel's back arrow (see KeyboardView.kt toggleClipboardView) -
-                 it never changes position, only its icon/content-description. -->
+            <!-- Ola brand mark, always the very first icon in the row. Purely a
+                 branding badge (no tint, full-color logo on its own circular
+                 background) - not part of the clipboard/emoji/fonts back-arrow
+                 group below. -->
+            <ImageView
+                android:id="@+id/btn_ola_logo"
+                style="@style/TopBarIcon"
+                android:layout_marginStart="0dp"
+                android:background="@drawable/bg_ola_logo_circle"
+                android:src="@drawable/ic_ola_logo_mark"
+                android:contentDescription="@string/app_name"/>
+
+            <!-- Pinned to the very start of the clipboard/emoji/fonts group. Doubles
+                 as the clipboard panel's back arrow (see KeyboardView.kt
+                 toggleClipboardView) - it never changes position, only its
+                 icon/content-description. -->
             <ImageView
                 android:id="@+id/btn_clipboard"
                 style="@style/TopBarIcon"

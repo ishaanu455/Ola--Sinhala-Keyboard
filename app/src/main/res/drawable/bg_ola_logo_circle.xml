@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Circular badge for the Ola logo toolbar icon, using the app icon's green
+     so the wordmark reads the same way it does on the launcher icon. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="@color/ic_launcher_background" />
+</shape>

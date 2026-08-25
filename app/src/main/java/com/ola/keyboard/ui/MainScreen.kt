@@ -6,6 +6,8 @@ import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -70,14 +72,14 @@ fun SetupScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Use R.drawable.ic_launcher_foreground instead of mipmap resource which might be causing issues
-        // or just use a generic icon if that fails. For now, assuming ic_launcher_foreground exists 
-        // as it is referenced in ic_launcher.xml
+        // Full app-icon tile (the whole Ola mark on its green background) reads better
+        // here than the isolated adaptive-icon foreground layer on its own.
         Image(
-            painter = painterResource(id = R.drawable.ic_launcher_foreground),
+            painter = painterResource(id = R.drawable.ic_ola_app_icon),
             contentDescription = null,
             modifier = Modifier
                 .size(120.dp)
+                .clip(RoundedCornerShape(24.dp))
                 .padding(bottom = 24.dp)
         )
 
