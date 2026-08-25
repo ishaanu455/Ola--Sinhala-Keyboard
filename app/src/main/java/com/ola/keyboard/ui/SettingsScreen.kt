@@ -10,13 +10,25 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Backspace
@@ -40,8 +52,13 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ime.suggest.UserDataBackup
@@ -52,6 +69,7 @@ import com.ola.keyboard.EmojiDownloader
 import com.ola.keyboard.EmojiStyle
 import com.ola.keyboard.Prefs
 import com.ola.keyboard.PredictionManagerActivity
+import com.ola.keyboard.R
 import com.ola.keyboard.ui.components.PreferenceItem
 import com.ola.keyboard.ui.components.RadioOptionPreference
 import com.ola.keyboard.ui.components.SettingsCategory
@@ -228,12 +246,226 @@ private fun AppearanceSection() {
     }
 
     val keyBorders = rememberBooleanPreference(context, "key_borders", true)
+    val colorTheme = rememberStringPreference(context, "color_theme", "ola")
+    val effectiveDark = if (automaticTheme.value) isSystemInDarkTheme() else darkTheme.value
+
+    SettingsCategory(title = "Preview")
+    KeyboardPreview(
+        dark = effectiveDark,
+        keyBorders = keyBorders.value,
+        colorThemeId = colorTheme.value,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    )
+
     SwitchPreference(
-        title = "Key Borders",
+        title = "Border",
         summary = "Show an outline around each key",
         checked = keyBorders.value,
         onCheckedChange = { keyBorders.value = it }
     )
+
+    SettingsCategory(title = "Colour Themes")
+    ColorThemePicker(
+        selected = colorTheme.value,
+        onSelect = { colorTheme.value = it },
+        modifier = Modifier.padding(horizontal = 16.dp)
+    )
+}
+
+/** One entry in the Colour Themes picker - id is what's persisted to
+ *  Prefs.colorTheme / SharedPreferences "color_theme", and must match the
+ *  `when (colorTheme)` branches in KeyboardView.kt's init{}. */
+private data class KeyboardColorTheme(val id: String, val label: String, val accent: Color)
+
+private val keyboardColorThemes = listOf(
+    KeyboardColorTheme("ola", "Ola", Color(0xFFD4A24C)),
+    KeyboardColorTheme("wine", "Wine", Color(0xFF8C3B4A)),
+    KeyboardColorTheme("slate", "Slate", Color(0xFF46545C)),
+    KeyboardColorTheme("ocean", "Ocean", Color(0xFF34597A)),
+    KeyboardColorTheme("forest", "Forest", Color(0xFF3F6B4A)),
+)
+
+@Composable
+private fun ColorThemePicker(
+    selected: String,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        keyboardColorThemes.forEach { theme ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.clickable { onSelect(theme.id) }
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(theme.accent)
+                        .then(
+                            if (selected == theme.id) {
+                                Modifier.border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                            } else {
+                                Modifier
+                            }
+                        )
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = theme.label,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A Compose mock-up of the real keyboard (KeyboardView.kt / keyboard_layout.xml),
+ * built from the exact same colour tokens (see colors.xml + themes.xml) rather
+ * than embedding the actual native KeyboardView here - that class is tightly
+ * coupled to InputMethodService (key layouts, IME callbacks) and isn't meant to
+ * be instantiated standalone inside a Settings screen. Reacts live to dark
+ * mode / border / colour-theme selection above, same as the real keyboard does.
+ */
+@Composable
+private fun KeyboardPreview(
+    dark: Boolean,
+    keyBorders: Boolean,
+    colorThemeId: String,
+    modifier: Modifier = Modifier
+) {
+    val bg = if (dark) Color(0xFF1C1B17) else Color(0xFFFBF8F2)
+    val keyColor = if (dark) Color(0xFF26241E) else Color(0xFFFFFFFF)
+    val funcColor = if (dark) Color(0xFF332F26) else Color(0xFFEFE9DC)
+    val textColor = if (dark) Color(0xFFFFFFFF) else Color(0xFF000000)
+    val borderColor = if (keyBorders) textColor.copy(alpha = 0.18f) else Color.Transparent
+    val accent = keyboardColorThemes.first { it.id == colorThemeId }.accent
+
+    fun keyMod(background: Color) = Modifier
+        .height(40.dp)
+        .clip(RoundedCornerShape(6.dp))
+        .background(background)
+        .border(0.5.dp, borderColor, RoundedCornerShape(6.dp))
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(bg)
+            .padding(6.dp)
+    ) {
+        // Top bar: Ola logo mark + the real toolbar icons, same order as
+        // keyboard_layout.xml's top_bar_icon_row.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(38.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.ic_ola_logo_mark),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(30.dp)
+                    .padding(4.dp)
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            listOf(R.drawable.ic_clipboard, R.drawable.ic_emoji, R.drawable.ic_text_select, R.drawable.ic_fonts)
+                .forEach { iconRes ->
+                    Image(
+                        painter = painterResource(id = iconRes),
+                        contentDescription = null,
+                        colorFilter = ColorFilter.tint(textColor),
+                        modifier = Modifier
+                            .padding(start = 10.dp)
+                            .size(20.dp)
+                    )
+                }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Letter row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            "QWERTYUIOP".forEach { letter ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .then(keyMod(keyColor)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = letter.toString(), color = textColor, fontSize = 13.sp)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Shift / letters / backspace row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1.4f)
+                    .then(keyMod(funcColor))
+            )
+            "ASDFGHJKL".forEach { letter ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .then(keyMod(keyColor)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = letter.toString(), color = textColor, fontSize = 13.sp)
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1.4f)
+                    .then(keyMod(funcColor))
+            )
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Bottom row: 123 / space (accent) / enter (accent)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1.4f)
+                    .then(keyMod(funcColor)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "?123", color = textColor, fontSize = 11.sp)
+            }
+            Box(
+                modifier = Modifier
+                    .weight(4f)
+                    .then(keyMod(accent))
+            )
+            Box(
+                modifier = Modifier
+                    .weight(1.4f)
+                    .then(keyMod(accent))
+            )
+        }
+    }
 }
 
 @Composable
@@ -638,6 +870,38 @@ private fun EmojiStyleSection() {
                 TextButton(onClick = { showConfirmDialog = false }) { Text("Cancel") }
             }
         )
+    }
+}
+
+@Composable
+fun rememberStringPreference(context: Context, key: String, defaultValue: String): MutableState<String> {
+    val prefs = remember { context.getSharedPreferences("prefs", Context.MODE_PRIVATE) }
+    val state = remember { mutableStateOf(prefs.getString(key, defaultValue) ?: defaultValue) }
+
+    DisposableEffect(key) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, k ->
+            if (k == key) {
+                state.value = sharedPreferences.getString(key, defaultValue) ?: defaultValue
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }
+
+    return remember(state) {
+        object : MutableState<String> {
+            override var value: String
+                get() = state.value
+                set(newValue) {
+                    state.value = newValue
+                    prefs.edit().putString(key, newValue).apply()
+                }
+
+            override fun component1() = value
+            override fun component2(): (String) -> Unit = { value = it }
+        }
     }
 }
 

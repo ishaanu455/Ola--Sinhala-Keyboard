@@ -32,9 +32,25 @@
     <color name="keyboard_func_pressed_dark">#403A2C</color>
 
     <!-- Brand accent - amber. Used for the Enter/Go action key, active toggle states,
-         and anywhere else on the physical keyboard that needs to stand out. -->
+         and anywhere else on the physical keyboard that needs to stand out.
+         This is also the default keyboard colour theme ("Ola"). -->
     <color name="accent_amber">#D4A24C</color>
     <color name="accent_amber_pressed">#B8853A</color>
+
+    <!-- Additional keyboard colour themes (Appearance > Colour Themes). Deliberately
+         muted/deep tones rather than flat primary red/black/blue, so they read as
+         "professional" variants that match the rest of the app's design language. -->
+    <color name="accent_wine">#8C3B4A</color>
+    <color name="accent_wine_pressed">#713040</color>
+
+    <color name="accent_slate">#46545C</color>
+    <color name="accent_slate_pressed">#37424A</color>
+
+    <color name="accent_ocean">#34597A</color>
+    <color name="accent_ocean_pressed">#294764</color>
+
+    <color name="accent_forest">#3F6B4A</color>
+    <color name="accent_forest_pressed">#325A3C</color>
 
     <!-- Misc tokens kept for compatibility (unused by any layout/theme currently) -->
     <color name="blue">#3956aa</color>

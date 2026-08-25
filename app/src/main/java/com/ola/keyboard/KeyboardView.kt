@@ -52,7 +52,8 @@ class KeyboardView(
     private var showNumberRow: Boolean = true,
     private val emojiStyle: EmojiStyle = EmojiStyle.SYSTEM,
     private var clipboardEnabled: Boolean = true,
-    private var initialFontStyle: FontStyle = FontStyle.NONE
+    private var initialFontStyle: FontStyle = FontStyle.NONE,
+    private val colorTheme: String = "ola"
 ) : LinearLayout(context) {
 
     companion object {
@@ -327,7 +328,25 @@ class KeyboardView(
             else -> R.style.Night
         }
 
-        val contextThemeWrapper = ContextThemeWrapper(context, style)
+        // "ola" (the brand default) needs no overlay - the base styles above
+        // already use accent_amber for accent/keyAction. Any other colour theme
+        // layers a second ContextThemeWrapper on top that only overrides
+        // accent/keyAction/keyActionPressed, so background/key-surface/text
+        // colors keep coming from the base style untouched.
+        val accentOverlayStyle = when (colorTheme) {
+            "wine" -> R.style.AccentWine
+            "slate" -> R.style.AccentSlate
+            "ocean" -> R.style.AccentOcean
+            "forest" -> R.style.AccentForest
+            else -> null
+        }
+
+        val baseThemeWrapper = ContextThemeWrapper(context, style)
+        val contextThemeWrapper = if (accentOverlayStyle != null) {
+            ContextThemeWrapper(baseThemeWrapper, accentOverlayStyle)
+        } else {
+            baseThemeWrapper
+        }
         themedContext = contextThemeWrapper
 
         try {

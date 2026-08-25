@@ -84,5 +84,36 @@
         <item name="border">@android:color/transparent</item>
     </style>
 
+    <!-- Accent overlays for Appearance > Colour Themes. Each only sets the 3
+         attrs that actually vary between colour themes (accent + the action key's
+         two states) and is layered on top of the Light/Dark/*NoBorder style via a
+         second ContextThemeWrapper (see KeyboardView.kt), so everything else -
+         background, key surfaces, text - stays whatever the base style already
+         set. "Ola" (the brand default) needs no overlay since the base styles
+         already use accent_amber. -->
+    <style name="AccentWine">
+        <item name="accent">@color/accent_wine</item>
+        <item name="keyAction">@color/accent_wine</item>
+        <item name="keyActionPressed">@color/accent_wine_pressed</item>
+    </style>
+
+    <style name="AccentSlate">
+        <item name="accent">@color/accent_slate</item>
+        <item name="keyAction">@color/accent_slate</item>
+        <item name="keyActionPressed">@color/accent_slate_pressed</item>
+    </style>
+
+    <style name="AccentOcean">
+        <item name="accent">@color/accent_ocean</item>
+        <item name="keyAction">@color/accent_ocean</item>
+        <item name="keyActionPressed">@color/accent_ocean_pressed</item>
+    </style>
+
+    <style name="AccentForest">
+        <item name="accent">@color/accent_forest</item>
+        <item name="keyAction">@color/accent_forest</item>
+        <item name="keyActionPressed">@color/accent_forest_pressed</item>
+    </style>
+
 </resources>
 

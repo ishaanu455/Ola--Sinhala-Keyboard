@@ -302,19 +302,22 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     private var appliedKeyBorders = true
     private var appliedTextSize = -1
     private var appliedEmojiStyle = EmojiStyle.SYSTEM
+    private var appliedColorTheme = "ola"
 
     private fun rememberAppliedAppearancePrefs() {
         appliedDarkTheme = Prefs.getDarkTheme(this)
         appliedKeyBorders = Prefs.getKeyBorders(this)
         appliedTextSize = Prefs.getTextSize(this)
         appliedEmojiStyle = Prefs.getEmojiStyle(this)
+        appliedColorTheme = Prefs.getColorTheme(this)
     }
 
     private fun appearancePrefsRequireRebuild(): Boolean {
         return appliedDarkTheme != Prefs.getDarkTheme(this) ||
             appliedKeyBorders != Prefs.getKeyBorders(this) ||
             appliedTextSize != Prefs.getTextSize(this) ||
-            appliedEmojiStyle != Prefs.getEmojiStyle(this)
+            appliedEmojiStyle != Prefs.getEmojiStyle(this) ||
+            appliedColorTheme != Prefs.getColorTheme(this)
     }
 
     private fun buildKeyboardView(): KeyboardView {
@@ -332,7 +335,8 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             Prefs.getShowNumberRow(this),
             Prefs.getEmojiStyle(this),
             Prefs.getClipboardEnabled(this),
-            Prefs.getFontStyle(this)
+            Prefs.getFontStyle(this),
+            Prefs.getColorTheme(this)
         )
     }
 

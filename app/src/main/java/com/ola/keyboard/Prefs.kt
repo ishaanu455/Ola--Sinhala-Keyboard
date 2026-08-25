@@ -31,6 +31,10 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean("key_borders", true)
         set(value) = prefs.edit().putBoolean("key_borders", value).apply()
 
+    var colorTheme: String
+        get() = prefs.getString("color_theme", "ola") ?: "ola"
+        set(value) = prefs.edit().putString("color_theme", value).apply()
+
     var sinhalaKeyLabels: Boolean
         get() = prefs.getBoolean("sinhala_key_labels", true)
         set(value) = prefs.edit().putBoolean("sinhala_key_labels", value).apply()
@@ -115,6 +119,11 @@ class Prefs(context: Context) {
         fun getKeyBorders(context: Context): Boolean {
             val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
             return prefs.getBoolean("key_borders", true)
+        }
+
+        fun getColorTheme(context: Context): String {
+            val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
+            return prefs.getString("color_theme", "ola") ?: "ola"
         }
 
         fun getSwipeToErase(context: Context): Boolean {
