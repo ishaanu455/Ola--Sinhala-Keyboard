@@ -160,6 +160,12 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     private var suggestionJob: Job? = null
     private var topBarController: TopBarController? = null
     private var suggestionTextViews: List<TextView> = emptyList()
+    // Purely a display toggle for the suggestion bar - see requestSuggestionsForToken(),
+    // which is the only place this gates anything. Word LEARNING (learnLastTypedWord /
+    // learnPendingWordIfFieldWasCleared) never checks this, by design: turning
+    // suggestions off should only hide the bar, not stop the dictionary from improving
+    // in the background. Re-read from Settings each time the keyboard is shown (see
+    // onStartInputView), same pattern as every other toggle here.
     private var suggestionsEnabled = true
 
     // Lifecycle and SavedStateRegistry support
@@ -463,6 +469,12 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         keyboardView.setShowNumberRow(Prefs.getShowNumberRow(this))
         keyboardView.updateRowHeight(Prefs.getRowHeight(this))
         keyboardView.setClipboardEnabled(Prefs.getClipboardEnabled(this))
+        suggestionsEnabled = Prefs.getShowSuggestionBar(this)
+        if (!suggestionsEnabled) {
+            // Off right now - drop anything left showing from the previous session
+            // immediately rather than waiting for the next keystroke.
+            topBarController?.showNormal()
+        }
         // Pick up any emoji usage from the previous session — kept out of the live
         // typing session (see emojiClick) so the row doesn't reorder under the user's
         // finger while they're using it.

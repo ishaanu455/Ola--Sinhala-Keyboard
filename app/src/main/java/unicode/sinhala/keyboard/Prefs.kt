@@ -184,6 +184,15 @@ class Prefs(context: Context) {
             return prefs.getBoolean("clipboard_enabled", true)
         }
 
+        /** Whether the suggestion bar (the row of word predictions above the keys)
+         *  is shown while typing. Purely a display toggle - turning it off does NOT
+         *  stop words from being learned in the background, it only hides the bar
+         *  that shows suggestions. */
+        fun getShowSuggestionBar(context: Context): Boolean {
+            val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
+            return prefs.getBoolean("show_suggestion_bar", true)
+        }
+
         fun getFontStyle(context: Context): FontStyle {
             val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
             return FontStyle.fromId(prefs.getString("font_style", FontStyle.NONE.id))

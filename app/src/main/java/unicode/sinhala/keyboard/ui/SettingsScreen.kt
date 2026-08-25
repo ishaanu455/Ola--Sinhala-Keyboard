@@ -66,7 +66,7 @@ private enum class SettingsSection(val title: String, val summary: String) {
     TYPING("Typing & Layout", "Size, height, vibration, swipe gestures"),
     EMOJI("Emoji", "Emoji row and emoji style"),
     CLIPBOARD("Clipboard", "Clipboard manager and history"),
-    DICTIONARY("Dictionary & Backup", "Learned words and backups"),
+    DICTIONARY("Dictionary & Backup", "Suggestion bar, learned words and backups"),
     ABOUT("About", "Source code and version")
 }
 
@@ -323,6 +323,15 @@ private fun ClipboardSection() {
 @Composable
 private fun DictionarySection() {
     val context = LocalContext.current
+
+    val showSuggestionBar = rememberBooleanPreference(context, "show_suggestion_bar", true)
+    SwitchPreference(
+        title = "Show Suggestion Bar",
+        summary = "Show word suggestions above the keys while typing. Words are " +
+            "still learned in the background either way - this only hides the bar.",
+        checked = showSuggestionBar.value,
+        onCheckedChange = { showSuggestionBar.value = it }
+    )
 
     PreferenceItem(
         title = "Prediction Manager",
