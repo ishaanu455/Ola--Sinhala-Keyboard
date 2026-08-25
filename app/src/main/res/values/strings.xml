@@ -54,4 +54,5 @@
     <string name="text_select_down">Move cursor down a line</string>
     <string name="text_select_word_left">Jump to previous word</string>
     <string name="text_select_word_right">Jump to next word</string>
+    <string name="settings_title">Settings</string>
 </resources>

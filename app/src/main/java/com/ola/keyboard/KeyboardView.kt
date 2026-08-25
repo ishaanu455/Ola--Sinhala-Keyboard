@@ -1083,6 +1083,19 @@ class KeyboardView(
             binding.btnFonts.setOnClickListener { toggleFontStyleView(!isFontStylePanelOpen) }
 
             this.closeFontStylePanelFn = { toggleFontStyleView(false) }
+
+            // --- Settings icon (fixed, far right of the top bar) ---
+            // Doesn't toggle an in-keyboard panel like the others - it jumps
+            // straight to the app's own Settings screen (MainActivity shows
+            // SettingsScreen once the keyboard is enabled/selected). Needs
+            // FLAG_ACTIVITY_NEW_TASK since we're launching an Activity from the
+            // IME's service context, not from an Activity.
+            binding.btnSettings.setOnClickListener {
+                val intent = android.content.Intent(context, MainActivity::class.java).apply {
+                    flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(intent)
+            }
             applyPanelHeights()
         } catch (t: Throwable) {
             Log.e("KeyboardView", "Error during KeyboardView init configuration", t)

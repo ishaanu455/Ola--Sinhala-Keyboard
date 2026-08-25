@@ -152,6 +152,16 @@
                 android:tint="?attr/foreground"
                 android:contentDescription="@string/font_style_title"/>
 
+            <!-- Pinned last (far right corner) in the row, fixed position like the
+                 icons before it. Opens the app's Settings screen (MainActivity) -
+                 does not toggle an in-keyboard panel like the others. -->
+            <ImageView
+                android:id="@+id/btn_settings"
+                style="@style/TopBarIcon"
+                android:src="@drawable/ic_settings"
+                android:tint="?attr/foreground"
+                android:contentDescription="@string/settings_title"/>
+
         </LinearLayout>
 
     </LinearLayout>
