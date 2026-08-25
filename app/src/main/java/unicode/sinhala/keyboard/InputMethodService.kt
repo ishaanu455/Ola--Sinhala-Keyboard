@@ -542,9 +542,21 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 val token = textBefore.takeLastWhile { !it.isWhitespace() }
                 if (token.isEmpty()) {
                     topBarController?.showNormal()
+                    // Might be a normal space/newline (already learned via the
+                    // space/Enter handler) or the host app's own Send button
+                    // clearing the whole field out from under us - the function
+                    // itself tells those apart and only acts on the latter.
+                    learnPendingWordIfFieldWasCleared(currentInputConnection)
                 } else {
                     val previousWord = textBefore.dropLast(token.length).trimEnd().takeLastWhile { !it.isWhitespace() }
                     requestSuggestionsForToken(token, previousWord)
+                    if (!isInPasswordField()) {
+                        // Keep the in-progress word cached in case the field gets
+                        // cleared before any of our own handlers see it - see
+                        // learnPendingWordIfFieldWasCleared().
+                        pendingWordCache = token
+                        pendingWordPreviousCache = previousWord
+                    }
                 }
             } catch (_: Throwable) {}
         }
@@ -592,6 +604,12 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         debouncer?.cancel()
         suggestionJob?.cancel()
         topBarController?.showNormal()
+        // A cached in-progress word belongs to whatever field/app we were just in -
+        // carrying it over to a new field would risk learning it under the wrong
+        // context (or not at all, since it's stale) if that new field happens to
+        // go empty for some unrelated reason.
+        pendingWordCache = ""
+        pendingWordPreviousCache = ""
     }
 
     override fun onEvaluateFullscreenMode(): Boolean {
@@ -1664,12 +1682,30 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     // would otherwise get learned twice for a single typing action.
     private var lastLearnedSnapshot: String? = null
 
+    // Cache of the word currently being typed (and the word before it, for the
+    // bigram model), refreshed on every onUpdateSelection call while the field
+    // still has content. Exists for ONE reason: apps like WhatsApp/Messenger have
+    // their own in-app Send button (not the keyboard's Enter/Send action key) that
+    // clears the whole text field but leaves the keyboard open. That field-clear
+    // never runs through any of our own key handlers, so by the time
+    // onUpdateSelection notices the change, the word is already gone from the
+    // field - reading it from the InputConnection at that point gets nothing.
+    // Keeping a running cache means we still have the word to learn from even
+    // though the field itself is already empty.
+    private var pendingWordCache: String = ""
+    private var pendingWordPreviousCache: String = ""
+
     private fun learnLastTypedWord(ic: android.view.inputmethod.InputConnection?) {
         // Never learn anything typed in a password field - a single guard here
         // covers all 4 call sites (space/punctuation, Enter/Send action, symbols
         // panel, keyboard close) so the password itself can never end up as a
         // suggestion later in a different field.
         if (isInPasswordField()) return
+        // Whichever trigger got us here, the in-progress word it was tracking is
+        // now resolved one way or another - drop the cache so a later field-clear
+        // doesn't try to re-learn a word that's already been handled.
+        pendingWordCache = ""
+        pendingWordPreviousCache = ""
         try {
             val textBefore = ic?.getTextBeforeCursor(60, 0)?.toString() ?: ""
             val trimmedEnd = textBefore.trimEnd()
@@ -1697,6 +1733,56 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                     suggestionEngine?.recordAccepted(justTypedWord, lang, previousWord)
                 }
             }
+        } catch (_: Throwable) {}
+    }
+
+    /**
+     * Handles the one gap [learnLastTypedWord] can't: a host app's OWN Send button
+     * (not the keyboard's Enter/Send action key) that clears the whole text field
+     * but leaves the keyboard open (WhatsApp/Messenger/Telegram all do this). That
+     * clear never goes through any of our key handlers, so by the time
+     * onUpdateSelection notices the field is empty, there's nothing left to read
+     * from the InputConnection - only [pendingWordCache], kept fresh on every
+     * onUpdateSelection call while the field had content, still has it.
+     *
+     * Called from onUpdateSelection whenever the token-at-cursor comes back empty;
+     * only actually learns anything if the field is FULLY empty (not just "cursor
+     * sits right after a space/newline", which is the normal, already-handled case
+     * every space/punctuation keystroke produces).
+     */
+    private fun learnPendingWordIfFieldWasCleared(ic: android.view.inputmethod.InputConnection?) {
+        if (pendingWordCache.isEmpty()) return
+        if (isInPasswordField()) {
+            pendingWordCache = ""
+            pendingWordPreviousCache = ""
+            return
+        }
+        try {
+            val fieldIsFullyEmpty = (ic?.getTextBeforeCursor(1, 0)?.toString() ?: "").isEmpty() &&
+                    (ic?.getTextAfterCursor(1, 0)?.toString() ?: "").isEmpty()
+            if (!fieldIsFullyEmpty) return
+
+            val justTypedWord = stripTrailingPunctuation(pendingWordCache)
+            val previousWord = pendingWordPreviousCache
+            pendingWordCache = ""
+            pendingWordPreviousCache = ""
+
+            if (justTypedWord.length >= 2) {
+                lastLearnedSnapshot = null
+                val lang = LanguageDetector.detectLanguage(justTypedWord)
+                serviceScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    suggestionEngine?.recordAccepted(justTypedWord, lang, previousWord)
+                }
+            }
+
+            // The field just vanished out from under the normal typing state (not
+            // through our own space/Enter/symbol handling) - clear the same state
+            // those handlers reset, so the next word starts clean instead of
+            // possibly reverting into a position that no longer exists.
+            lastChar = null
+            lastLetter = null
+            positionFlag = ""
+            inputHistory.clear()
         } catch (_: Throwable) {}
     }
 
