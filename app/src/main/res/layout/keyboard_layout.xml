@@ -51,7 +51,7 @@
                 android:id="@+id/btn_ola_logo"
                 style="@style/TopBarIcon"
                 android:layout_marginStart="0dp"
-                android:background="@drawable/bg_ola_logo_circle"
+                android:background="@null"
                 android:src="@drawable/ic_ola_logo_mark"
                 android:contentDescription="@string/app_name"/>
 
