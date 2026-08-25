@@ -1227,6 +1227,8 @@ class KeyboardView(
     val clipboardButtonView: ImageView get() = binding.btnClipboard
     val textSelectButtonView: ImageView get() = binding.btnTextSelect
     val fontsButtonView: ImageView get() = binding.btnFonts
+    val settingsButtonView: ImageView get() = binding.btnSettings
+    val olaLogoButtonView: ImageView get() = binding.btnOlaLogo
 
     /** True while any of the emoji/clipboard/text-select panels is open. The IME uses
      *  this to skip its own suggestion-bar refresh (which otherwise fights with the

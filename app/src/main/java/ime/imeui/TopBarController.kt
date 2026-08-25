@@ -20,7 +20,13 @@ class TopBarController(
     // The Fonts ("Aa") icon - same deal as emojiButton/textSelectButton: it has to
     // get out of the way while suggestion chips are showing (they used to overlap it),
     // and come back once the chips are gone.
-    private val fontsButton: View? = null
+    private val fontsButton: View? = null,
+    // The Settings (gear) icon at the far end of the row - same deal as the icons
+    // above: needs to hide while suggestion chips are showing and come back after.
+    private val settingsButton: View? = null,
+    // The Ola brand mark, first icon in the row - same deal: hide while suggestion
+    // chips are showing, come back after.
+    private val olaLogoButton: View? = null
 ) {
 
     private fun applyColors(tv: TextView?) {
@@ -37,6 +43,8 @@ class TopBarController(
         emojiButton?.visibility = View.VISIBLE
         textSelectButton?.visibility = View.VISIBLE
         fontsButton?.visibility = View.VISIBLE
+        settingsButton?.visibility = View.VISIBLE
+        olaLogoButton?.visibility = View.VISIBLE
         // Restore the clipboard icon only if the feature is actually enabled in
         // Settings - showSuggestions() hides it unconditionally while a suggestion
         // chip is up, so coming back to "normal" must respect the user's toggle
@@ -49,6 +57,8 @@ class TopBarController(
         clipboardButton?.visibility = View.GONE
         textSelectButton?.visibility = View.GONE
         fontsButton?.visibility = View.GONE
+        settingsButton?.visibility = View.GONE
+        olaLogoButton?.visibility = View.GONE
         suggestionContainer?.visibility = View.VISIBLE
         for (i in suggestionTextViews.indices) {
             val tv = suggestionTextViews.getOrNull(i)
