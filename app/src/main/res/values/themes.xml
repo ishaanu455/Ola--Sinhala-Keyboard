@@ -40,6 +40,16 @@
         <item name="preferenceTheme">@style/ThemeOverlay.fox.Preference</item>
     </style>
 
+    <!-- Splash screen theme - sets the window background to the same dark ink
+         color the Compose splash content uses, so there's no white system flash
+         before setContent() draws (see SplashActivity.kt). -->
+    <style name="Theme.Splash" parent="Theme.fox">
+        <item name="android:windowBackground">@color/keyboard_bg_dark</item>
+        <item name="android:statusBarColor">@color/keyboard_bg_dark</item>
+        <item name="android:navigationBarColor">@color/keyboard_bg_dark</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
+
     <style name="ThemeOverlay.fox.Preference"
         parent="PreferenceThemeOverlay">
         <item name="android:textColorPrimary">@color/text_on_light</item>

@@ -16,13 +16,17 @@
         android:supportsRtl="false"
         android:theme="@style/Theme.fox">
         <activity
-            android:name="com.ola.keyboard.MainActivity"
-            android:exported="true">
+            android:name="com.ola.keyboard.SplashActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name="com.ola.keyboard.MainActivity"
+            android:exported="false" />
         <activity
             android:name="com.ola.keyboard.DonateActivity"
             android:exported="false"
