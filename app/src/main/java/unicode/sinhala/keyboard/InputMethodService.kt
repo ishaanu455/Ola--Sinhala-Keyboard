@@ -807,6 +807,19 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         // itself replacing an already-open composing region.
         var composable = false
 
+        // True only when `composable` above was just opened FRESH by this keystroke
+        // (newLetter()'s h-convertible-consonant case, or a bare vowel at word start) -
+        // as opposed to a doubling keystroke that's replacing the content of an
+        // ALREADY-open region from the previous keystroke (e.g. o -> oo). A fresh
+        // region can land right after a DIFFERENT region that the previous keystroke
+        // left open (e.g. "දු" is still open as ු when "ba" starts a new ට/බ-style
+        // composing region) - if we call setComposingText() there without finalizing
+        // first, Android silently REPLACES the still-open ු instead of keeping it and
+        // appending after it, so it vanishes (e.g. "දුබ" -> "දබ"). finishComposingText()
+        // right before setComposingText() closes that gap; it's a safe no-op when
+        // nothing was actually left open.
+        var freshComposable = false
+
         if (!hasPositionChanged()) {
             mLastChar = lastChar
             mLastLetter = lastLetter
@@ -835,7 +848,10 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 tLastChar = CHAR.SIGN_AL_LAKUNA
                 // Keep it open in case the next key is "h" and converts this into a
                 // different consonant (e.g. ට් -> ත්) - see hConvertibleConsonantCodes.
-                if (singlishChar.code in hConvertibleConsonantCodes) composable = true
+                if (singlishChar.code in hConvertibleConsonantCodes) {
+                    composable = true
+                    freshComposable = true
+                }
             }
         }
 
@@ -845,7 +861,10 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 newLetter()
                 // Fresh word starting with a bare vowel letter (e.g. "e" -> එ) -
                 // keep it open in case the next key doubles it (e.g. "ee" -> ඒ).
-                if (singlishChar.code in doublableVowelCodes) composable = true
+                if (singlishChar.code in doublableVowelCodes) {
+                    composable = true
+                    freshComposable = true
+                }
             }
         } else {
             when {
@@ -1227,6 +1246,15 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                     erasePrevious(erasePreviousChars)
                 }
                 if (composable) {
+                    // If this keystroke is opening a BRAND NEW composing region
+                    // (freshComposable) rather than replacing the content of one that
+                    // was already open, finalize whatever's currently open first.
+                    // Otherwise setComposingText() below would silently replace it
+                    // instead of leaving it in place - e.g. "දු" (ු still open) + "b"
+                    // opening a fresh ට/බ-style region would erase the ු instead of
+                    // keeping it and appending "බ්" after it. Safe no-op if nothing
+                    // was actually left open.
+                    if (freshComposable) ic.finishComposingText()
                     // Leave this as an open composing region instead of finalizing it -
                     // if the next key doubles the vowel, we just swap this region's
                     // content directly (see the composable branches above) instead of
@@ -1247,7 +1275,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 // through it step by step instead of just deleting raw codepoints.
                 val previousTop = inputHistory.lastOrNull()
                 val historyEntry: InputStep? = when {
-                    erasePreviousChars == 0 && composable && previousTop != null && previousTop.myWasComposable ->
+                    erasePreviousChars == 0 && composable && !freshComposable && previousTop != null && previousTop.myWasComposable ->
                         // This step replaced the still-open region from the previous
                         // keystroke wholesale (e.g. o -> oo) with no erase at all - it must
                         // ALSO be composable itself (i.e. this step used setComposingText to
@@ -1259,6 +1287,10 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                         // replaced, so treating it as a region-swap made backspace put an
                         // extra character back INTO the field instead of just deleting the
                         // fresh ඔ (කෝඔ -> කෝෝ instead of the correct කෝ).
+                        // !freshComposable excludes the sibling bug this fixed: a fresh
+                        // region (e.g. a new ට/බ-style open after a DIFFERENT region like
+                        // ු was just finalized) isn't a replace either - it's an append
+                        // after already-finalized text, same as the plain branch below.
                         InputStep(output, composable, previousTop.myOutput, mLastChar, mLastLetter, pendingGaettaBase)
 
                     erasePreviousChars == 0 ->
