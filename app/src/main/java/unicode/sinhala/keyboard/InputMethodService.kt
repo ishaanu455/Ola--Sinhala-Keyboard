@@ -700,9 +700,16 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     }
 
     private fun isInPasswordField(): Boolean {
-        val t = currentInputEditorInfo
-        return t != null && (t.inputType and InputType.TYPE_TEXT_VARIATION_PASSWORD) == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
-                t != null && (t.inputType and InputType.TYPE_NUMBER_VARIATION_PASSWORD) == InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        val t = currentInputEditorInfo ?: return false
+        // Compare against the full variation field (not just AND-with-itself against
+        // one constant) so this correctly catches ALL password-style variations, not
+        // just the plain one - web login forms and "show password" fields use a
+        // different variation value that the old check silently missed.
+        val variation = t.inputType and InputType.TYPE_MASK_VARIATION
+        return variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
+                variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD ||
+                variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
+                variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD
     }
 
     private fun onSuggestionClicked(suggestion: String) {
@@ -1626,6 +1633,11 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     private var lastLearnedSnapshot: String? = null
 
     private fun learnLastTypedWord(ic: android.view.inputmethod.InputConnection?) {
+        // Never learn anything typed in a password field - a single guard here
+        // covers all 4 call sites (space/punctuation, Enter/Send action, symbols
+        // panel, keyboard close) so the password itself can never end up as a
+        // suggestion later in a different field.
+        if (isInPasswordField()) return
         try {
             val textBefore = ic?.getTextBeforeCursor(60, 0)?.toString() ?: ""
             val trimmedEnd = textBefore.trimEnd()
