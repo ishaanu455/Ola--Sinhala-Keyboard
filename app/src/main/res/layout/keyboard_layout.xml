@@ -168,7 +168,7 @@
                 android:layout_height="48dp"
                 android:orientation="horizontal">
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/n_1"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -176,7 +176,7 @@
                     android:tag="1"
                     android:text="1" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/n_2"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -184,7 +184,7 @@
                     android:tag="2"
                     android:text="2" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/n_3"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -192,7 +192,7 @@
                     android:tag="3"
                     android:text="3" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/n_4"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -200,7 +200,7 @@
                     android:tag="4"
                     android:text="4" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/n_5"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -208,7 +208,7 @@
                     android:tag="5"
                     android:text="5" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/n_6"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -216,7 +216,7 @@
                     android:tag="6"
                     android:text="6" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/n_7"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -224,7 +224,7 @@
                     android:tag="7"
                     android:text="7" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/n_8"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -232,7 +232,7 @@
                     android:tag="8"
                     android:text="8" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/n_9"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -240,7 +240,7 @@
                     android:tag="9"
                     android:text="9" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/n_0"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -256,7 +256,7 @@
                 android:layout_height="48dp"
                 android:orientation="horizontal">
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_q"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -264,7 +264,7 @@
                     android:tag="q"
                     android:text="q" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_w"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -272,7 +272,7 @@
                     android:tag="w"
                     android:text="w" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_e"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -280,7 +280,7 @@
                     android:tag="e"
                     android:text="e" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_r"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -288,7 +288,7 @@
                     android:tag="r"
                     android:text="r" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_t"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -296,7 +296,7 @@
                     android:tag="t"
                     android:text="t" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_y"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -304,7 +304,7 @@
                     android:tag="y"
                     android:text="y" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_u"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -312,7 +312,7 @@
                     android:tag="u"
                     android:text="u" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_i"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -320,7 +320,7 @@
                     android:tag="i"
                     android:text="i" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_o"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -328,7 +328,7 @@
                     android:tag="o"
                     android:text="o" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_p"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -350,7 +350,7 @@
                     android:layout_height="match_parent"
                     android:layout_weight="0.5" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_a"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -358,7 +358,7 @@
                     android:tag="a"
                     android:text="a" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_s"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -366,7 +366,7 @@
                     android:tag="s"
                     android:text="s" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_d"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -374,7 +374,7 @@
                     android:tag="d"
                     android:text="d" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_f"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -382,7 +382,7 @@
                     android:tag="f"
                     android:text="f" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_g"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -390,7 +390,7 @@
                     android:tag="g"
                     android:text="g" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_h"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -398,7 +398,7 @@
                     android:tag="h"
                     android:text="h" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_j"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -406,7 +406,7 @@
                     android:tag="j"
                     android:text="j" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_k"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -414,7 +414,7 @@
                     android:tag="k"
                     android:text="k" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_l"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -422,7 +422,7 @@
                     android:tag="l"
                     android:text="l" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/colon_wijesekara"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -456,7 +456,7 @@
                     android:scaleType="centerInside"
                     android:src="@drawable/ic_shift" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_z"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -464,7 +464,7 @@
                     android:tag="z"
                     android:text="z" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_x"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -472,7 +472,7 @@
                     android:tag="x"
                     android:text="x" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_c"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -480,7 +480,7 @@
                     android:tag="c"
                     android:text="c" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_v"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -488,7 +488,7 @@
                     android:tag="v"
                     android:text="v" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_b"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -496,7 +496,7 @@
                     android:tag="b"
                     android:text="b" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_n"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -504,7 +504,7 @@
                     android:tag="n"
                     android:text="n" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/l_m"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -530,7 +530,7 @@
                 android:layout_height="48dp"
                 android:orientation="horizontal">
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/panel"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -553,7 +553,7 @@
                     android:text="ENG"
                     tools:ignore="HardcodedText" />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/symbol_1"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -563,7 +563,7 @@
                     android:visibility="gone"
                     android.background="@drawable/key_background_function"/>
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/comma"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -583,7 +583,7 @@
                     android:src="@drawable/ic_space_bar"
                     android:tag=" " />
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/comma_wijesekara"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
@@ -593,7 +593,7 @@
                     android:visibility="gone"
                     android:background="@drawable/key_background_function"/>
 
-                <unicode.sinhala.keyboard.KeyboardButton
+                <com.ola.keyboard.KeyboardButton
                     android:id="@+id/dot"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"

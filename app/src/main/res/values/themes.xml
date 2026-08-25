@@ -2,39 +2,39 @@
 <resources>
     <style name="unicodesinhala" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <!-- General background and text -->
-        <item name="fox_background">@color/gboard_bg_light</item>
-        <item name="accent">@color/gboard_action_blue</item>
+        <item name="fox_background">@color/keyboard_bg_light</item>
+        <item name="accent">@color/accent_amber</item>
         <item name="foreground">@color/text_on_light</item>
         <item name="foreground_2">@color/text_on_light_variant</item>
         <item name="isLight">true</item>
 
         <!-- Key surfaces and borders -->
-        <item name="border">@color/gboard_bg_light</item>
-        <item name="keyNormal">@color/gboard_key_light</item>
-        <item name="keyFunction">@color/gboard_func_light</item>
-        <item name="keyAction">@color/gboard_action_blue</item>
+        <item name="border">@color/keyboard_bg_light</item>
+        <item name="keyNormal">@color/keyboard_key_light</item>
+        <item name="keyFunction">@color/keyboard_func_light</item>
+        <item name="keyAction">@color/accent_amber</item>
 
         <!-- Pressed states -->
-        <item name="keyNormalPressed">@color/gboard_func_pressed_light</item>
-        <item name="keyFunctionPressed">@color/gboard_func_pressed_light</item>
-        <item name="keyActionPressed">@color/gboard_action_blue_pressed</item>
+        <item name="keyNormalPressed">@color/keyboard_func_pressed_light</item>
+        <item name="keyFunctionPressed">@color/keyboard_func_pressed_light</item>
+        <item name="keyActionPressed">@color/accent_amber_pressed</item>
         <item name="keyShadowColor">#40000000</item>
 
         <!-- Special keys -->
-        <item name="keySpecial">@color/gboard_key_light</item>
-        <item name="keySpecialPressed">@color/gboard_func_pressed_light</item>
+        <item name="keySpecial">@color/keyboard_key_light</item>
+        <item name="keySpecialPressed">@color/keyboard_func_pressed_light</item>
 
         <!-- Clipboard "Clips" card surface -->
         <item name="clipCard">@color/clip_card_light</item>
-        <item name="clipCardPressed">@color/gboard_func_pressed_light</item>
+        <item name="clipCardPressed">@color/keyboard_func_pressed_light</item>
     </style>
 
     <style name="Theme.fox"
         parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="fox_background">@color/gboard_bg_light</item>
-        <item name="colorPrimary">@color/gboard_action_blue</item>
+        <item name="fox_background">@color/keyboard_bg_light</item>
+        <item name="colorPrimary">@color/accent_amber</item>
         <item name="colorOnPrimary">@color/text_on_light</item>
-        <item name="colorSurface">@color/gboard_bg_light</item>
+        <item name="colorSurface">@color/keyboard_bg_light</item>
         <item name="colorOnSurface">@color/text_on_light</item>
         <item name="colorOnSurfaceVariant">@color/text_on_light_variant</item>
         <item name="preferenceTheme">@style/ThemeOverlay.fox.Preference</item>
@@ -44,7 +44,7 @@
         parent="PreferenceThemeOverlay">
         <item name="android:textColorPrimary">@color/text_on_light</item>
         <item name="android:textColorSecondary">@color/text_on_light_variant</item>
-        <item name="colorControlActivated">@color/gboard_action_blue</item>
+        <item name="colorControlActivated">@color/accent_amber</item>
     </style>
 
     <!-- Light fallback (pre-v31) -->
@@ -60,24 +60,24 @@
     <style name="Night" parent="unicodesinhala">
         <item name="isLight">false</item>
         <!-- Override to dark tokens -->
-        <item name="fox_background">@color/gboard_bg_dark</item>
+        <item name="fox_background">@color/keyboard_bg_dark</item>
         <item name="foreground">@color/text_on_dark</item>
         <item name="foreground_2">@color/text_on_dark_variant</item>
-        <item name="border">@color/gboard_bg_dark</item>
+        <item name="border">@color/keyboard_bg_dark</item>
 
         <!-- Keys -->
-        <item name="keyNormal">@color/gboard_key_dark</item>
-        <item name="keyFunction">@color/gboard_func_dark</item>
-        <item name="keyAction">@color/gboard_action_blue</item>
+        <item name="keyNormal">@color/keyboard_key_dark</item>
+        <item name="keyFunction">@color/keyboard_func_dark</item>
+        <item name="keyAction">@color/accent_amber</item>
 
         <!-- Pressed states -->
-        <item name="keyNormalPressed">@color/gboard_func_pressed_dark</item>
-        <item name="keyFunctionPressed">@color/gboard_func_pressed_dark</item>
-        <item name="keyActionPressed">@color/gboard_action_blue_pressed</item>
+        <item name="keyNormalPressed">@color/keyboard_func_pressed_dark</item>
+        <item name="keyFunctionPressed">@color/keyboard_func_pressed_dark</item>
+        <item name="keyActionPressed">@color/accent_amber_pressed</item>
 
         <!-- Clipboard "Clips" card surface -->
         <item name="clipCard">@color/clip_card_dark</item>
-        <item name="clipCardPressed">@color/gboard_func_pressed_dark</item>
+        <item name="clipCardPressed">@color/keyboard_func_pressed_dark</item>
     </style>
 
     <style name="NightNoBorder" parent="Night">

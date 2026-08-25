@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Same purple circular button as bg_clip_purple_circle, but with a thin white
+<!-- Same accent circular button as bg_clip_purple_circle, but with a thin white
      ring around it - used on btn_clip_filter while a non-"All" filter is active,
      so the user can tell at a glance the clip list is narrowed even after the
      dropdown itself has closed. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_pressed="true">
         <shape android:shape="oval">
-            <solid android:color="@color/clip_purple_pressed" />
+            <solid android:color="@color/clip_accent_pressed" />
             <stroke android:width="1.5dp" android:color="@android:color/white" />
         </shape>
     </item>
     <item>
         <shape android:shape="oval">
-            <solid android:color="@color/clip_purple" />
+            <solid android:color="@color/clip_accent" />
             <stroke android:width="1.5dp" android:color="@android:color/white" />
         </shape>
     </item>

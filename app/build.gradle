@@ -4,7 +4,7 @@ plugins {
 }
 android {
     compileSdkVersion = 34
-    namespace "unicode.sinhala.com"
+    namespace "com.ola.keyboard"
     defaultConfig {
         minSdkVersion 21
         versionCode 90
@@ -36,7 +36,7 @@ android {
     productFlavors {
         unicode {
             dimension = "app_id"
-            applicationId "unicode.sinhala.com"
+            applicationId "com.ola.keyboard"
         }
     }
     compileOptions {

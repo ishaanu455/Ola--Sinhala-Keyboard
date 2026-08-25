@@ -16,7 +16,7 @@
         android:supportsRtl="false"
         android:theme="@style/Theme.fox">
         <activity
-            android:name="unicode.sinhala.keyboard.MainActivity"
+            android:name="com.ola.keyboard.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -24,19 +24,19 @@
             </intent-filter>
         </activity>
         <activity
-            android:name="unicode.sinhala.keyboard.DonateActivity"
+            android:name="com.ola.keyboard.DonateActivity"
             android:exported="false"
-            android:parentActivityName="unicode.sinhala.keyboard.MainActivity" />
+            android:parentActivityName="com.ola.keyboard.MainActivity" />
         <activity
-            android:name="unicode.sinhala.keyboard.PredictionManagerActivity"
+            android:name="com.ola.keyboard.PredictionManagerActivity"
             android:exported="false"
-            android:parentActivityName="unicode.sinhala.keyboard.MainActivity" />
+            android:parentActivityName="com.ola.keyboard.MainActivity" />
         <activity
-            android:name="unicode.sinhala.keyboard.ClipsManagerActivity"
+            android:name="com.ola.keyboard.ClipsManagerActivity"
             android:exported="false"
-            android:parentActivityName="unicode.sinhala.keyboard.MainActivity" />
+            android:parentActivityName="com.ola.keyboard.MainActivity" />
         <service
-            android:name="unicode.sinhala.keyboard.InputMethodService"
+            android:name="com.ola.keyboard.InputMethodService"
             android:exported="true"
             android:label="@string/app_name"
             android:permission="android.permission.BIND_INPUT_METHOD">
