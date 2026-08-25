@@ -590,7 +590,7 @@
                     android:layout_width="48dp"
                     android:layout_height="match_parent"
                     android:layout_weight="3"
-                    android:background="@drawable/key_background_normal"
+                    android:background="@drawable/key_background_action"
                     android:padding="4dp"
                     android:scaleType="centerInside"
                     android:src="@drawable/ic_space_bar"

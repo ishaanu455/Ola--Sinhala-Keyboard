@@ -276,15 +276,60 @@ private fun AppearanceSection() {
 
 /** One entry in the Colour Themes picker - id is what's persisted to
  *  Prefs.colorTheme / SharedPreferences "color_theme", and must match the
- *  `when (colorTheme)` branches in KeyboardView.kt's init{}. */
-private data class KeyboardColorTheme(val id: String, val label: String, val accent: Color)
+ *  `when (colorTheme)` branches in KeyboardView.kt's init{}. Each theme now
+ *  retints the whole key bed (not just Enter/Space), so this carries the same
+ *  light/dark key-surface palette as the AccentXxxLight/Dark style overlays in
+ *  themes.xml + colors.xml - keep the two in sync if either changes. */
+private data class KeyboardColorTheme(
+    val id: String,
+    val label: String,
+    val accent: Color,
+    val lightBg: Color,
+    val lightKey: Color,
+    val lightFunc: Color,
+    val lightFuncPressed: Color,
+    val darkBg: Color,
+    val darkKey: Color,
+    val darkFunc: Color,
+    val darkFuncPressed: Color,
+)
 
 private val keyboardColorThemes = listOf(
-    KeyboardColorTheme("ola", "Ola", Color(0xFFD4A24C)),
-    KeyboardColorTheme("wine", "Wine", Color(0xFF8C3B4A)),
-    KeyboardColorTheme("slate", "Slate", Color(0xFF46545C)),
-    KeyboardColorTheme("ocean", "Ocean", Color(0xFF34597A)),
-    KeyboardColorTheme("forest", "Forest", Color(0xFF3F6B4A)),
+    KeyboardColorTheme(
+        "ola", "Ola", Color(0xFFD4A24C),
+        lightBg = Color(0xFFFBF8F2), lightKey = Color(0xFFFFFFFF), lightFunc = Color(0xFFEFE9DC), lightFuncPressed = Color(0xFFE3DBC8),
+        darkBg = Color(0xFF1C1B17), darkKey = Color(0xFF26241E), darkFunc = Color(0xFF332F26), darkFuncPressed = Color(0xFF403A2C),
+    ),
+    KeyboardColorTheme(
+        "wine", "Wine", Color(0xFF8C3B4A),
+        lightBg = Color(0xFFF8F5F6), lightKey = Color(0xFFFFFFFF), lightFunc = Color(0xFFEBE0E2), lightFuncPressed = Color(0xFFDECDD0),
+        darkBg = Color(0xFF1D1618), darkKey = Color(0xFF271D1F), darkFunc = Color(0xFF342528), darkFuncPressed = Color(0xFF402C30),
+    ),
+    KeyboardColorTheme(
+        "slate", "Slate", Color(0xFF46545C),
+        lightBg = Color(0xFFF5F7F8), lightKey = Color(0xFFFFFFFF), lightFunc = Color(0xFFE0E7EB), lightFuncPressed = Color(0xFFCDD8DE),
+        darkBg = Color(0xFF161A1D), darkKey = Color(0xFF1D2327), darkFunc = Color(0xFF252F34), darkFuncPressed = Color(0xFF2C3940),
+    ),
+    KeyboardColorTheme(
+        "ocean", "Ocean", Color(0xFF34597A),
+        lightBg = Color(0xFFF5F7F8), lightKey = Color(0xFFFFFFFF), lightFunc = Color(0xFFE0E6EB), lightFuncPressed = Color(0xFFCDD6DE),
+        darkBg = Color(0xFF161A1D), darkKey = Color(0xFF1D2227), darkFunc = Color(0xFF252D34), darkFuncPressed = Color(0xFF2C3740),
+    ),
+    KeyboardColorTheme(
+        "forest", "Forest", Color(0xFF3F6B4A),
+        lightBg = Color(0xFFF5F8F6), lightKey = Color(0xFFFFFFFF), lightFunc = Color(0xFFE0EBE3), lightFuncPressed = Color(0xFFCDDED1),
+        darkBg = Color(0xFF161D18), darkKey = Color(0xFF1D2720), darkFunc = Color(0xFF253429), darkFuncPressed = Color(0xFF2C4031),
+    ),
+    KeyboardColorTheme(
+        "onyx", "Onyx", Color(0xFF2B2B2E),
+        lightBg = Color(0xFFF6F6F7), lightKey = Color(0xFFFFFFFF), lightFunc = Color(0xFFE4E4E7), lightFuncPressed = Color(0xFFD3D3D8),
+        darkBg = Color(0xFF19191A), darkKey = Color(0xFF212123), darkFunc = Color(0xFF2B2B2E), darkFuncPressed = Color(0xFF34343A),
+    ),
+    KeyboardColorTheme(
+        "navy", "Navy", Color(0xFF22385C),
+        lightBg = Color(0xFFF5F6F8), lightKey = Color(0xFFFFFFFF), lightFunc = Color(0xFFE0E4EB), lightFuncPressed = Color(0xFFCDD3DE),
+        darkBg = Color(0xFF16191D), darkKey = Color(0xFF1D2127), darkFunc = Color(0xFF252B34), darkFuncPressed = Color(0xFF2C3440),
+    ),
 )
 
 @Composable
@@ -343,12 +388,13 @@ private fun KeyboardPreview(
     colorThemeId: String,
     modifier: Modifier = Modifier
 ) {
-    val bg = if (dark) Color(0xFF1C1B17) else Color(0xFFFBF8F2)
-    val keyColor = if (dark) Color(0xFF26241E) else Color(0xFFFFFFFF)
-    val funcColor = if (dark) Color(0xFF332F26) else Color(0xFFEFE9DC)
+    val theme = keyboardColorThemes.first { it.id == colorThemeId }
+    val bg = if (dark) theme.darkBg else theme.lightBg
+    val keyColor = if (dark) theme.darkKey else theme.lightKey
+    val funcColor = if (dark) theme.darkFunc else theme.lightFunc
     val textColor = if (dark) Color(0xFFFFFFFF) else Color(0xFF000000)
     val borderColor = if (keyBorders) textColor.copy(alpha = 0.18f) else Color.Transparent
-    val accent = keyboardColorThemes.first { it.id == colorThemeId }.accent
+    val accent = theme.accent
 
     fun keyMod(background: Color) = Modifier
         .height(40.dp)
@@ -392,6 +438,28 @@ private fun KeyboardPreview(
         }
 
         Spacer(modifier = Modifier.height(6.dp))
+
+        // Number row - shown above the letters, same key styling as the letter
+        // row (KeyboardButton has no explicit background override in
+        // keyboard_layout.xml's key_row_1, so it inherits the same keyNormal
+        // surface as the QWERTY rows on the real keyboard).
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            "1234567890".forEach { digit ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .then(keyMod(keyColor)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = digit.toString(), color = textColor, fontSize = 13.sp)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
 
         // Letter row
         Row(

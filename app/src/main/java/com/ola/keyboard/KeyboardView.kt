@@ -329,15 +329,18 @@ class KeyboardView(
         }
 
         // "ola" (the brand default) needs no overlay - the base styles above
-        // already use accent_amber for accent/keyAction. Any other colour theme
-        // layers a second ContextThemeWrapper on top that only overrides
-        // accent/keyAction/keyActionPressed, so background/key-surface/text
-        // colors keep coming from the base style untouched.
+        // already use accent_amber. Any other colour theme layers a second
+        // ContextThemeWrapper on top that retints the whole key bed (background,
+        // key surfaces, pressed states, border, accent) to that theme's hue -
+        // split into Light/Dark variants since key surface colors differ
+        // between the two, matching whichever the current dark-theme setting is.
         val accentOverlayStyle = when (colorTheme) {
-            "wine" -> R.style.AccentWine
-            "slate" -> R.style.AccentSlate
-            "ocean" -> R.style.AccentOcean
-            "forest" -> R.style.AccentForest
+            "wine" -> if (darkTheme) R.style.AccentWineDark else R.style.AccentWineLight
+            "slate" -> if (darkTheme) R.style.AccentSlateDark else R.style.AccentSlateLight
+            "ocean" -> if (darkTheme) R.style.AccentOceanDark else R.style.AccentOceanLight
+            "forest" -> if (darkTheme) R.style.AccentForestDark else R.style.AccentForestLight
+            "onyx" -> if (darkTheme) R.style.AccentOnyxDark else R.style.AccentOnyxLight
+            "navy" -> if (darkTheme) R.style.AccentNavyDark else R.style.AccentNavyLight
             else -> null
         }
 

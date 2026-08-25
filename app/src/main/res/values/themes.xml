@@ -84,35 +84,207 @@
         <item name="border">@android:color/transparent</item>
     </style>
 
-    <!-- Accent overlays for Appearance > Colour Themes. Each only sets the 3
-         attrs that actually vary between colour themes (accent + the action key's
-         two states) and is layered on top of the Light/Dark/*NoBorder style via a
-         second ContextThemeWrapper (see KeyboardView.kt), so everything else -
-         background, key surfaces, text - stays whatever the base style already
-         set. "Ola" (the brand default) needs no overlay since the base styles
-         already use accent_amber. -->
-    <style name="AccentWine">
+    <!-- Accent overlays for Appearance > Colour Themes. Layered on top of the
+         Light/Dark/*NoBorder style via a second ContextThemeWrapper (see
+         KeyboardView.kt), so each retints the whole key bed (background, key
+         surfaces, pressed states, border) to the theme's hue - not just the
+         Enter/Space accent - while keeping the exact same lightness structure
+         as the neutral palette (bg lightest -> key -> func -> func_pressed
+         darkest) so the key hierarchy still reads clearly; only the hue shifts.
+         "Ola" (the brand default) needs no overlay since the base styles
+         already use the amber palette. Split into Light/Dark pairs since key
+         surface colors differ between the two - KeyboardView.kt picks the
+         right one based on the current dark-theme setting. -->
+    <style name="AccentWineLight">
         <item name="accent">@color/accent_wine</item>
         <item name="keyAction">@color/accent_wine</item>
         <item name="keyActionPressed">@color/accent_wine_pressed</item>
+        <item name="fox_background">@color/wine_bg_light</item>
+        <item name="border">@color/wine_bg_light</item>
+        <item name="keyNormal">@color/wine_key_light</item>
+        <item name="keyFunction">@color/wine_func_light</item>
+        <item name="keyNormalPressed">@color/wine_func_pressed_light</item>
+        <item name="keyFunctionPressed">@color/wine_func_pressed_light</item>
+        <item name="keySpecial">@color/wine_key_light</item>
+        <item name="keySpecialPressed">@color/wine_func_pressed_light</item>
+        <item name="clipCard">@color/wine_func_light</item>
+        <item name="clipCardPressed">@color/wine_func_pressed_light</item>
     </style>
 
-    <style name="AccentSlate">
+    <style name="AccentWineDark">
+        <item name="accent">@color/accent_wine</item>
+        <item name="keyAction">@color/accent_wine</item>
+        <item name="keyActionPressed">@color/accent_wine_pressed</item>
+        <item name="fox_background">@color/wine_bg_dark</item>
+        <item name="border">@color/wine_bg_dark</item>
+        <item name="keyNormal">@color/wine_key_dark</item>
+        <item name="keyFunction">@color/wine_func_dark</item>
+        <item name="keyNormalPressed">@color/wine_func_pressed_dark</item>
+        <item name="keyFunctionPressed">@color/wine_func_pressed_dark</item>
+        <item name="keySpecial">@color/wine_key_dark</item>
+        <item name="keySpecialPressed">@color/wine_func_pressed_dark</item>
+        <item name="clipCard">@color/wine_func_dark</item>
+        <item name="clipCardPressed">@color/wine_func_pressed_dark</item>
+    </style>
+
+    <style name="AccentSlateLight">
         <item name="accent">@color/accent_slate</item>
         <item name="keyAction">@color/accent_slate</item>
         <item name="keyActionPressed">@color/accent_slate_pressed</item>
+        <item name="fox_background">@color/slate_bg_light</item>
+        <item name="border">@color/slate_bg_light</item>
+        <item name="keyNormal">@color/slate_key_light</item>
+        <item name="keyFunction">@color/slate_func_light</item>
+        <item name="keyNormalPressed">@color/slate_func_pressed_light</item>
+        <item name="keyFunctionPressed">@color/slate_func_pressed_light</item>
+        <item name="keySpecial">@color/slate_key_light</item>
+        <item name="keySpecialPressed">@color/slate_func_pressed_light</item>
+        <item name="clipCard">@color/slate_func_light</item>
+        <item name="clipCardPressed">@color/slate_func_pressed_light</item>
     </style>
 
-    <style name="AccentOcean">
+    <style name="AccentSlateDark">
+        <item name="accent">@color/accent_slate</item>
+        <item name="keyAction">@color/accent_slate</item>
+        <item name="keyActionPressed">@color/accent_slate_pressed</item>
+        <item name="fox_background">@color/slate_bg_dark</item>
+        <item name="border">@color/slate_bg_dark</item>
+        <item name="keyNormal">@color/slate_key_dark</item>
+        <item name="keyFunction">@color/slate_func_dark</item>
+        <item name="keyNormalPressed">@color/slate_func_pressed_dark</item>
+        <item name="keyFunctionPressed">@color/slate_func_pressed_dark</item>
+        <item name="keySpecial">@color/slate_key_dark</item>
+        <item name="keySpecialPressed">@color/slate_func_pressed_dark</item>
+        <item name="clipCard">@color/slate_func_dark</item>
+        <item name="clipCardPressed">@color/slate_func_pressed_dark</item>
+    </style>
+
+    <style name="AccentOceanLight">
         <item name="accent">@color/accent_ocean</item>
         <item name="keyAction">@color/accent_ocean</item>
         <item name="keyActionPressed">@color/accent_ocean_pressed</item>
+        <item name="fox_background">@color/ocean_bg_light</item>
+        <item name="border">@color/ocean_bg_light</item>
+        <item name="keyNormal">@color/ocean_key_light</item>
+        <item name="keyFunction">@color/ocean_func_light</item>
+        <item name="keyNormalPressed">@color/ocean_func_pressed_light</item>
+        <item name="keyFunctionPressed">@color/ocean_func_pressed_light</item>
+        <item name="keySpecial">@color/ocean_key_light</item>
+        <item name="keySpecialPressed">@color/ocean_func_pressed_light</item>
+        <item name="clipCard">@color/ocean_func_light</item>
+        <item name="clipCardPressed">@color/ocean_func_pressed_light</item>
     </style>
 
-    <style name="AccentForest">
+    <style name="AccentOceanDark">
+        <item name="accent">@color/accent_ocean</item>
+        <item name="keyAction">@color/accent_ocean</item>
+        <item name="keyActionPressed">@color/accent_ocean_pressed</item>
+        <item name="fox_background">@color/ocean_bg_dark</item>
+        <item name="border">@color/ocean_bg_dark</item>
+        <item name="keyNormal">@color/ocean_key_dark</item>
+        <item name="keyFunction">@color/ocean_func_dark</item>
+        <item name="keyNormalPressed">@color/ocean_func_pressed_dark</item>
+        <item name="keyFunctionPressed">@color/ocean_func_pressed_dark</item>
+        <item name="keySpecial">@color/ocean_key_dark</item>
+        <item name="keySpecialPressed">@color/ocean_func_pressed_dark</item>
+        <item name="clipCard">@color/ocean_func_dark</item>
+        <item name="clipCardPressed">@color/ocean_func_pressed_dark</item>
+    </style>
+
+    <style name="AccentForestLight">
         <item name="accent">@color/accent_forest</item>
         <item name="keyAction">@color/accent_forest</item>
         <item name="keyActionPressed">@color/accent_forest_pressed</item>
+        <item name="fox_background">@color/forest_bg_light</item>
+        <item name="border">@color/forest_bg_light</item>
+        <item name="keyNormal">@color/forest_key_light</item>
+        <item name="keyFunction">@color/forest_func_light</item>
+        <item name="keyNormalPressed">@color/forest_func_pressed_light</item>
+        <item name="keyFunctionPressed">@color/forest_func_pressed_light</item>
+        <item name="keySpecial">@color/forest_key_light</item>
+        <item name="keySpecialPressed">@color/forest_func_pressed_light</item>
+        <item name="clipCard">@color/forest_func_light</item>
+        <item name="clipCardPressed">@color/forest_func_pressed_light</item>
+    </style>
+
+    <style name="AccentForestDark">
+        <item name="accent">@color/accent_forest</item>
+        <item name="keyAction">@color/accent_forest</item>
+        <item name="keyActionPressed">@color/accent_forest_pressed</item>
+        <item name="fox_background">@color/forest_bg_dark</item>
+        <item name="border">@color/forest_bg_dark</item>
+        <item name="keyNormal">@color/forest_key_dark</item>
+        <item name="keyFunction">@color/forest_func_dark</item>
+        <item name="keyNormalPressed">@color/forest_func_pressed_dark</item>
+        <item name="keyFunctionPressed">@color/forest_func_pressed_dark</item>
+        <item name="keySpecial">@color/forest_key_dark</item>
+        <item name="keySpecialPressed">@color/forest_func_pressed_dark</item>
+        <item name="clipCard">@color/forest_func_dark</item>
+        <item name="clipCardPressed">@color/forest_func_pressed_dark</item>
+    </style>
+
+    <style name="AccentOnyxLight">
+        <item name="accent">@color/accent_onyx</item>
+        <item name="keyAction">@color/accent_onyx</item>
+        <item name="keyActionPressed">@color/accent_onyx_pressed</item>
+        <item name="fox_background">@color/onyx_bg_light</item>
+        <item name="border">@color/onyx_bg_light</item>
+        <item name="keyNormal">@color/onyx_key_light</item>
+        <item name="keyFunction">@color/onyx_func_light</item>
+        <item name="keyNormalPressed">@color/onyx_func_pressed_light</item>
+        <item name="keyFunctionPressed">@color/onyx_func_pressed_light</item>
+        <item name="keySpecial">@color/onyx_key_light</item>
+        <item name="keySpecialPressed">@color/onyx_func_pressed_light</item>
+        <item name="clipCard">@color/onyx_func_light</item>
+        <item name="clipCardPressed">@color/onyx_func_pressed_light</item>
+    </style>
+
+    <style name="AccentOnyxDark">
+        <item name="accent">@color/accent_onyx</item>
+        <item name="keyAction">@color/accent_onyx</item>
+        <item name="keyActionPressed">@color/accent_onyx_pressed</item>
+        <item name="fox_background">@color/onyx_bg_dark</item>
+        <item name="border">@color/onyx_bg_dark</item>
+        <item name="keyNormal">@color/onyx_key_dark</item>
+        <item name="keyFunction">@color/onyx_func_dark</item>
+        <item name="keyNormalPressed">@color/onyx_func_pressed_dark</item>
+        <item name="keyFunctionPressed">@color/onyx_func_pressed_dark</item>
+        <item name="keySpecial">@color/onyx_key_dark</item>
+        <item name="keySpecialPressed">@color/onyx_func_pressed_dark</item>
+        <item name="clipCard">@color/onyx_func_dark</item>
+        <item name="clipCardPressed">@color/onyx_func_pressed_dark</item>
+    </style>
+
+    <style name="AccentNavyLight">
+        <item name="accent">@color/accent_navy</item>
+        <item name="keyAction">@color/accent_navy</item>
+        <item name="keyActionPressed">@color/accent_navy_pressed</item>
+        <item name="fox_background">@color/navy_bg_light</item>
+        <item name="border">@color/navy_bg_light</item>
+        <item name="keyNormal">@color/navy_key_light</item>
+        <item name="keyFunction">@color/navy_func_light</item>
+        <item name="keyNormalPressed">@color/navy_func_pressed_light</item>
+        <item name="keyFunctionPressed">@color/navy_func_pressed_light</item>
+        <item name="keySpecial">@color/navy_key_light</item>
+        <item name="keySpecialPressed">@color/navy_func_pressed_light</item>
+        <item name="clipCard">@color/navy_func_light</item>
+        <item name="clipCardPressed">@color/navy_func_pressed_light</item>
+    </style>
+
+    <style name="AccentNavyDark">
+        <item name="accent">@color/accent_navy</item>
+        <item name="keyAction">@color/accent_navy</item>
+        <item name="keyActionPressed">@color/accent_navy_pressed</item>
+        <item name="fox_background">@color/navy_bg_dark</item>
+        <item name="border">@color/navy_bg_dark</item>
+        <item name="keyNormal">@color/navy_key_dark</item>
+        <item name="keyFunction">@color/navy_func_dark</item>
+        <item name="keyNormalPressed">@color/navy_func_pressed_dark</item>
+        <item name="keyFunctionPressed">@color/navy_func_pressed_dark</item>
+        <item name="keySpecial">@color/navy_key_dark</item>
+        <item name="keySpecialPressed">@color/navy_func_pressed_dark</item>
+        <item name="clipCard">@color/navy_func_dark</item>
+        <item name="clipCardPressed">@color/navy_func_pressed_dark</item>
     </style>
 
 </resources>

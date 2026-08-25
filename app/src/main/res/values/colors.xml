@@ -52,6 +52,72 @@
     <color name="accent_forest">#3F6B4A</color>
     <color name="accent_forest_pressed">#325A3C</color>
 
+    <color name="accent_onyx">#2B2B2E</color>
+    <color name="accent_onyx_pressed">#1C1C1E</color>
+
+    <color name="accent_navy">#22385C</color>
+    <color name="accent_navy_pressed">#182A45</color>
+
+    <!-- Full key-surface palettes per colour theme (Appearance > Colour Themes).
+         Same lightness structure as the neutral/amber palette above (bg lightest,
+         then key, func, func_pressed darkening in the same steps) so key hierarchy
+         reads identically across themes - only the hue changes, at a muted
+         saturation, so it never turns into a flat single-colour keyboard. Wired
+         into the AccentXxx style overlays below. -->
+    <color name="wine_bg_light">#F8F5F6</color>
+    <color name="wine_key_light">#FFFFFF</color>
+    <color name="wine_func_light">#EBE0E2</color>
+    <color name="wine_func_pressed_light">#DECDD0</color>
+    <color name="wine_bg_dark">#1D1618</color>
+    <color name="wine_key_dark">#271D1F</color>
+    <color name="wine_func_dark">#342528</color>
+    <color name="wine_func_pressed_dark">#402C30</color>
+
+    <color name="slate_bg_light">#F5F7F8</color>
+    <color name="slate_key_light">#FFFFFF</color>
+    <color name="slate_func_light">#E0E7EB</color>
+    <color name="slate_func_pressed_light">#CDD8DE</color>
+    <color name="slate_bg_dark">#161A1D</color>
+    <color name="slate_key_dark">#1D2327</color>
+    <color name="slate_func_dark">#252F34</color>
+    <color name="slate_func_pressed_dark">#2C3940</color>
+
+    <color name="ocean_bg_light">#F5F7F8</color>
+    <color name="ocean_key_light">#FFFFFF</color>
+    <color name="ocean_func_light">#E0E6EB</color>
+    <color name="ocean_func_pressed_light">#CDD6DE</color>
+    <color name="ocean_bg_dark">#161A1D</color>
+    <color name="ocean_key_dark">#1D2227</color>
+    <color name="ocean_func_dark">#252D34</color>
+    <color name="ocean_func_pressed_dark">#2C3740</color>
+
+    <color name="forest_bg_light">#F5F8F6</color>
+    <color name="forest_key_light">#FFFFFF</color>
+    <color name="forest_func_light">#E0EBE3</color>
+    <color name="forest_func_pressed_light">#CDDED1</color>
+    <color name="forest_bg_dark">#161D18</color>
+    <color name="forest_key_dark">#1D2720</color>
+    <color name="forest_func_dark">#253429</color>
+    <color name="forest_func_pressed_dark">#2C4031</color>
+
+    <color name="onyx_bg_light">#F6F6F7</color>
+    <color name="onyx_key_light">#FFFFFF</color>
+    <color name="onyx_func_light">#E4E4E7</color>
+    <color name="onyx_func_pressed_light">#D3D3D8</color>
+    <color name="onyx_bg_dark">#19191A</color>
+    <color name="onyx_key_dark">#212123</color>
+    <color name="onyx_func_dark">#2B2B2E</color>
+    <color name="onyx_func_pressed_dark">#34343A</color>
+
+    <color name="navy_bg_light">#F5F6F8</color>
+    <color name="navy_key_light">#FFFFFF</color>
+    <color name="navy_func_light">#E0E4EB</color>
+    <color name="navy_func_pressed_light">#CDD3DE</color>
+    <color name="navy_bg_dark">#16191D</color>
+    <color name="navy_key_dark">#1D2127</color>
+    <color name="navy_func_dark">#252B34</color>
+    <color name="navy_func_pressed_dark">#2C3440</color>
+
     <!-- Misc tokens kept for compatibility (unused by any layout/theme currently) -->
     <color name="blue">#3956aa</color>
     <color name="yellow">#dfc540</color>

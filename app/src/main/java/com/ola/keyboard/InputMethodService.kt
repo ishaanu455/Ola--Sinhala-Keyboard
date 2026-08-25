@@ -203,6 +203,8 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         EmojiData.loadRecentEmojis(this)
         ClipboardData.load(this)
         registerClipboardListener()
+        getSharedPreferences("prefs", MODE_PRIVATE)
+            .registerOnSharedPreferenceChangeListener(appearancePrefsListener)
     }
 
     // --- System clipboard auto-capture ---
@@ -255,6 +257,12 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             systemClipboardManager.removePrimaryClipChangedListener(clipChangedListener)
         } catch (t: Throwable) {
             Log.e("IME", "failed to unregister clipboard listener", t)
+        }
+        try {
+            getSharedPreferences("prefs", MODE_PRIVATE)
+                .unregisterOnSharedPreferenceChangeListener(appearancePrefsListener)
+        } catch (t: Throwable) {
+            Log.e("IME", "failed to unregister appearance prefs listener", t)
         }
         super.onDestroy()
         serviceJob.cancel()
@@ -319,6 +327,48 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             appliedEmojiStyle != Prefs.getEmojiStyle(this) ||
             appliedColorTheme != Prefs.getColorTheme(this)
     }
+
+    /** Shared by onStartInputView's rebuild-on-reopen path and the live
+     *  SharedPreferences listener below: tears down and re-inflates the
+     *  KeyboardView against a fresh themed context so an appearance change
+     *  (border / colour theme / dark theme / text size / emoji style) that
+     *  has no cheap hot-update path actually takes effect. */
+    private fun rebuildKeyboardViewForAppearanceChange() {
+        if (!::keyboardView.isInitialized) return
+        try {
+            keyboardView = buildKeyboardView()
+            rememberAppliedAppearancePrefs()
+            setInputView(keyboardView)
+            topBarController = TopBarController(
+                keyboardView.suggestionContainerView,
+                keyboardView.emojiButtonView,
+                Prefs.getDarkTheme(this),
+                keyboardView.clipboardButtonView,
+                { Prefs.getClipboardEnabled(this) },
+                keyboardView.textSelectButtonView,
+                keyboardView.fontsButtonView
+            )
+            suggestionTextViews = keyboardView.getSuggestionTextViews()
+            keyboardLayout = Prefs.getSelectedLayout(this)
+            setKeyboardLayout(keyboardLayout)
+        } catch (t: Throwable) {
+            Log.e("IME", "Failed to rebuild keyboard view for changed appearance settings", t)
+        }
+    }
+
+    // Fires the moment an appearance-affecting pref changes in Settings, so
+    // Border / Colour Theme / Dark Theme take effect immediately - even if the
+    // keyboard is currently showing behind the Settings screen and never gets
+    // a fresh onStartInputView call before the user switches back to it. The
+    // onStartInputView-driven rebuild above still runs too (harmless no-op if
+    // this listener already caught the change), so either path alone is enough.
+    private val appearancePrefsListener =
+        android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            when (key) {
+                "key_borders", "color_theme", "dark_theme", "automatic_theme",
+                "text_size", "emoji_style" -> rebuildKeyboardViewForAppearanceChange()
+            }
+        }
 
     private fun buildKeyboardView(): KeyboardView {
         return KeyboardView(
@@ -448,23 +498,9 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
              // Dark theme / key borders / text size drive the inflate-time style and
              // per-button text size — no cheap hot-update path, so rebuild the view
              // when Settings has changed one of these since the keyboard was last shown.
-             try {
-                 keyboardView = buildKeyboardView()
-                 rememberAppliedAppearancePrefs()
-                 setInputView(keyboardView)
-                 topBarController = TopBarController(
-                     keyboardView.suggestionContainerView,
-                     keyboardView.emojiButtonView,
-                     Prefs.getDarkTheme(this),
-                     keyboardView.clipboardButtonView,
-                     { Prefs.getClipboardEnabled(this) },
-                     keyboardView.textSelectButtonView,
-                     keyboardView.fontsButtonView
-                 )
-                 suggestionTextViews = keyboardView.getSuggestionTextViews()
-             } catch (t: Throwable) {
-                 Log.e("IME", "Failed to rebuild keyboard view for changed appearance settings", t)
-             }
+             // (Usually already caught live by appearancePrefsListener below - this is
+             // just a safety net for whatever edge case reaches here first.)
+             rebuildKeyboardViewForAppearanceChange()
          }
 
         // Re-apply latest toggle/value settings each time the keyboard is shown,
