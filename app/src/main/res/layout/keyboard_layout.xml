@@ -69,6 +69,7 @@
                  a second weighted child here would compete with those and
                  break their "push to the far end" behaviour. -->
             <Space
+                android:id="@+id/logo_spacer"
                 android:layout_width="28dp"
                 android:layout_height="match_parent" />
 

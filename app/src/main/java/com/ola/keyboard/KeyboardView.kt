@@ -725,6 +725,7 @@ class KeyboardView(
                 // into (see setTopBarIconRowExpanded).
                 binding.emojiCategoriesScroll.isVisible = visible
                 setTopBarIconRowExpanded(visible)
+                setLogoVisible(!visible)
                 if (isClipboardPanelOpen) {
                     binding.btnClipboard.setImageResource(R.drawable.ic_clipboard)
                     binding.btnClipClear.isVisible = false
@@ -894,6 +895,7 @@ class KeyboardView(
                 // filter icons to the row's far end (see setTopBarIconRowExpanded).
                 binding.clipboardRowSpacer.isVisible = visible
                 setTopBarIconRowExpanded(visible)
+                setLogoVisible(!visible)
                 binding.btnEmoji.visibility = if (visible) View.GONE else View.VISIBLE
                 binding.btnTextSelect.visibility = if (visible) View.GONE else View.VISIBLE
                 binding.btnFonts.visibility = if (visible) View.GONE else View.VISIBLE
@@ -1039,6 +1041,7 @@ class KeyboardView(
                 binding.btnEmoji.visibility = if (visible) View.GONE else View.VISIBLE
                 binding.btnTextSelect.visibility = if (visible) View.GONE else View.VISIBLE
                 setTopBarIconRowExpanded(visible)
+                setLogoVisible(!visible)
                 if (isEmojiPanelOpen) {
                     binding.btnEmoji.setImageResource(R.drawable.ic_emoji)
                     binding.emojiCategoriesScroll.isVisible = false
@@ -1250,6 +1253,18 @@ class KeyboardView(
             params.weight = 0f
         }
         binding.topBarIconRow.layoutParams = params
+    }
+
+    /** While any panel (emoji/clipboard/fonts) is open, the Ola brand mark and the
+     *  fixed gap after it just push that panel's back arrow away from the row's
+     *  true start. Hiding both here - and only here, alongside the other
+     *  panel-specific icon visibility toggles in toggleEmojiView/toggleClipboardView/
+     *  toggleFontStyleView - lets the back arrow become the first thing in the row,
+     *  flush against its left edge, exactly like it already is on the base keyboard
+     *  screen when the logo itself is the flush-left icon. */
+    private fun setLogoVisible(visible: Boolean) {
+        binding.btnOlaLogo.visibility = if (visible) View.VISIBLE else View.GONE
+        binding.logoSpacer.visibility = if (visible) View.VISIBLE else View.GONE
     }
     // suggestionContainer in the binding is a generated binding object; use its root view when a View is expected
     val suggestionContainerView: View get() = binding.suggestionContainer.root
