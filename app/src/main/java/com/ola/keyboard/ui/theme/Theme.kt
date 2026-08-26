@@ -16,19 +16,22 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = OlivePrimaryDark,
-    secondary = AmberDark,
-    tertiary = Light2,
-    background = Ink1,
-    surface = Ink2,
-    // onPrimary pairs with `primary` above. The lighter OlivePrimaryDark (not the
-    // deep Olive) needs dark text/icons on top of it to stay readable - Cream would
-    // wash out against it.
+    primary = LogoGold,
+    secondary = LogoGoldDeep,
+    tertiary = LogoCreamMuted,
+    background = MattBlack,
+    surface = SettingsSurface,
+    primaryContainer = SettingsSurfaceElevated,
+    outline = LogoGoldDeep,
+    // onPrimary pairs with `primary` above - gold needs dark text/icons on top of
+    // it to stay readable, Cream would wash out against it.
     onPrimary = Ink1,
     onSecondary = Ink1,
     onTertiary = Ink1,
-    onBackground = Light1,
-    onSurface = Light1,
+    onPrimaryContainer = LogoGold,
+    onBackground = LogoCream,
+    onSurface = LogoCream,
+    onSurfaceVariant = LogoCreamMuted,
 )
 
 private val LightColorScheme = lightColorScheme(

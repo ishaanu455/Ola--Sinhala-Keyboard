@@ -18,6 +18,19 @@ val Ink2 = Color(0xFF332F26)
 val Light1 = Color(0xFFD9D9D9)
 val Light2 = Color(0xFFA6A6A6)
 
+// Matte-black + logo-gold palette. Sampled straight from the "Ola" wordmark
+// (cream/ivory letters, gold swoosh + dots on a near-black field), so this is
+// what the dark theme now uses everywhere - and what Settings is forced into
+// regardless of the user's own light/dark toggle, since that's the screen this
+// was specifically built for.
+val MattBlack = Color(0xFF151515)                 // page background
+val SettingsSurface = Color(0xFF1F1F1D)           // card / row surface, one step up from MattBlack
+val SettingsSurfaceElevated = Color(0xFF29281F)   // selected / pressed surface, warmed slightly toward gold
+val LogoGold = Color(0xFFFCAD15)                  // primary accent - matches the logo swoosh
+val LogoGoldDeep = Color(0xFFC9860B)              // pressed / secondary gold, matches the swoosh's shadow edge
+val LogoCream = Color(0xFFF9EED5)                 // primary text/icons on black, matches the logo lettering
+val LogoCreamMuted = Color(0xFFA79E8C)            // secondary/summary text on black
+
 // Physical keyboard key palette (warm cream/ink undertone rather than Gboard's
 // cool white/grey - see colors.xml for the matching XML tokens used by the
 // classic View-based keyboard renderer).
