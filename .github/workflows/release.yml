@@ -87,7 +87,7 @@ jobs:
         id: find_apk
         run: |
           APK_PATH=$(find app/build/outputs/apk -name "*.apk" -path "*release*" | head -n 1)
-          APK_NAME="FoxKeyboard-${{ steps.bump_version.outputs.new_name }}.apk"
+          APK_NAME="Ola Keyboard-${{ steps.bump_version.outputs.new_name }}.apk"
           cp "$APK_PATH" "$APK_NAME"
           echo "apk_path=$APK_NAME" >> "$GITHUB_OUTPUT"
           echo "Found APK: $APK_PATH -> $APK_NAME"
