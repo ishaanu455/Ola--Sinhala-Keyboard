@@ -142,7 +142,7 @@ fun ClipsManagerScreen(onBackClick: () -> Unit) {
             LazyVerticalStaggeredGrid(
                 columns = StaggeredGridCells.Fixed(2),
                 modifier = Modifier.padding(paddingValues).fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 4.dp, top = 4.dp, bottom = 96.dp),
+                contentPadding = PaddingValues(start = 4.dp, end = 4.dp, top = 4.dp, bottom = 96.dp),
                 verticalItemSpacing = 0.dp
             ) {
                 if (pinned.isNotEmpty()) {
