@@ -895,7 +895,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     // keep the freshly-typed consonant+al-lakuna as an open composing region so the
     // "h" can swap it directly instead of erase(2)+commit.
     private val hConvertibleConsonantCodes = setOf(
-        CHAR.ALPAPRAANA_TTAYANNA.code, CHAR.ALPAPRAANA_BAYANNA.code
+        CHAR.ALPAPRAANA_TTAYANNA.code, CHAR.ALPAPRAANA_BAYANNA.code, CHAR.DANTAJA_SAYANNA.code
     )
 
     private fun singlishInput(input: String) {
@@ -1121,11 +1121,15 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                                     }
 
                                     CHAR.DANTAJA_SAYANNA.code -> {
+                                        // Composing region already holds ස් (2 units, now that
+                                        // DANTAJA_SAYANNA is in hConvertibleConsonantCodes) -
+                                        // swap it directly for ශ්, no erase needed. Same fix as
+                                        // ට්->ත් and බ්->භ් above.
                                         output =
                                             CHAR.TAALUJA_SAYANNA.text + CHAR.SIGN_AL_LAKUNA.text
-                                        erasePreviousChars = 2
                                         tLastLetter = CHAR.TAALUJA_SAYANNA
                                         tLastChar = CHAR.SIGN_AL_LAKUNA
+                                        composable = true
                                     }
 
                                     CHAR.SANYAKA_DDAYANNA.code -> {
