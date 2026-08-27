@@ -38,7 +38,8 @@
              within a standard keyboard width. -->
         <LinearLayout
             android:id="@+id/top_bar_icon_row"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
+            android:layout_weight="1"
             android:layout_height="match_parent"
             android:orientation="horizontal"
             android:gravity="center_vertical">
@@ -59,18 +60,21 @@
                 android:src="@drawable/ic_ola_logo_mark"
                 android:contentDescription="@string/app_name"/>
 
-            <!-- Fixed gap that separates the Ola brand mark from the
-                 functional icon group to its right. Deliberately NOT a
-                 weight=1 spacer: top_bar_icon_row is wrap_content in the
-                 normal state (a weighted child would have no extra space to
-                 expand into there anyway), and during the clipboard/emoji
-                 panel-open states the row's own weight=1 expansion is already
-                 spoken for by clipboard_row_spacer / emoji_categories_scroll -
-                 a second weighted child here would compete with those and
-                 break their "push to the far end" behaviour. -->
+            <!-- Flexible gap that separates the Ola brand mark from the
+                 functional icon group to its right. top_bar_icon_row is now
+                 always width=0dp/weight=1 (see below), so this spacer soaks
+                 up whatever width isn't needed by the logo or the fixed-size
+                 icons after it - which is exactly what pins the logo flush
+                 left and the icon group flush right instead of leaving dead
+                 space at the row's end. During the clipboard/emoji panel-open
+                 states this spacer (and the logo) are hidden entirely
+                 (setLogoVisible), so it never competes with
+                 clipboard_row_spacer / emoji_categories_scroll for that
+                 expansion. -->
             <Space
                 android:id="@+id/logo_spacer"
-                android:layout_width="28dp"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="match_parent" />
 
             <!-- Doubles as the emoji panel's back arrow (see KeyboardView.kt

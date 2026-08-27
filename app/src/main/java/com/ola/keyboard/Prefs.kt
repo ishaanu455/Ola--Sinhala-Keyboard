@@ -52,7 +52,11 @@ class Prefs(context: Context) {
         set(value) = prefs.edit().putInt("height_percentage", value).apply()
 
     var textSize: Int
-        get() = prefs.getInt("text_size", 16)
+        // Kept in sync with SettingsScreen.kt's rememberIntPreference(context, "text_size", 28)
+        // default - this value is also what governs emoji glyph size (EmojiAdapter), so a
+        // mismatched default here made the keyboard's actual first-run size differ from what
+        // the Settings slider showed until the user touched it.
+        get() = prefs.getInt("text_size", 28)
         set(value) = prefs.edit().putInt("text_size", value).apply()
 
     var vibration: Boolean
@@ -138,7 +142,7 @@ class Prefs(context: Context) {
 
         fun getTextSize(context: Context): Int {
             val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
-            return prefs.getInt("text_size", 16)
+            return prefs.getInt("text_size", 28)
         }
 
         fun getKeyboardLayout(context: Context): KeyboardLayout {

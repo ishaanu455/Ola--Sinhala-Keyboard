@@ -1232,26 +1232,26 @@ class KeyboardView(
     val fontsButtonView: ImageView get() = binding.btnFonts
     val settingsButtonView: ImageView get() = binding.btnSettings
     val olaLogoButtonView: ImageView get() = binding.btnOlaLogo
+    val topBarIconRowView: LinearLayout get() = binding.topBarIconRow
 
     /** True while any of the emoji/clipboard/text-select panels is open. The IME uses
      *  this to skip its own suggestion-bar refresh (which otherwise fights with the
      *  panel-specific icon visibility below by forcing btnEmoji/btnClipboard back on). */
     val isAnyPanelOpen: Boolean get() = isEmojiPanelOpen || isClipboardPanelOpen || isTextSelectPanelOpen || isFontStylePanelOpen
 
-    /** top_bar_icon_row is normally wrap_content so its icons stay bunched together
-     *  at the row's start. While the clipboard or emoji panel is open, one of its
-     *  icons needs to stretch to the far end of the line (the clip-clear trash icon
-     *  for clipboard, the category tab strip for emoji) - switching the row to
-     *  width=0dp/weight=1 gives that stretchy child actual space to expand into. */
+    /** top_bar_icon_row is now always width=0dp/weight=1 (set in the layout XML),
+     *  so its icons right-align against the flexible logo_spacer instead of
+     *  bunching up at the row's start with dead space after them. That same
+     *  expansion is also what lets one of its icons stretch to the far end of the
+     *  line while a panel is open (the clip-clear trash icon for clipboard, the
+     *  category tab strip for emoji) - so this just re-asserts that expansion
+     *  rather than ever collapsing it back to wrap_content; only
+     *  TopBarController's showSuggestions()/showNormal() collapse/restore it now,
+     *  to give suggestion chips the room they need. */
     private fun setTopBarIconRowExpanded(expanded: Boolean) {
         val params = binding.topBarIconRow.layoutParams as LinearLayout.LayoutParams
-        if (expanded) {
-            params.width = 0
-            params.weight = 1f
-        } else {
-            params.width = LayoutParams.WRAP_CONTENT
-            params.weight = 0f
-        }
+        params.width = 0
+        params.weight = 1f
         binding.topBarIconRow.layoutParams = params
     }
 

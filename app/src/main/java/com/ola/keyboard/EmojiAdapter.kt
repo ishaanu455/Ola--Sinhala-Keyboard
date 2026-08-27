@@ -30,18 +30,34 @@ class EmojiAdapter(
     private fun dp(value: Float): Int =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, context.resources.displayMetrics).toInt()
 
-    private fun sp(value: Float): Int =
-        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, value, context.resources.displayMetrics).toInt()
+    /** The emoji grid is a fixed 8-column GridLayoutManager (see KeyboardView), so every
+     *  cell is always exactly (grid width) / 8 wide - GridLayoutManager forces that exact
+     *  width on its children regardless of what their own layoutParams ask for. Sizing the
+     *  glyph in SP used to let it grow past that fixed cell width whenever the device's
+     *  system Font size / Display size setting was above 1x (this varies a lot by phone
+     *  brand even at their own "default"), which is what clipped the emoji's sides -
+     *  differently on different phones, since it depends on a setting this app never reads.
+     *  Sizing off density only (like dp(), not scaledDensity) removes that source of
+     *  variance entirely, and clamping against the actual computed cell width below is a
+     *  second, device-independent safety net so a large "Text Size" preference value can't
+     *  overflow the cell either, on any screen width. */
+    private fun glyphTextSizePx(): Float {
+        val requestedPx = dp(textSize.toFloat()).toFloat()
+        val cellWidthPx = context.resources.displayMetrics.widthPixels / 8f
+        val maxGlyphPx = cellWidthPx - dp(8f) * 2 // leaves room for the pad(8dp) used on each side below
+        return if (maxGlyphPx > 0f) minOf(requestedPx, maxGlyphPx) else requestedPx
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): EmojiViewHolder {
         val pad = dp(8f)
+        val glyphPx = glyphTextSizePx()
 
         if (emojiStyle == EmojiStyle.SYSTEM || emojiStyle == EmojiStyle.CUSTOM) {
             val tv = TextView(context)
             tv.layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             tv.gravity = Gravity.CENTER
             tv.textAlignment = TextView.TEXT_ALIGNMENT_CENTER
-            tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize.toFloat())
+            tv.setTextSize(TypedValue.COMPLEX_UNIT_PX, glyphPx)
             tv.setPadding(pad, pad, pad, pad)
             tv.includeFontPadding = false
             tv.setTextColor(if (darkTheme) Color.WHITE else Color.BLACK)
@@ -57,7 +73,7 @@ class EmojiAdapter(
         // fallback) underneath an ImageView that shows the downloaded Twemoji artwork once
         // it's loaded. If the image fails (e.g. no network and not yet cached), the system
         // glyph underneath just stays visible instead of leaving a blank cell.
-        val glyphSize = sp(textSize.toFloat()) + dp(4f)
+        val glyphSize = glyphPx.toInt() + dp(4f)
         val cellSize = glyphSize + pad * 2
 
         val frame = FrameLayout(context)
@@ -68,7 +84,7 @@ class EmojiAdapter(
         fallbackText.layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
         fallbackText.gravity = Gravity.CENTER
         fallbackText.textAlignment = TextView.TEXT_ALIGNMENT_CENTER
-        fallbackText.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSize.toFloat())
+        fallbackText.setTextSize(TypedValue.COMPLEX_UNIT_PX, glyphPx)
         fallbackText.includeFontPadding = false
         fallbackText.setTextColor(if (darkTheme) Color.WHITE else Color.BLACK)
         frame.addView(fallbackText)

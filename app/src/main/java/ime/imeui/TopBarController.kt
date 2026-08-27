@@ -2,6 +2,7 @@ package ime.imeui
 
 import android.graphics.Color
 import android.view.View
+import android.widget.LinearLayout
 import android.widget.TextView
 
 class TopBarController(
@@ -26,8 +27,27 @@ class TopBarController(
     private val settingsButton: View? = null,
     // The Ola brand mark, first icon in the row - same deal: hide while suggestion
     // chips are showing, come back after.
-    private val olaLogoButton: View? = null
+    private val olaLogoButton: View? = null,
+    // top_bar_icon_row itself - normally width=0dp/weight=1 so its icons right-align
+    // against the flexible logo_spacer (see keyboard_layout.xml / KeyboardView). While
+    // suggestion chips are showing there's nothing left in the row to right-align (every
+    // icon above is hidden), so it's collapsed back to wrap_content to give the chips the
+    // room instead of leaving it holding a now-pointless equal share of the line.
+    private val topBarIconRow: View? = null
 ) {
+
+    private fun setIconRowExpanded(expanded: Boolean) {
+        val row = topBarIconRow ?: return
+        val params = row.layoutParams as? LinearLayout.LayoutParams ?: return
+        if (expanded) {
+            params.width = 0
+            params.weight = 1f
+        } else {
+            params.width = LinearLayout.LayoutParams.WRAP_CONTENT
+            params.weight = 0f
+        }
+        row.layoutParams = params
+    }
 
     private fun applyColors(tv: TextView?) {
         if (tv == null) return
@@ -39,6 +59,7 @@ class TopBarController(
     }
 
     fun showNormal() {
+        setIconRowExpanded(true)
         suggestionContainer?.visibility = View.GONE
         emojiButton?.visibility = View.VISIBLE
         textSelectButton?.visibility = View.VISIBLE
@@ -53,6 +74,7 @@ class TopBarController(
     }
 
     fun showSuggestions(suggestions: List<String>, suggestionTextViews: List<TextView>, onClick: (String) -> Unit) {
+        setIconRowExpanded(false)
         emojiButton?.visibility = View.GONE
         clipboardButton?.visibility = View.GONE
         textSelectButton?.visibility = View.GONE
