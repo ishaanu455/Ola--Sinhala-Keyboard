@@ -711,6 +711,19 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                     if (!isActive) return@launch
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                         if (sList.isNotEmpty()) {
+                            // Re-read the live pref here instead of trusting whatever
+                            // EmojiStyle topBarController was constructed with. Unlike
+                            // ClipboardAdapter (which calls Prefs.getEmojiStyle(context)
+                            // fresh on every single bind), topBarController's emojiStyle
+                            // is a snapshot taken once - at onCreateInputView(), or at the
+                            // last full appearance rebuild - so if the user opens Settings
+                            // and picks/changes their custom font while this same keyboard
+                            // session is still running, that snapshot only refreshes if the
+                            // rebuild path happens to catch it. Clipboard previews always
+                            // reflected the change immediately for exactly this reason;
+                            // suggestion chips didn't. Setting it here, right before every
+                            // render, closes that gap the same way.
+                            topBarController?.setEmojiStyle(Prefs.getEmojiStyle(this@InputMethodService))
                             topBarController?.showSuggestions(sList, suggestionTextViews) { suggestion ->
                                 onSuggestionClicked(suggestion)
                             }

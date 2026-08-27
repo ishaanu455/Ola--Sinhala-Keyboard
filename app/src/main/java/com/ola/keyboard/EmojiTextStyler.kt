@@ -38,42 +38,22 @@ class EmojiTextStyler {
         cancel()
         when (style) {
             EmojiStyle.SYSTEM -> {
-                textView.typeface = currentSystemTypeface(context)
+                textView.typeface = Typeface.DEFAULT
                 textView.text = text
             }
             EmojiStyle.CUSTOM -> {
-                // Falls back to the device's current system typeface (not the
-                // stock Typeface.DEFAULT) if the stored font file is missing or
-                // Android can't parse its color-glyph table - same fallback
-                // EmojiAdapter uses for the picker grid, just pointed at the
-                // right default.
-                textView.typeface = CustomFontManager.loadTypeface(context) ?: currentSystemTypeface(context)
+                // Falls back to the default typeface if the stored font file is
+                // missing or Android can't parse its color-glyph table - same
+                // fallback EmojiAdapter uses for the picker grid.
+                textView.typeface = CustomFontManager.loadTypeface(context) ?: Typeface.DEFAULT
                 textView.text = text
             }
             EmojiStyle.TWEMOJI -> {
-                textView.typeface = currentSystemTypeface(context)
+                textView.typeface = Typeface.DEFAULT
                 textView.text = buildTwemojiSpans(context, textView, text)
             }
         }
     }
-
-    /**
-     * Freshly resolves "whatever typeface an untouched TextView would get right
-     * now" instead of reading the cached Typeface.DEFAULT singleton. This
-     * matters on devices with a system-wide custom font (Samsung/Xiaomi/Realme
-     * "Font style" settings, iFont, etc. - common for Sinhala users):
-     * Typeface.DEFAULT is resolved once by the framework and cached for the
-     * process's lifetime, so it goes stale the moment the user changes their
-     * device font again without force-closing the keyboard. A brand-new,
-     * unstyled TextView re-resolves its typeface against the theme/font config
-     * as it stands *right now*, so building one fresh on every bind - suggestion
-     * chips update at most a debounce-cycle behind, not "until next app
-     * restart" - keeps this in sync even if the user changes their device font
-     * several times in the same session. Cheap enough to do per suggestion
-     * update: this runs on the same cadence as showSuggestions(), not per
-     * keystroke.
-     */
-    private fun currentSystemTypeface(context: Context): Typeface? = TextView(context).typeface
 
     /** Cancels any in-flight image loads - call from onViewRecycled/onDetach so
      *  a slow load doesn't land on a view that's since been reused elsewhere. */
