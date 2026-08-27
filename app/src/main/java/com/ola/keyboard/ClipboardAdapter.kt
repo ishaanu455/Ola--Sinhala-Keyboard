@@ -103,7 +103,8 @@ class ClipboardAdapter(
     }
 
     private fun bindClip(holder: ClipViewHolder, item: ClipItem) {
-        holder.text.text = item.text
+        val context = holder.itemView.context
+        holder.textStyler.bind(context, holder.text, item.text, Prefs.getEmojiStyle(context))
         // The pin/share/delete row and the selection checkmark are mutually exclusive -
         // only one indicator makes sense on a card at a time.
         holder.actions.isVisible = !selectionMode && item.id == expandedId
@@ -208,12 +209,22 @@ class ClipboardAdapter(
 
     override fun getItemCount(): Int = rows.size
 
+    override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
+        super.onViewRecycled(holder)
+        // Cancel any Twemoji image still loading for a clip row that's about to
+        // be rebound to a completely different clip.
+        if (holder is ClipViewHolder) holder.textStyler.cancel()
+    }
+
     class HeaderViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val title: TextView = itemView.findViewById(R.id.section_header_title)
     }
 
     class ClipViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val text: TextView = itemView.findViewById(R.id.clip_text)
+        // Renders clip_text using Settings > Emoji Style (Twemoji/custom font),
+        // same as the emoji picker grid - not just the device's plain glyph.
+        val textStyler: EmojiTextStyler = EmojiTextStyler()
         val actions: View = itemView.findViewById(R.id.clip_actions)
         val pin: ImageView = itemView.findViewById(R.id.clip_pin)
         val share: ImageView = itemView.findViewById(R.id.clip_share)

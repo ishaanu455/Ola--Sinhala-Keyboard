@@ -4,6 +4,8 @@ import android.graphics.Color
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.ola.keyboard.EmojiStyle
+import com.ola.keyboard.EmojiTextStyler
 
 class TopBarController(
     private val suggestionContainer: View?,
@@ -40,8 +42,29 @@ class TopBarController(
     // suggestion chips are showing there's nothing left in the row to right-align (every
     // icon above is hidden), so it's collapsed back to wrap_content to give the chips the
     // room instead of leaving it holding a now-pointless equal share of the line.
-    private val topBarIconRow: View? = null
+    private val topBarIconRow: View? = null,
+    // Settings > Emoji Style - so a suggestion chip that happens to contain an
+    // emoji (e.g. echoing back a word the user typed with one in it) matches the
+    // same Twemoji/custom-font look the emoji picker grid uses, instead of
+    // always falling back to the device's plain system glyph.
+    private var emojiStyle: EmojiStyle = EmojiStyle.SYSTEM
 ) {
+
+    // One styler per suggestion chip slot, reused across binds so a previous
+    // chip's in-flight Twemoji image load gets cancelled before a new word's
+    // does - otherwise a slow-loading image for an old suggestion could land on
+    // a chip that's since moved on to a completely different word.
+    private val suggestionStylers = mutableListOf<EmojiTextStyler>()
+
+    private fun stylerFor(index: Int): EmojiTextStyler {
+        while (suggestionStylers.size <= index) suggestionStylers.add(EmojiTextStyler())
+        return suggestionStylers[index]
+    }
+
+    /** Call when Settings > Emoji Style changes while the keyboard stays open. */
+    fun setEmojiStyle(style: EmojiStyle) {
+        emojiStyle = style
+    }
 
     private fun setIconRowExpanded(expanded: Boolean) {
         val row = topBarIconRow ?: return
@@ -96,7 +119,7 @@ class TopBarController(
             val text = suggestions.getOrNull(i) ?: ""
             if (tv != null) {
                 applyColors(tv)
-                tv.text = text
+                stylerFor(i).bind(tv.context, tv, text, emojiStyle)
                 tv.visibility = if (text.isEmpty()) View.GONE else View.VISIBLE
                 tv.setOnClickListener { onClick(text) }
             }
