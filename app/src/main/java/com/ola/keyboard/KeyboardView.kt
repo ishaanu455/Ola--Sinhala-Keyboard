@@ -76,6 +76,21 @@ class KeyboardView(
         // mean "100% of 48dp", i.e. 48dp. This is the baseline that percentage is
         // applied against.
         private const val BASE_ROW_HEIGHT_DP = 48f
+
+        // text_select_layout.xml's cursor-cross column uses fixed (not weighted) dp
+        // sizes: 56dp title bar + (68dp up-chevron + 24dp margin + 68dp mid row +
+        // 24dp margin + 68dp down-chevron = 252dp cross) + 56dp bottom bar = 364dp.
+        // Before the row-height fix above, rowHeightPx worked out to roughly double
+        // BASE_ROW_HEIGHT_DP even at the slider's default, so the panel height derived
+        // from it (see applyPanelHeights) was comfortably over this floor and nobody
+        // noticed the panel's own content was fixed-size. Now that the default panel
+        // height is correctly smaller, it can fall under what this fixed content
+        // actually needs, and a LinearLayout doesn't shrink non-weighted children to
+        // fit - it just centers-and-clips them, which is what was chopping the up/down
+        // chevrons down to slivers. Flooring the panel height at this fixed minimum
+        // keeps the cross fully visible regardless of the height slider. If the fixed
+        // dp values in text_select_layout.xml change, update this to match.
+        private const val TEXT_SELECT_MIN_CONTENT_HEIGHT_DP = 364f
     }
 
     /** Height to use for the number row given the current base [rowHeight]. */
@@ -1336,7 +1351,8 @@ class KeyboardView(
         // toggleTextSelectView), so while it's open it needs that row's height
         // added back on top, or the panel would come up short by exactly that much.
         val textSelectExtra = if (isTextSelectPanelOpen) binding.topBar.layoutParams.height else 0
-        binding.textSelectView.root.layoutParams.height = panelHeight + textSelectExtra
+        binding.textSelectView.root.layoutParams.height =
+            max(panelHeight + textSelectExtra, dp(TEXT_SELECT_MIN_CONTENT_HEIGHT_DP))
         binding.fontStyleView.root.layoutParams.height = panelHeight
     }
 

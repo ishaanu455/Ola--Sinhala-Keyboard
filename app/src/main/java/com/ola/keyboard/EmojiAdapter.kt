@@ -2,6 +2,8 @@ package com.ola.keyboard
 
 import android.content.Context
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -25,7 +27,37 @@ class EmojiAdapter(
     private val emojiStyle: EmojiStyle = EmojiStyle.SYSTEM
 ) : RecyclerView.Adapter<EmojiAdapter.EmojiViewHolder>() {
 
-    private val items = ArrayList<String>(emojis)
+    companion object {
+        // How much smaller than the "requested" size to actually render color-emoji
+        // glyphs, to leave headroom for artwork overshoot past its own font-metrics
+        // box (see glyphTextSizePx() below). 0.85 = 15% shrink; tune here if some
+        // devices' emoji sets still clip at the edges, or come in with visible
+        // unused margin once this is confirmed fixed.
+        private const val EMOJI_OVERSHOOT_SAFETY = 0.85f
+    }
+
+    // SYSTEM mode draws the raw emoji character straight from the device's own font -
+    // there's no bundled artwork to fall back on. Some entries in EmojiData (e.g. newer
+    // additions like the "smiling face with tear") are only a few Unicode versions old,
+    // and plenty of phones still ship an emoji font from before that glyph existed. On
+    // those devices the TextView doesn't fail or leave a blank cell - it renders the
+    // font's "tofu" placeholder (a small boxed x), which is what showed up as a broken
+    // square in the middle of an otherwise normal-looking Smileys page. Paint.hasGlyph
+    // (API 23+, and this app's minSdk is already above that) can check per-emoji whether
+    // the active font actually has a drawable glyph for it, so unsupported ones are
+    // filtered out before they ever reach the adapter's data set - a slightly smaller
+    // grid instead of a broken box for whoever's on an older emoji font.
+    // hasGlyph needs API 23; this app's minSdk is 21, so guard it - on the handful of
+    // API 21/22 devices left, this just no-ops back to the old (unfiltered) behavior
+    // instead of crashing.
+    private val probePaint: Paint? =
+        if (emojiStyle == EmojiStyle.SYSTEM && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M)
+            Paint().apply { typeface = Typeface.DEFAULT }
+        else null
+
+    private fun supported(emoji: String): Boolean = probePaint?.hasGlyph(emoji) ?: true
+
+    private val items = ArrayList<String>(emojis.filter(::supported))
 
     private fun dp(value: Float): Int =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, context.resources.displayMetrics).toInt()
@@ -42,6 +74,17 @@ class EmojiAdapter(
      *  second, device-independent safety net so a large "Text Size" preference value can't
      *  overflow the cell either, on any screen width.
      *
+     *  That clamp alone still wasn't enough, though: it only protects against the
+     *  requested *font-metrics* box being wider than the cell. Colour emoji artwork
+     *  routinely paints wider than its own font-metrics box - the same overshoot this
+     *  file already compensates for vertically in RECENT_EMOJI_ROW_VERTICAL_PADDING_DP's
+     *  comment above - and at the default Text Size the requested box is comfortably
+     *  under the cell width, so the minOf() clamp below never even engages; the artwork
+     *  still visibly touches/crosses the cell edge on many devices' emoji sets. Scaling
+     *  the requested size down by EMOJI_OVERSHOOT_SAFETY first (not just clamping)
+     *  reserves that overshoot headroom unconditionally, regardless of which branch of
+     *  minOf() ends up chosen.
+     *
      *  "Grid width" here isn't the full screen width - emoji_grid itself has
      *  android:padding="4dp" (emoji_layout.xml) on each side, and the keyboard root has
      *  android:paddingStart/End="2dp" (keyboard_layout.xml) outside that, so the real
@@ -49,7 +92,7 @@ class EmojiAdapter(
      *  subtracted below so the clamp isn't a few px too generous and still lets the glyph's
      *  edge touch the cell boundary. */
     private fun glyphTextSizePx(): Float {
-        val requestedPx = dp(textSize.toFloat()).toFloat()
+        val requestedPx = dp(textSize.toFloat()).toFloat() * EMOJI_OVERSHOOT_SAFETY
         val outerPaddingPx = dp(4f + 2f) * 2 // emoji_grid's 4dp + keyboard root's 2dp, both sides
         val cellWidthPx = (context.resources.displayMetrics.widthPixels - outerPaddingPx) / 8f
         val maxGlyphPx = cellWidthPx - dp(8f) * 2 // leaves room for the pad(8dp) used on each side below
@@ -151,7 +194,7 @@ class EmojiAdapter(
 
     fun updateEmojis(newEmojis: List<String>) {
         items.clear()
-        items.addAll(newEmojis)
+        items.addAll(newEmojis.filter(::supported))
         notifyDataSetChanged()
     }
 
