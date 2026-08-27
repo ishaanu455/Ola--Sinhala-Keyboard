@@ -69,6 +69,13 @@ class KeyboardView(
         // their font metrics box on some devices. Without this buffer the row was
         // sized purely off the sp value and glyphs got clipped top/bottom.
         private const val RECENT_EMOJI_ROW_VERTICAL_PADDING_DP = 24f
+
+        // The Settings > "Keyboard Height" slider (key: "height_percentage", range
+        // 70-190, default 100) is a PERCENTAGE, not a dp value - the pref name says
+        // so, and the layout XML's own default row height is 48dp. So "100" must
+        // mean "100% of 48dp", i.e. 48dp. This is the baseline that percentage is
+        // applied against.
+        private const val BASE_ROW_HEIGHT_DP = 48f
     }
 
     /** Height to use for the number row given the current base [rowHeight]. */
@@ -96,17 +103,16 @@ class KeyboardView(
     private fun dp(value: Float): Int =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, context.resources.displayMetrics).toInt()
 
-    /** [rowHeight] (the Settings > Keyboard Height slider value, 70-190) was being applied
-     *  straight to layoutParams.height as if it were already pixels - on a phone with
-     *  density=1 that's a reasonable ~100dp-tall row, but on a typical modern phone
-     *  (density 2.5-4) the very same "100" collapses to a ~25-40dp row, i.e. thin/squished
-     *  keys on first install before anyone's touched the slider, and the fix only "worked"
-     *  by manually cranking the slider up to compensate for that one device's density -
-     *  it wasn't actually fixed, just guessed-around for that specific screen. Treating the
-     *  slider value as dp and converting through density here (like every other size in
-     *  this file) makes the same slider value produce the same physical row height on every
-     *  device, so this only ever needs setting once, not per-device. */
-    private var rowHeightPx: Int = dp(rowHeight.toFloat())
+    /** [rowHeight] is the Settings > Keyboard Height slider value - a PERCENTAGE
+     *  (70-190, default 100) of [BASE_ROW_HEIGHT_DP], not a dp value on its own.
+     *  It was previously being passed straight into dp() as if "100" meant "100dp",
+     *  so on first install (before anyone touches the slider) every row rendered at
+     *  ~100dp instead of the intended 48dp - roughly double height, which is why the
+     *  keyboard opened taking up more than half the screen. Scaling the 48dp baseline
+     *  by rowHeight/100 first, then converting through density, makes "100" mean
+     *  "100% of the normal 48dp row" as the pref name and default imply, and it's
+     *  still device-independent since dp() still goes through density last. */
+    private var rowHeightPx: Int = dp(BASE_ROW_HEIGHT_DP * rowHeight / 100f)
 
     interface ClickListener {
         fun letterOrSymbolClick(tag: String)
@@ -1526,10 +1532,12 @@ class KeyboardView(
 
     /** Hot-update all row heights (called when height slider changes without keyboard recreate). */
     fun updateRowHeight(newRowHeight: Int) {
-        // newRowHeight is the raw Settings slider value (dp) - convert through density the
-        // same way the constructor does, and keep rowHeightPx in sync so the swipe-gesture
-        // Y-thresholds above (which compare against real touch-event pixels) stay correct too.
-        rowHeightPx = dp(newRowHeight.toFloat())
+        // newRowHeight is the raw Settings slider value - a percentage of
+        // BASE_ROW_HEIGHT_DP (see constructor comment above), not a dp value on its
+        // own. Scale first, then convert through density, and keep rowHeightPx in
+        // sync so the swipe-gesture Y-thresholds above (which compare against real
+        // touch-event pixels) stay correct too.
+        rowHeightPx = dp(BASE_ROW_HEIGHT_DP * newRowHeight / 100f)
         // recentEmojiRow is intentionally NOT updated here - its height is sized
         // off the emoji glyph size (recentEmojiRowHeightPx()) set at init, not
         // this keyboard-height slider.
