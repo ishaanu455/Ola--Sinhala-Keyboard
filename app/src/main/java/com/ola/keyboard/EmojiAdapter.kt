@@ -40,10 +40,18 @@ class EmojiAdapter(
      *  Sizing off density only (like dp(), not scaledDensity) removes that source of
      *  variance entirely, and clamping against the actual computed cell width below is a
      *  second, device-independent safety net so a large "Text Size" preference value can't
-     *  overflow the cell either, on any screen width. */
+     *  overflow the cell either, on any screen width.
+     *
+     *  "Grid width" here isn't the full screen width - emoji_grid itself has
+     *  android:padding="4dp" (emoji_layout.xml) on each side, and the keyboard root has
+     *  android:paddingStart/End="2dp" (keyboard_layout.xml) outside that, so the real
+     *  content width available to the 8 columns is (screen width - 2*(4dp+2dp)) - both are
+     *  subtracted below so the clamp isn't a few px too generous and still lets the glyph's
+     *  edge touch the cell boundary. */
     private fun glyphTextSizePx(): Float {
         val requestedPx = dp(textSize.toFloat()).toFloat()
-        val cellWidthPx = context.resources.displayMetrics.widthPixels / 8f
+        val outerPaddingPx = dp(4f + 2f) * 2 // emoji_grid's 4dp + keyboard root's 2dp, both sides
+        val cellWidthPx = (context.resources.displayMetrics.widthPixels - outerPaddingPx) / 8f
         val maxGlyphPx = cellWidthPx - dp(8f) * 2 // leaves room for the pad(8dp) used on each side below
         return if (maxGlyphPx > 0f) minOf(requestedPx, maxGlyphPx) else requestedPx
     }

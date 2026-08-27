@@ -96,6 +96,18 @@ class KeyboardView(
     private fun dp(value: Float): Int =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, context.resources.displayMetrics).toInt()
 
+    /** [rowHeight] (the Settings > Keyboard Height slider value, 70-190) was being applied
+     *  straight to layoutParams.height as if it were already pixels - on a phone with
+     *  density=1 that's a reasonable ~100dp-tall row, but on a typical modern phone
+     *  (density 2.5-4) the very same "100" collapses to a ~25-40dp row, i.e. thin/squished
+     *  keys on first install before anyone's touched the slider, and the fix only "worked"
+     *  by manually cranking the slider up to compensate for that one device's density -
+     *  it wasn't actually fixed, just guessed-around for that specific screen. Treating the
+     *  slider value as dp and converting through density here (like every other size in
+     *  this file) makes the same slider value produce the same physical row height on every
+     *  device, so this only ever needs setting once, not per-device. */
+    private var rowHeightPx: Int = dp(rowHeight.toFloat())
+
     interface ClickListener {
         fun letterOrSymbolClick(tag: String)
         fun emojiClick(tag: String)
@@ -251,9 +263,9 @@ class KeyboardView(
                     if (!startIgnoreSwipe && !touchStartedInRecentEmojiRow && !panelShowing) {
                         val distanceFromDownX: Float = swipeStepStartX - ev.x
 
-                        if (swipeToErase && ev.y < rowHeight * 4 && distanceFromDownX > swipeStepDistance)
+                        if (swipeToErase && ev.y < rowHeightPx * 4 && distanceFromDownX > swipeStepDistance)
                             currentSwipeActionType = SwipeActionType.ERASE
-                        else if (swipeToMoveCursor && ev.y >= rowHeight * 4 && (distanceFromDownX > swipeStepDistance || distanceFromDownX < -swipeStepDistance))
+                        else if (swipeToMoveCursor && ev.y >= rowHeightPx * 4 && (distanceFromDownX > swipeStepDistance || distanceFromDownX < -swipeStepDistance))
                             currentSwipeActionType = SwipeActionType.MOVE_CURSOR
 
                         return currentSwipeActionType != SwipeActionType.NONE
@@ -392,11 +404,11 @@ class KeyboardView(
             binding.recentEmojiRow.layoutParams.height = recentEmojiRowHeightPx()
             updateRecentEmojiRowVisibility()
 
-            binding.keyRow1.layoutParams.height = numRowHeight(rowHeight)
-            binding.keyRow2.layoutParams.height = rowHeight
-            binding.keyRow3.layoutParams.height = rowHeight
-            binding.keyRow4.layoutParams.height = rowHeight
-            binding.keyRow5.layoutParams.height = rowHeight
+            binding.keyRow1.layoutParams.height = numRowHeight(rowHeightPx)
+            binding.keyRow2.layoutParams.height = rowHeightPx
+            binding.keyRow3.layoutParams.height = rowHeightPx
+            binding.keyRow4.layoutParams.height = rowHeightPx
+            binding.keyRow5.layoutParams.height = rowHeightPx
 
             for (row in binding.keyboardRows.children)
                 if (row is LinearLayout)
@@ -413,7 +425,7 @@ class KeyboardView(
             // Target icon size based on text size (roughly matching text height)
             val targetIconSize = textSize * density
 
-            val padding = max(0, ((rowHeight - targetIconSize) / 2).toInt())
+            val padding = max(0, ((rowHeightPx - targetIconSize) / 2).toInt())
 
             binding.emojiView.btnBackspace.setPadding(padding, padding, padding, padding)
             binding.emojiView.btnAbc.setPadding(padding, padding, padding, padding)
@@ -551,9 +563,9 @@ class KeyboardView(
             // (Final height - including recent-row compensation - is applied below,
             // once the clipboard panel section has also been set up.)
             binding.emojiView.root.layoutParams.height =
-                rowHeight * 4 + (if (showNumberRow) numRowHeight(rowHeight) else 0)
+                rowHeightPx * 4 + (if (showNumberRow) numRowHeight(rowHeightPx) else 0)
 
-            binding.emojiView.emojiBottomBar.layoutParams.height = rowHeight
+            binding.emojiView.emojiBottomBar.layoutParams.height = rowHeightPx
             // emoji_categories_scroll now lives directly in the top bar (same line
             // as the back arrow) instead of its own row inside emoji_layout.xml, so
             // its height is simply match_parent against the top bar's fixed height -
@@ -633,10 +645,10 @@ class KeyboardView(
                 categoryView.scaleType = ImageView.ScaleType.CENTER_INSIDE
                 // Filled category glyphs read fine smaller than the old outline ones did,
                 // so shrink the padding to let them render bigger and bolder in the tab strip.
-                val iconPadding = (rowHeight * 0.20f).toInt()
+                val iconPadding = (rowHeightPx * 0.20f).toInt()
                 categoryView.setPadding(iconPadding, iconPadding, iconPadding, iconPadding)
                 categoryView.layoutParams =
-                    LinearLayout.LayoutParams(rowHeight, LayoutParams.MATCH_PARENT)
+                    LinearLayout.LayoutParams(rowHeightPx, LayoutParams.MATCH_PARENT)
                 categoryView.tag = category
                 categoryView.setOnClickListener(categoryClickListener)
                 categoryView.setOnLongClickListener(categoryLongPressListener)
@@ -803,9 +815,9 @@ class KeyboardView(
             // Same row-count fix as the emoji panel above, so the clipboard panel
             // opens at the same height as the normal keyboard, not taller.
             binding.clipboardView.root.layoutParams.height =
-                rowHeight * 4 + (if (showNumberRow) numRowHeight(rowHeight) else 0)
+                rowHeightPx * 4 + (if (showNumberRow) numRowHeight(rowHeightPx) else 0)
             binding.textSelectView.root.layoutParams.height =
-                rowHeight * 4 + (if (showNumberRow) numRowHeight(rowHeight) else 0)
+                rowHeightPx * 4 + (if (showNumberRow) numRowHeight(rowHeightPx) else 0)
 
             // Finalize both panels' heights now that recentEmojiRow is fully configured,
             // adding back the recent-row height if it's currently showing on the plain
@@ -1514,15 +1526,19 @@ class KeyboardView(
 
     /** Hot-update all row heights (called when height slider changes without keyboard recreate). */
     fun updateRowHeight(newRowHeight: Int) {
+        // newRowHeight is the raw Settings slider value (dp) - convert through density the
+        // same way the constructor does, and keep rowHeightPx in sync so the swipe-gesture
+        // Y-thresholds above (which compare against real touch-event pixels) stay correct too.
+        rowHeightPx = dp(newRowHeight.toFloat())
         // recentEmojiRow is intentionally NOT updated here - its height is sized
         // off the emoji glyph size (recentEmojiRowHeightPx()) set at init, not
         // this keyboard-height slider.
-        binding.keyRow1.layoutParams.height = numRowHeight(newRowHeight)
-        binding.keyRow2.layoutParams.height = newRowHeight
-        binding.keyRow3.layoutParams.height = newRowHeight
-        binding.keyRow4.layoutParams.height = newRowHeight
-        binding.keyRow5.layoutParams.height = newRowHeight
-        binding.emojiView.emojiBottomBar.layoutParams.height = newRowHeight
+        binding.keyRow1.layoutParams.height = numRowHeight(rowHeightPx)
+        binding.keyRow2.layoutParams.height = rowHeightPx
+        binding.keyRow3.layoutParams.height = rowHeightPx
+        binding.keyRow4.layoutParams.height = rowHeightPx
+        binding.keyRow5.layoutParams.height = rowHeightPx
+        binding.emojiView.emojiBottomBar.layoutParams.height = rowHeightPx
         // emoji_categories_scroll no longer needs syncing here - it now lives in the
         // top bar with a fixed match_parent height (see keyboard_layout.xml).
         applyPanelHeights()
