@@ -38,18 +38,22 @@ class EmojiTextStyler {
         cancel()
         when (style) {
             EmojiStyle.SYSTEM -> {
-                textView.typeface = Typeface.DEFAULT
+                // Not an emoji-style choice - just the app's own bundled Sinhala/English
+                // font, same as everywhere else in the keyboard.
+                textView.typeface = AppFont.get(context)
                 textView.text = text
             }
             EmojiStyle.CUSTOM -> {
-                // Falls back to the default typeface if the stored font file is
-                // missing or Android can't parse its color-glyph table - same
-                // fallback EmojiAdapter uses for the picker grid.
+                // User's own picked local font (Settings > Emoji Style > Custom) - falls
+                // back to the default typeface if the stored font file is missing or
+                // Android can't parse its color-glyph table, same fallback EmojiAdapter
+                // uses for the picker grid. Left exactly as-is: this is a separate,
+                // user-chosen opt-in and takes priority over the bundled app font.
                 textView.typeface = CustomFontManager.loadTypeface(context) ?: Typeface.DEFAULT
                 textView.text = text
             }
             EmojiStyle.TWEMOJI -> {
-                textView.typeface = Typeface.DEFAULT
+                textView.typeface = AppFont.get(context)
                 textView.text = buildTwemojiSpans(context, textView, text)
             }
         }

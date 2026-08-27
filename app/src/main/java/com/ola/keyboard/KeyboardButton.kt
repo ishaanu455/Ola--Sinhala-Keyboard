@@ -57,6 +57,12 @@ class KeyboardButton : AppCompatTextView {
         context.theme.resolveAttribute(R.attr.foreground, typedValue, true)
         setTextColor(typedValue.data)
 
+        // Bundled Sinhala/English font - main key label and the small long-press
+        // hint drawn in the corner (secondaryLabelPaint is a raw Paint, not a View,
+        // so it needs the typeface set directly rather than via a TextView sweep).
+        typeface = AppFont.get(context)
+        secondaryLabelPaint.typeface = typeface
+
         setOnTouchListener { view, event ->
             // What actually gets committed on long-press: longPressChar wins when set
             // (e.g. Singlish shows a Sinhala corner label but should commit a symbol),
@@ -134,6 +140,7 @@ class KeyboardButton : AppCompatTextView {
         val tv = TextView(context).apply {
             text = label
             textSize = this@KeyboardButton.textSize * 1.4f  // bigger than key text
+            typeface = AppFont.get(context)
             gravity = CENTER
             setTextColor(this@KeyboardButton.currentTextColor)
             setPadding(

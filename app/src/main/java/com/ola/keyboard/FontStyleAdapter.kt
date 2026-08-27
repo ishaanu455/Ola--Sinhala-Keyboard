@@ -32,6 +32,7 @@ class FontStyleAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): StyleViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_font_style, parent, false)
+        AppFont.applyRecursively(view)
         return StyleViewHolder(view)
     }
 

@@ -406,6 +406,13 @@ class KeyboardView(
             }
         }
 
+        // Bundled Sinhala/English font, applied everywhere in the keyboard view tree
+        // in one sweep - keys, suggestion bar, clipboard/emoji/text-select/font-style
+        // panels (all included inside keyboard_layout.xml). Anything added later
+        // dynamically (RecyclerView rows, popups) gets the font at creation time
+        // instead - see ClipboardAdapter, FontStyleAdapter, and showClipFilterMenu().
+        AppFont.applyRecursively(this, context)
+
         try {
             // Number row: hide entirely when the user has toggled it off in Settings
             binding.keyRow1.visibility = if (showNumberRow) View.VISIBLE else View.GONE
@@ -1453,6 +1460,8 @@ class KeyboardView(
             }
             optionsContainer.addView(row)
         }
+
+        AppFont.applyRecursively(popupContent, context)
 
         clipFilterPopup = popup
 

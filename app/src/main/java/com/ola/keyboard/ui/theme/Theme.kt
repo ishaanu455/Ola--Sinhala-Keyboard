@@ -4,16 +4,19 @@ import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import com.ola.keyboard.AppFont
 
 private val DarkColorScheme = darkColorScheme(
     primary = LogoGold,
@@ -47,6 +50,32 @@ private val LightColorScheme = lightColorScheme(
     onSurface = Ink1,
 )
 
+/** Wraps Material3's default Typography, swapping in the app's bundled font
+ *  (res/font/sinhala_sangam_mn.ttf) on every text style so Sinhala/English text
+ *  across Settings, Clips manager, Donate, etc. renders with it instead of
+ *  whatever font family the device happens to be set to. */
+private fun olaTypography(): Typography {
+    val font = AppFont.composeFontFamily()
+    val base = Typography()
+    return Typography(
+        displayLarge = base.displayLarge.copy(fontFamily = font),
+        displayMedium = base.displayMedium.copy(fontFamily = font),
+        displaySmall = base.displaySmall.copy(fontFamily = font),
+        headlineLarge = base.headlineLarge.copy(fontFamily = font),
+        headlineMedium = base.headlineMedium.copy(fontFamily = font),
+        headlineSmall = base.headlineSmall.copy(fontFamily = font),
+        titleLarge = base.titleLarge.copy(fontFamily = font),
+        titleMedium = base.titleMedium.copy(fontFamily = font),
+        titleSmall = base.titleSmall.copy(fontFamily = font),
+        bodyLarge = base.bodyLarge.copy(fontFamily = font),
+        bodyMedium = base.bodyMedium.copy(fontFamily = font),
+        bodySmall = base.bodySmall.copy(fontFamily = font),
+        labelLarge = base.labelLarge.copy(fontFamily = font),
+        labelMedium = base.labelMedium.copy(fontFamily = font),
+        labelSmall = base.labelSmall.copy(fontFamily = font),
+    )
+}
+
 @Composable
 fun OlaTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -74,8 +103,11 @@ fun OlaTheme(
         }
     }
 
+    val typography = remember { olaTypography() }
+
     MaterialTheme(
         colorScheme = colorScheme,
+        typography = typography,
         content = content
     )
 }

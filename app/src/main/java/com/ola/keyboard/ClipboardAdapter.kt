@@ -76,10 +76,12 @@ class ClipboardAdapter(
         return if (viewType == TYPE_HEADER) {
             val view = LayoutInflater.from(parent.context)
                 .inflate(R.layout.item_clipboard_section_header, parent, false)
+            AppFont.applyRecursively(view)
             HeaderViewHolder(view)
         } else {
             val view = LayoutInflater.from(parent.context)
                 .inflate(R.layout.item_clipboard_clip, parent, false)
+            AppFont.applyRecursively(view)
             ClipViewHolder(view)
         }
     }
