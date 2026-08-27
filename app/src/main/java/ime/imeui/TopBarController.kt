@@ -28,6 +28,13 @@ class TopBarController(
     // The Ola brand mark, first icon in the row - same deal: hide while suggestion
     // chips are showing, come back after.
     private val olaLogoButton: View? = null,
+    // The flexible spacer that sits right after the Ola logo (logo_spacer in
+    // keyboard_layout.xml). It has its own layout_weight="1" independent of
+    // olaLogoButton, so hiding the logo alone still left this spacer visible and
+    // claiming a share of the top bar's width - starving the suggestion chips of
+    // room and pushing them off to one side instead of letting them span the
+    // whole bar. Must be hidden/restored in lockstep with olaLogoButton.
+    private val logoSpacer: View? = null,
     // top_bar_icon_row itself - normally width=0dp/weight=1 so its icons right-align
     // against the flexible logo_spacer (see keyboard_layout.xml / KeyboardView). While
     // suggestion chips are showing there's nothing left in the row to right-align (every
@@ -66,6 +73,7 @@ class TopBarController(
         fontsButton?.visibility = View.VISIBLE
         settingsButton?.visibility = View.VISIBLE
         olaLogoButton?.visibility = View.VISIBLE
+        logoSpacer?.visibility = View.VISIBLE
         // Restore the clipboard icon only if the feature is actually enabled in
         // Settings - showSuggestions() hides it unconditionally while a suggestion
         // chip is up, so coming back to "normal" must respect the user's toggle
@@ -81,6 +89,7 @@ class TopBarController(
         fontsButton?.visibility = View.GONE
         settingsButton?.visibility = View.GONE
         olaLogoButton?.visibility = View.GONE
+        logoSpacer?.visibility = View.GONE
         suggestionContainer?.visibility = View.VISIBLE
         for (i in suggestionTextViews.indices) {
             val tv = suggestionTextViews.getOrNull(i)

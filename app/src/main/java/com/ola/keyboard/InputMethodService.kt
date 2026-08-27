@@ -357,7 +357,8 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 keyboardView.textSelectButtonView,
                 keyboardView.fontsButtonView,
                 keyboardView.settingsButtonView,
-                keyboardView.olaLogoButtonView
+                keyboardView.olaLogoButtonView,
+                keyboardView.logoSpacerView
             )
             suggestionTextViews = keyboardView.getSuggestionTextViews()
             keyboardLayout = Prefs.getSelectedLayout(this)
@@ -443,7 +444,8 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 keyboardView.textSelectButtonView,
                 keyboardView.fontsButtonView,
                 keyboardView.settingsButtonView,
-                keyboardView.olaLogoButtonView
+                keyboardView.olaLogoButtonView,
+                keyboardView.logoSpacerView
             )
             suggestionTextViews = keyboardView.getSuggestionTextViews()
 

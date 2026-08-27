@@ -1265,6 +1265,7 @@ class KeyboardView(
     val fontsButtonView: ImageView get() = binding.btnFonts
     val settingsButtonView: ImageView get() = binding.btnSettings
     val olaLogoButtonView: ImageView get() = binding.btnOlaLogo
+    val logoSpacerView: View get() = binding.logoSpacer
     val topBarIconRowView: LinearLayout get() = binding.topBarIconRow
 
     /** True while any of the emoji/clipboard/text-select panels is open. The IME uses
