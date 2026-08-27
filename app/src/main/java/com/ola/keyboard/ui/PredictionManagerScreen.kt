@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +39,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ime.suggest.DefaultDictionary
 import ime.suggest.SinhalaCollation
 import ime.suggest.UserDictionary
 import ime.suggest.UserWordFrequency
@@ -54,6 +56,17 @@ private data class PredictionEntry(
     val word: String,
     val count: Int?,
     val isCustom: Boolean
+)
+
+/** One row in the "All Usage" tab - either a word the user has actually typed
+ *  ([count] set) or one from the keyboard's own bundled dictionary that the
+ *  user has never typed yet ([count] null, [isDefault] true). A word that's
+ *  in both just shows as the learned entry, since its count is the more
+ *  useful of the two. */
+private data class AllUsageEntry(
+    val word: String,
+    val count: Int?,
+    val isDefault: Boolean
 )
 
 /**
@@ -95,9 +108,29 @@ fun PredictionManagerScreen(
             }
             .sortedWith(compareBy(SinhalaCollation.comparator) { it.word })
     }
-    val allUsageWords = remember(refreshToken) {
-        UserWordFrequency.getAllWithCount(context)
-            .sortedWith(Comparator { p1, p2 -> SinhalaCollation.compare(p1.first, p2.first) })
+    // The bundled dictionary (~25k words) is read from assets once and cached in
+    // DefaultDictionary itself, but the read is still async so it doesn't jank
+    // the screen the first time this tab is opened.
+    var defaultWords by remember { mutableStateOf<List<String>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        defaultWords = DefaultDictionary.getAll(context)
+    }
+
+    val allUsageWords = remember(refreshToken, defaultWords) {
+        val learnedCounts = UserWordFrequency.getAllWithCount(context).toMap()
+        val allWords = LinkedHashSet<String>().apply {
+            addAll(learnedCounts.keys)
+            addAll(defaultWords)
+        }
+        allWords
+            .map { word ->
+                AllUsageEntry(
+                    word = word,
+                    count = learnedCounts[word],
+                    isDefault = word !in learnedCounts
+                )
+            }
+            .sortedWith(compareBy(SinhalaCollation.comparator) { it.word })
     }
 
     var showAddDialog by remember { mutableStateOf(false) }
@@ -151,10 +184,14 @@ fun PredictionManagerScreen(
                     }
                 )
                 else -> AllUsageList(
-                    words = allUsageWords,
-                    onDelete = { word ->
-                        UserWordFrequency.remove(context, word)
-                        refreshToken++
+                    entries = allUsageWords,
+                    onDelete = { entry ->
+                        // Only learned words can be removed - the bundled
+                        // dictionary is a shipped asset, not user data.
+                        if (!entry.isDefault) {
+                            UserWordFrequency.remove(context, entry.word)
+                            refreshToken++
+                        }
                     }
                 )
             }
@@ -191,18 +228,10 @@ private fun MyPredictionList(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 4.dp)
     ) {
+        // Just the word itself now - no "Added" / "Used N times" usage line.
         items(entries, key = { it.word }) { entry ->
-            // "Added" = only in the custom list, never actually typed yet.
-            // "Used N times" = has been typed/learned, whether or not it was also
-            // manually added. Both = manually added *and* has usage history.
-            val secondary = when {
-                entry.isCustom && entry.count != null -> "Added • Used ${entry.count} times"
-                entry.isCustom -> "Added"
-                else -> "Used ${entry.count} times"
-            }
             WordRow(
                 primaryText = entry.word,
-                secondaryText = secondary,
                 onDelete = { onDelete(entry) }
             )
         }
@@ -211,10 +240,10 @@ private fun MyPredictionList(
 
 @Composable
 private fun AllUsageList(
-    words: List<Pair<String, Int>>,
-    onDelete: (String) -> Unit
+    entries: List<AllUsageEntry>,
+    onDelete: (AllUsageEntry) -> Unit
 ) {
-    if (words.isEmpty()) {
+    if (entries.isEmpty()) {
         EmptyState(
             message = "ඔබ තවම කිසිදු වචනයක් ටයිප් කර නැත."
         )
@@ -224,11 +253,13 @@ private fun AllUsageList(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 4.dp)
     ) {
-        items(words, key = { it.first }) { (word, count) ->
+        items(entries, key = { it.word }) { entry ->
             WordRow(
-                primaryText = word,
-                secondaryText = "Used $count times",
-                onDelete = { onDelete(word) }
+                primaryText = entry.word,
+                // Bundled-dictionary words have no usage count and can't be
+                // removed, so they get no secondary line and no delete icon.
+                secondaryText = entry.count?.let { "Used $it times" },
+                onDelete = if (entry.isDefault) null else { { onDelete(entry) } }
             )
         }
     }
@@ -237,8 +268,8 @@ private fun AllUsageList(
 @Composable
 private fun WordRow(
     primaryText: String,
-    secondaryText: String?,
-    onDelete: () -> Unit
+    secondaryText: String? = null,
+    onDelete: (() -> Unit)?
 ) {
     Row(
         modifier = Modifier
@@ -258,12 +289,14 @@ private fun WordRow(
                 )
             }
         }
-        IconButton(onClick = onDelete) {
-            Icon(
-                Icons.Filled.Delete,
-                contentDescription = "Delete",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        if (onDelete != null) {
+            IconButton(onClick = onDelete) {
+                Icon(
+                    Icons.Filled.Delete,
+                    contentDescription = "Delete",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

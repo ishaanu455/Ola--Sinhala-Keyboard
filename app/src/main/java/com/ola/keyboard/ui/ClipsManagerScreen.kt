@@ -1,5 +1,6 @@
 package com.ola.keyboard.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,8 +12,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -66,7 +69,7 @@ import com.ola.keyboard.ClipboardData
  * FAB; tapping a clip while selecting toggles it instead of pasting it (this
  * screen never pastes - that's only what the in-keyboard panel does).
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ClipsManagerScreen(onBackClick: () -> Unit) {
     val context = LocalContext.current
@@ -133,12 +136,19 @@ fun ClipsManagerScreen(onBackClick: () -> Unit) {
                 )
             }
         } else {
-            LazyColumn(
+            // 2-column staggered grid, same layout the in-keyboard clipboard panel uses
+            // (see ClipboardAdapter), instead of a single full-width column - so clips
+            // sit side by side and short ones don't waste half the row.
+            LazyVerticalStaggeredGrid(
+                columns = StaggeredGridCells.Fixed(2),
                 modifier = Modifier.padding(paddingValues).fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 96.dp)
+                contentPadding = PaddingValues(horizontal = 4.dp, top = 4.dp, bottom = 96.dp),
+                verticalItemSpacing = 0.dp
             ) {
                 if (pinned.isNotEmpty()) {
-                    item(key = "header_pinned") { SectionHeader(stringResource(R.string.clipboard_section_pinned)) }
+                    item(key = "header_pinned", span = StaggeredGridItemSpan.FullLine) {
+                        SectionHeader(stringResource(R.string.clipboard_section_pinned))
+                    }
                     items(pinned, key = { it.id }) { clip ->
                         ClipRow(
                             clip = clip,
@@ -156,7 +166,9 @@ fun ClipsManagerScreen(onBackClick: () -> Unit) {
                     }
                 }
                 if (others.isNotEmpty()) {
-                    item(key = "header_others") { SectionHeader(stringResource(R.string.clipboard_section_others)) }
+                    item(key = "header_others", span = StaggeredGridItemSpan.FullLine) {
+                        SectionHeader(stringResource(R.string.clipboard_section_others))
+                    }
                     items(others, key = { it.id }) { clip ->
                         ClipRow(
                             clip = clip,
@@ -263,6 +275,13 @@ private fun ClipRow(
                 fontSize = 15.sp,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
+                // Explicit full-contrast color instead of the Card's auto-picked
+                // content color: unselected cards use surfaceVariant as their
+                // container, which pairs with onSurfaceVariant (a deliberately
+                // muted tone meant for secondary text) - that made the clip text
+                // itself look faded. onSurface matches the bright text used
+                // everywhere else in Settings.
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f)
             )
             if (!selectionMode) {
