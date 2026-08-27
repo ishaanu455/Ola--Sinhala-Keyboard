@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ime.suggest.SinhalaCollation
@@ -44,11 +45,27 @@ import ime.suggest.UserWordFrequency
 private const val TAB_MY_PREDICTION = 0
 private const val TAB_ALL_USAGE = 1
 
+/** One row in the "My Prediction" tab - a word from either source (or both) that
+ *  actually feeds live suggestions (see SuggestionEngine.suggest(), which merges
+ *  UserDictionary.getByPrefix() and UserWordFrequency.getByPrefix() together).
+ *  [count] is null for a word that was only ever added manually and has never
+ *  actually been typed/learned yet. */
+private data class PredictionEntry(
+    val word: String,
+    val count: Int?,
+    val isCustom: Boolean
+)
+
 /**
  * Lets the user browse and manage the two word lists that feed keyboard
  * suggestions: the words they've manually added ("My Prediction", via
  * [UserDictionary]) and every word the keyboard has learned from their typing
  * ("All Usage", via [UserWordFrequency]). Both are on-device only.
+ *
+ * "My Prediction" shows the union of both sources - not just the manually-added
+ * ones - since a learned word is just as much a part of "what predicts for me"
+ * as a hand-added one; "All Usage" stays a pure, unfiltered view of everything
+ * the keyboard has picked up from typing, with its raw usage count.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,7 +79,21 @@ fun PredictionManagerScreen(
     var refreshToken by remember { mutableIntStateOf(0) }
 
     val myPredictionWords = remember(refreshToken) {
-        UserDictionary.getAll(context).sortedWith(SinhalaCollation.comparator)
+        val customWords = UserDictionary.getAll(context)
+        val learnedCounts = UserWordFrequency.getAllWithCount(context).toMap()
+        val allWords = LinkedHashSet<String>().apply {
+            addAll(customWords)
+            addAll(learnedCounts.keys)
+        }
+        allWords
+            .map { word ->
+                PredictionEntry(
+                    word = word,
+                    count = learnedCounts[word],
+                    isCustom = word in customWords
+                )
+            }
+            .sortedWith(compareBy(SinhalaCollation.comparator) { it.word })
     }
     val allUsageWords = remember(refreshToken) {
         UserWordFrequency.getAllWithCount(context)
@@ -108,9 +139,14 @@ fun PredictionManagerScreen(
 
             when (selectedTab) {
                 TAB_MY_PREDICTION -> MyPredictionList(
-                    words = myPredictionWords,
-                    onDelete = { word ->
-                        UserDictionary.remove(context, word)
+                    entries = myPredictionWords,
+                    onDelete = { entry ->
+                        // A word can live in either store, or both (manually added
+                        // AND since learned from typing) - clear it out of whichever
+                        // actually has it so it doesn't silently reappear from the
+                        // other one on the next refresh.
+                        if (entry.isCustom) UserDictionary.remove(context, entry.word)
+                        if (entry.count != null) UserWordFrequency.remove(context, entry.word)
                         refreshToken++
                     }
                 )
@@ -142,10 +178,10 @@ fun PredictionManagerScreen(
 
 @Composable
 private fun MyPredictionList(
-    words: List<String>,
-    onDelete: (String) -> Unit
+    entries: List<PredictionEntry>,
+    onDelete: (PredictionEntry) -> Unit
 ) {
-    if (words.isEmpty()) {
+    if (entries.isEmpty()) {
         EmptyState(
             message = "තවම ඔබ වචන එකතු කර නැත. එකතු කිරීමට ඉහත + බොත්තම ඔබන්න."
         )
@@ -155,11 +191,19 @@ private fun MyPredictionList(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 4.dp)
     ) {
-        items(words, key = { it }) { word ->
+        items(entries, key = { it.word }) { entry ->
+            // "Added" = only in the custom list, never actually typed yet.
+            // "Used N times" = has been typed/learned, whether or not it was also
+            // manually added. Both = manually added *and* has usage history.
+            val secondary = when {
+                entry.isCustom && entry.count != null -> "Added • Used ${entry.count} times"
+                entry.isCustom -> "Added"
+                else -> "Used ${entry.count} times"
+            }
             WordRow(
-                primaryText = word,
-                secondaryText = null,
-                onDelete = { onDelete(word) }
+                primaryText = entry.word,
+                secondaryText = secondary,
+                onDelete = { onDelete(entry) }
             )
         }
     }
@@ -204,11 +248,12 @@ private fun WordRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = primaryText, fontSize = 17.sp)
+            Text(text = primaryText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
             if (secondaryText != null) {
                 Text(
                     text = secondaryText,
                     fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
