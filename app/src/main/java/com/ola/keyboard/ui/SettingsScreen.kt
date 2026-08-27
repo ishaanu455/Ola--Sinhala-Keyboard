@@ -98,13 +98,9 @@ private enum class SettingsSection(val title: String, val summary: String) {
  */
 @Composable
 fun SettingsScreen() {
-    // rememberSaveable (not plain remember) - AppCompatDelegate.setDefaultNightMode()
-    // (triggered from MainActivity whenever the Appearance section's
-    // "Automatic theme" / "Dark theme" switches are flipped) recreates the host
-    // Activity under the hood even though nothing here calls recreate()
-    // directly. A plain `remember` doesn't survive that recreate, so the section
-    // silently reset to null and the user got bounced back to the Settings home
-    // list mid-toggle. rememberSaveable persists it across the recreate instead.
+    // rememberSaveable (not plain remember): survives real configuration changes
+    // (rotation, etc.) so the user never gets silently bounced back to the Settings
+    // home list out of an open sub-screen.
     var currentSection by rememberSaveable { mutableStateOf<SettingsSection?>(null) }
 
     // Without this, the device back button isn't consumed by the in-app settings
