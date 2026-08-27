@@ -88,8 +88,20 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
         if (key == "automatic_theme" || key == "dark_theme") {
+            // applyTheme()'s setDefaultNightMode() call is enough on its own: it's a
+            // configuration change, and every OlaTheme() call in this app either reads
+            // darkTheme via Compose's own isSystemInDarkTheme() (SetupScreen, before the
+            // keyboard is enabled/selected - reactive, recomposes on its own) or is
+            // hardcoded to darkTheme = true regardless of this preference (SettingsScaffold
+            // - see the comment on that OlaTheme(darkTheme = true) call in MainScreen.kt).
+            // Either way nothing here actually needs a full Activity recreate() to look
+            // right, and recreate() has a real cost: SettingsScreen's currentSection
+            // navigation state (plain remember { mutableStateOf(...) }, not persisted
+            // anywhere) lives on this Activity's Compose tree, so tearing the Activity
+            // down and rebuilding it wipes that state - which is what was silently
+            // bouncing the user back to the Settings home list every time they flipped
+            // this one toggle, even though nothing about the toggle needed that at all.
             sharedPreferences?.let { applyTheme(it) }
-            recreate()
         }
     }
 
