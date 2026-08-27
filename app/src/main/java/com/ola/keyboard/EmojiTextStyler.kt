@@ -22,6 +22,12 @@ import coil.target.Target
  * style was picked, so a Twemoji or custom-font choice only ever showed up in
  * the emoji grid itself (see [EmojiAdapter], which this mirrors).
  *
+ * NOTE: The user's custom emoji font (EmojiStyle.CUSTOM) is intentionally
+ * NOT applied here for the clipboard or suggestion bar. It is only applied in
+ * the emoji picker tabs and the recent-emoji row (see [EmojiAdapter]).
+ * The clipboard and suggestion bar always use the bundled app font (AppFont),
+ * regardless of which emoji style is active.
+ *
  * One instance is meant to live alongside the TextView it styles - a
  * suggestion chip, or a recycled clipboard row - so an in-flight Twemoji image
  * load from a previous bind can be cancelled before starting a new one.
@@ -33,7 +39,11 @@ class EmojiTextStyler {
     /** Renders [text] into [textView] using [style]. Safe to call repeatedly on
      *  the same TextView (e.g. a suggestion chip being reused, or a
      *  RecyclerView rebind) - always cancels whatever this styler was still
-     *  loading before starting the new bind. */
+     *  loading before starting the new bind.
+     *
+     *  For EmojiStyle.CUSTOM: the clipboard and suggestion bar always use the
+     *  bundled AppFont (not the user's custom emoji font). The custom font only
+     *  applies inside the emoji picker tabs and the recent-emoji row. */
     fun bind(context: Context, textView: TextView, text: CharSequence, style: EmojiStyle) {
         cancel()
         when (style) {
@@ -44,12 +54,12 @@ class EmojiTextStyler {
                 textView.text = text
             }
             EmojiStyle.CUSTOM -> {
-                // User's own picked local font (Settings > Emoji Style > Custom) - falls
-                // back to the default typeface if the stored font file is missing or
-                // Android can't parse its color-glyph table, same fallback EmojiAdapter
-                // uses for the picker grid. Left exactly as-is: this is a separate,
-                // user-chosen opt-in and takes priority over the bundled app font.
-                textView.typeface = CustomFontManager.loadTypeface(context) ?: Typeface.DEFAULT
+                // The user picked a custom emoji font in Settings, but that font is only
+                // meant for the emoji picker grid and the recent-emoji strip (see EmojiAdapter).
+                // The clipboard text and suggestion bar always use the bundled AppFont so
+                // that Sinhala/English text (which dominates these surfaces) always renders
+                // correctly, regardless of what font the user loaded for emoji.
+                textView.typeface = AppFont.get(context)
                 textView.text = text
             }
             EmojiStyle.TWEMOJI -> {
