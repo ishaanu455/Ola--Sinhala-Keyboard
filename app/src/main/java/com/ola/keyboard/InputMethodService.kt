@@ -303,12 +303,19 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
 
     // Settings that require a full KeyboardView rebuild to take effect, since they
     // drive the inflate-time theme/style or per-button text size and have no
-    // cheap hot-update path (unlike row height / number row / recent-emoji row,
-    // which update in place). We snapshot what's currently applied and rebuild
-    // whenever Settings has changed one of these since the keyboard was last shown.
+    // cheap hot-update path (unlike number row / recent-emoji row, which update in
+    // place). We snapshot what's currently applied and rebuild whenever Settings
+    // has changed one of these since the keyboard was last shown.
+    // height_percentage is included here too now - it does have its own lighter
+    // hot-update path (KeyboardView.updateRowHeight, still called unconditionally
+    // below in onStartInputView), but routing it through the same full-rebuild
+    // path as text_size/theme as well is what actually guarantees it takes effect
+    // on next open on every device, rather than depending on that lighter path
+    // alone.
     private var appliedDarkTheme = false
     private var appliedKeyBorders = true
     private var appliedTextSize = -1
+    private var appliedHeightPercentage = -1
     private var appliedEmojiStyle = EmojiStyle.SYSTEM
     private var appliedColorTheme = "ola"
 
@@ -316,6 +323,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         appliedDarkTheme = Prefs.getDarkTheme(this)
         appliedKeyBorders = Prefs.getKeyBorders(this)
         appliedTextSize = Prefs.getTextSize(this)
+        appliedHeightPercentage = Prefs.getRowHeight(this)
         appliedEmojiStyle = Prefs.getEmojiStyle(this)
         appliedColorTheme = Prefs.getColorTheme(this)
     }
@@ -324,6 +332,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         return appliedDarkTheme != Prefs.getDarkTheme(this) ||
             appliedKeyBorders != Prefs.getKeyBorders(this) ||
             appliedTextSize != Prefs.getTextSize(this) ||
+            appliedHeightPercentage != Prefs.getRowHeight(this) ||
             appliedEmojiStyle != Prefs.getEmojiStyle(this) ||
             appliedColorTheme != Prefs.getColorTheme(this)
     }
@@ -359,16 +368,17 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     }
 
     // Fires the moment an appearance-affecting pref changes in Settings, so
-    // Border / Colour Theme / Dark Theme take effect immediately - even if the
-    // keyboard is currently showing behind the Settings screen and never gets
-    // a fresh onStartInputView call before the user switches back to it. The
-    // onStartInputView-driven rebuild above still runs too (harmless no-op if
-    // this listener already caught the change), so either path alone is enough.
+    // Border / Colour Theme / Dark Theme / Text Size / Keyboard Height take effect
+    // immediately - even if the keyboard is currently showing behind the Settings
+    // screen and never gets a fresh onStartInputView call before the user switches
+    // back to it. The onStartInputView-driven rebuild above still runs too
+    // (harmless no-op if this listener already caught the change), so either path
+    // alone is enough.
     private val appearancePrefsListener =
         android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             when (key) {
                 "key_borders", "color_theme", "dark_theme", "automatic_theme",
-                "text_size", "emoji_style" -> rebuildKeyboardViewForAppearanceChange()
+                "text_size", "height_percentage", "emoji_style" -> rebuildKeyboardViewForAppearanceChange()
             }
         }
 
