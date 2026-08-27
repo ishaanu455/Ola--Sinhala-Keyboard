@@ -1348,11 +1348,26 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                     // InputConnection.commitText() contract, so no extra cleanup needed.
                     ic.setComposingText(output, 1)
                 } else {
-                    // Also finalize any open composing region before a plain commit,
-                    // so commitText() doesn't replace the composing span unexpectedly
-                    // in apps that track the composing region separately (e.g. Chrome).
-                    if (output.isNotEmpty()) ic.finishComposingText()
-                    commitStyled(ic, output)
+                    // Finalize any open composing region left by the PREVIOUS keystroke
+                    // before this one's commit - unconditionally, regardless of whether
+                    // THIS keystroke's own output is empty. Guarding this on
+                    // output.isNotEmpty() was the bug: "z" (see MARK_SANYAKA above, the
+                    // nasalized-consonant prefix - z+g -> ඟ, z+j etc.) deliberately
+                    // produces no visible output on its own first press, since it just
+                    // remembers "nasalize whatever consonant comes next". That empty
+                    // output meant finishComposingText() got skipped here entirely, so
+                    // commitStyled(ic, "") ran directly against whatever the PREVIOUS
+                    // keystroke had left open in an active composing region -
+                    // InputConnection.commitText() replaces an open region's content
+                    // with the given text, so committing "" silently erased it: a bare
+                    // vowel like අ vanished outright, and a still-open vowel sign like
+                    // පෝ's ෝ or ජෝ's ෝ got wiped back down to the bare consonant. Since
+                    // finishComposingText() only LOCKS IN whatever's already visible and
+                    // never deletes anything, calling it first - every time, not just
+                    // when output is non-empty - is always safe and fixes this for any
+                    // keystroke that legitimately has nothing new to show yet.
+                    ic.finishComposingText()
+                    if (output.isNotEmpty()) commitStyled(ic, output)
                 }
 
                 // Record how to undo this exact keystroke, so BACKSPACE can walk back
