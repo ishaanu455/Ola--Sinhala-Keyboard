@@ -2194,11 +2194,23 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             return
         }
         try {
-            if (Build.VERSION.SDK_INT >= 26) {
-                vibrator.vibrate(VibrationEffect.createOneShot(20, VibrationEffect.DEFAULT_AMPLITUDE))
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(20)
+            when {
+                Build.VERSION.SDK_INT >= 29 -> {
+                    // EFFECT_TICK is the OS's own short, crisp "tap" haptic - tuned
+                    // per device by the OEM's haptics engine, so it feels much
+                    // snappier/more premium than a raw amplitude pulse (closer to
+                    // what Gboard/system keyboards use for keypress feedback).
+                    vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+                }
+                Build.VERSION.SDK_INT >= 26 -> {
+                    // No predefined effects before API 29 - a short 15ms pulse is
+                    // the closest raw approximation of the same quick tick.
+                    vibrator.vibrate(VibrationEffect.createOneShot(15, VibrationEffect.DEFAULT_AMPLITUDE))
+                }
+                else -> {
+                    @Suppress("DEPRECATION")
+                    vibrator.vibrate(15)
+                }
             }
         } catch (t: Throwable) {
             Log.e("IME", "vibrate failed", t)
