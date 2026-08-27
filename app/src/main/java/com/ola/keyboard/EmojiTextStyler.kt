@@ -30,26 +30,47 @@ class EmojiTextStyler {
 
     private val pending = mutableListOf<Disposable>()
 
+    // Captured the first time this styler ever binds a TextView - i.e. whatever
+    // typeface that view naturally had right after inflation, before this class
+    // touched it. This is what SYSTEM/TWEMOJI mode resets back to instead of the
+    // hardcoded Typeface.DEFAULT singleton. The two are NOT the same thing: on
+    // devices with a system-wide custom font (Samsung/Xiaomi/Realme "Font style"
+    // settings, iFont, etc. - common for Sinhala users), an untouched TextView
+    // resolves its typeface dynamically against the device's current font config,
+    // but Typeface.DEFAULT is a static field the framework resolves once and
+    // caches for the process's lifetime, so it does not track that device-wide
+    // font. That's why the keyboard's own key labels and the emoji grid's SYSTEM
+    // tiles (neither of which ever assigns .typeface) correctly picked up the
+    // device font while these suggestion chips - explicitly reset to
+    // Typeface.DEFAULT on every bind - kept showing the plain stock font.
+    private var naturalTypeface: Typeface? = null
+    private var naturalTypefaceCaptured = false
+
     /** Renders [text] into [textView] using [style]. Safe to call repeatedly on
      *  the same TextView (e.g. a suggestion chip being reused, or a
      *  RecyclerView rebind) - always cancels whatever this styler was still
      *  loading before starting the new bind. */
     fun bind(context: Context, textView: TextView, text: CharSequence, style: EmojiStyle) {
         cancel()
+        if (!naturalTypefaceCaptured) {
+            naturalTypeface = textView.typeface
+            naturalTypefaceCaptured = true
+        }
         when (style) {
             EmojiStyle.SYSTEM -> {
-                textView.typeface = Typeface.DEFAULT
+                textView.typeface = naturalTypeface
                 textView.text = text
             }
             EmojiStyle.CUSTOM -> {
-                // Falls back to the default typeface if the stored font file is
-                // missing or Android can't parse its color-glyph table - same
-                // fallback EmojiAdapter uses for the picker grid.
-                textView.typeface = CustomFontManager.loadTypeface(context) ?: Typeface.DEFAULT
+                // Falls back to the device's natural typeface (not the stock
+                // Typeface.DEFAULT) if the stored font file is missing or Android
+                // can't parse its color-glyph table - same fallback EmojiAdapter
+                // uses for the picker grid, just pointed at the right default.
+                textView.typeface = CustomFontManager.loadTypeface(context) ?: naturalTypeface
                 textView.text = text
             }
             EmojiStyle.TWEMOJI -> {
-                textView.typeface = Typeface.DEFAULT
+                textView.typeface = naturalTypeface
                 textView.text = buildTwemojiSpans(context, textView, text)
             }
         }
