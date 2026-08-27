@@ -14,11 +14,15 @@ enum class CharType { SWARA, WYANJANA, PILI, LAKUNU, UNKNOWN }
  * CUSTOM  - renders emoji using a .ttf/.otf font file the user picks from their own device
  *           storage. The app never bundles or distributes this file; it only reads the one
  *           local copy the user explicitly selected via the system file picker.
+ * BUNDLED - renders emoji using one of the .ttf font packs shipped inside the app itself
+ *           (assets/fonts/), picked from a radio list. Fully offline, no download or file
+ *           picker needed - see [BundledEmojiFonts].
  */
 enum class EmojiStyle(val id: String, val displayName: String) {
     SYSTEM("system", "Mobile (System Default)"),
     TWEMOJI("twemoji", "iOS-style (Twemoji, open-source)"),
-    CUSTOM("custom", "Custom (Your Font File)");
+    CUSTOM("custom", "Custom (Your Font File)"),
+    BUNDLED("bundled", "Emoji Font Packs");
 
     companion object {
         fun fromId(id: String?): EmojiStyle = entries.find { it.id == id } ?: SYSTEM

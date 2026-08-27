@@ -49,6 +49,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
@@ -62,8 +64,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import android.widget.TextView
 import ime.suggest.UserDataBackup
 import kotlinx.coroutines.launch
+import com.ola.keyboard.BundledEmojiFonts
 import com.ola.keyboard.BuildConfig
 import com.ola.keyboard.CustomFontManager
 import com.ola.keyboard.EmojiDownloader
@@ -782,6 +787,8 @@ private fun EmojiStyleSection() {
     var downloadFailed by remember { mutableStateOf(false) }
     var hasCustomFont by remember { mutableStateOf(CustomFontManager.hasCustomFont(context)) }
     var customFontImportFailed by remember { mutableStateOf(false) }
+    val bundledFonts = remember { BundledEmojiFonts.list(context) }
+    var selectedBundledFont by remember { mutableStateOf(prefs.bundledEmojiFontFile) }
 
     val fontPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -905,6 +912,45 @@ private fun EmojiStyleSection() {
         }
     }
 
+    // Font packs bundled inside the app itself (assets/fonts/) - fully offline, no
+    // download or file picker needed, unlike TWEMOJI/CUSTOM above. See BundledEmojiFonts
+    // for the naming rule: whatever a .ttf is named in that folder is its display name.
+    RadioOptionPreference(
+        title = EmojiStyle.BUNDLED.displayName,
+        summary = if (bundledFonts.isEmpty())
+            "No font packs bundled with this app"
+        else
+            "Choose from ${bundledFonts.size} font pack(s) bundled with the app - fully offline",
+        selected = selectedStyle == EmojiStyle.BUNDLED,
+        onClick = {
+            if (bundledFonts.isNotEmpty()) {
+                selectedStyle = EmojiStyle.BUNDLED
+                prefs.emojiStyle = EmojiStyle.BUNDLED
+                // First time picking this style: default to whatever was saved before,
+                // falling back to the first bundled pack if nothing valid was saved yet.
+                if (selectedBundledFont == null || bundledFonts.none { it.fileName == selectedBundledFont }) {
+                    selectedBundledFont = bundledFonts.first().fileName
+                    prefs.bundledEmojiFontFile = selectedBundledFont
+                }
+            }
+        }
+    )
+
+    if (selectedStyle == EmojiStyle.BUNDLED && bundledFonts.isNotEmpty()) {
+        Column(modifier = Modifier.padding(start = 24.dp)) {
+            bundledFonts.forEach { font ->
+                BundledFontOptionPreference(
+                    font = font,
+                    selected = selectedBundledFont == font.fileName,
+                    onClick = {
+                        selectedBundledFont = font.fileName
+                        prefs.bundledEmojiFontFile = font.fileName
+                    }
+                )
+            }
+        }
+    }
+
     if (showConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showConfirmDialog = false },
@@ -941,6 +987,57 @@ private fun EmojiStyleSection() {
             dismissButton = {
                 TextButton(onClick = { showConfirmDialog = false }) { Text("Cancel") }
             }
+        )
+    }
+}
+
+/**
+ * One row in the "Emoji Font Packs" radio list (shown once EmojiStyle.BUNDLED is
+ * selected) - a RadioButton plus a small live sample rendered in that pack's own
+ * font, so the user can see the actual look before picking it, then the file's
+ * display name. Mirrors RadioOptionPreference's layout/behavior; a plain View-based
+ * TextView is used for the sample (via AndroidView) rather than a Compose Font, since
+ * that renders through the exact same Typeface.createFromAsset path the keyboard
+ * itself uses (see BundledEmojiFonts), so the preview never disagrees with reality.
+ */
+@Composable
+private fun BundledFontOptionPreference(
+    font: BundledEmojiFonts.BundledFont,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val context = LocalContext.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = onClick,
+            colors = RadioButtonDefaults.colors(
+                selectedColor = MaterialTheme.colorScheme.primary,
+                unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        AndroidView(
+            factory = { ctx ->
+                TextView(ctx).apply {
+                    text = "\uD83D\uDE00 \uD83D\uDE0D \uD83C\uDF89" // sample emoji: 😀 😍 🎉
+                    textSize = 20f
+                }
+            },
+            update = { tv -> BundledEmojiFonts.loadTypeface(context, font.fileName)?.let { tv.typeface = it } },
+            modifier = Modifier.padding(end = 12.dp)
+        )
+        Text(
+            text = font.displayName,
+            fontSize = 16.sp,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
         )
     }
 }

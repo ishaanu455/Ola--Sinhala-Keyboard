@@ -53,12 +53,13 @@ class EmojiTextStyler {
                 textView.typeface = AppFont.get(context)
                 textView.text = text
             }
-            EmojiStyle.CUSTOM -> {
-                // The user picked a custom emoji font in Settings, but that font is only
-                // meant for the emoji picker grid and the recent-emoji strip (see EmojiAdapter).
-                // The clipboard text and suggestion bar always use the bundled AppFont so
-                // that Sinhala/English text (which dominates these surfaces) always renders
-                // correctly, regardless of what font the user loaded for emoji.
+            EmojiStyle.CUSTOM, EmojiStyle.BUNDLED -> {
+                // Same reasoning as CUSTOM above: whichever emoji font is active (the
+                // user's own file, or one of the bundled packs) is only meant for the
+                // emoji picker grid and the recent-emoji strip (see EmojiAdapter). The
+                // clipboard text and suggestion bar always use the bundled AppFont so
+                // that Sinhala/English text (which dominates these surfaces) always
+                // renders correctly, regardless of which emoji font is loaded.
                 textView.typeface = AppFont.get(context)
                 textView.text = text
             }

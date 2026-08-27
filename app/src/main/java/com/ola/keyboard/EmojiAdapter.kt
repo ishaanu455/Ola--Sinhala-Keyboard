@@ -103,7 +103,7 @@ class EmojiAdapter(
         val pad = dp(8f)
         val glyphPx = glyphTextSizePx()
 
-        if (emojiStyle == EmojiStyle.SYSTEM || emojiStyle == EmojiStyle.CUSTOM) {
+        if (emojiStyle == EmojiStyle.SYSTEM || emojiStyle == EmojiStyle.CUSTOM || emojiStyle == EmojiStyle.BUNDLED) {
             val tv = TextView(context)
             tv.layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             tv.gravity = Gravity.CENTER
@@ -116,6 +116,10 @@ class EmojiAdapter(
                 // Falls back to the default system typeface (still fine for emoji) if the
                 // stored file is missing or Android can't parse its color-glyph table.
                 CustomFontManager.loadTypeface(context)?.let { tv.typeface = it }
+            } else if (emojiStyle == EmojiStyle.BUNDLED) {
+                // Same fallback reasoning, but for one of the app's own bundled packs
+                // (assets/fonts/) instead of a file the user picked themselves.
+                BundledEmojiFonts.loadSelectedTypeface(context)?.let { tv.typeface = it }
             }
             return EmojiViewHolder(tv, null, null)
         }
@@ -152,7 +156,7 @@ class EmojiAdapter(
     override fun onBindViewHolder(holder: EmojiViewHolder, position: Int) {
         val emoji = items[position]
 
-        if (emojiStyle == EmojiStyle.SYSTEM || emojiStyle == EmojiStyle.CUSTOM) {
+        if (emojiStyle == EmojiStyle.SYSTEM || emojiStyle == EmojiStyle.CUSTOM || emojiStyle == EmojiStyle.BUNDLED) {
             holder.textView?.text = emoji
             holder.textView?.setOnClickListener { clickListener.emojiClick(emoji) }
             return

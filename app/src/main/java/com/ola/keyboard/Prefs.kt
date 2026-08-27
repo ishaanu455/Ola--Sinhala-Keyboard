@@ -75,6 +75,14 @@ class Prefs(context: Context) {
         get() = EmojiStyle.fromId(prefs.getString("emoji_style", EmojiStyle.SYSTEM.id))
         set(value) = prefs.edit().putString("emoji_style", value.id).apply()
 
+    /** Which bundled emoji font pack (see [BundledEmojiFonts]) is selected for
+     *  EmojiStyle.BUNDLED - stores the .ttf filename under assets/fonts/, e.g.
+     *  "Bubble Style.ttf". Null means "none picked yet"; callers fall back to the
+     *  first available pack in that case (see [BundledEmojiFonts.loadSelectedTypeface]). */
+    var bundledEmojiFontFile: String?
+        get() = prefs.getString("bundled_emoji_font_file", null)
+        set(value) = prefs.edit().putString("bundled_emoji_font_file", value).apply()
+
     /** Whether the Twemoji image pack has already been fully downloaded/cached. */
     var twemojiDownloaded: Boolean
         get() = prefs.getBoolean("twemoji_downloaded", false)
