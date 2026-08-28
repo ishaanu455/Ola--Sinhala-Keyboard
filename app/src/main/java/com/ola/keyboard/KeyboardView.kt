@@ -418,7 +418,7 @@ class KeyboardView(
         // styles/colors can't express a 2-stop gradient) - layer the real gradient
         // onto the Space/Enter keys now that binding exists. Safe to call
         // unconditionally: it's a no-op for every non-gradient colorTheme.
-        applyGradientActionKeyBackgrounds()
+        applyGradientToKeyboard()
 
         // Bundled Sinhala/English font, applied everywhere in the keyboard view tree
         // in one sweep - keys, suggestion bar, clipboard/emoji/text-select/font-style
@@ -1171,15 +1171,19 @@ class KeyboardView(
     /**
      * "*_gradient" theme ids (Settings > Appearance > Gradient Color Themes) only get a
      * flat [accentOverlayStyle] from `init{}` above - XML styles/colors can't express a
-     * 2-stop gradient. This replaces just the Space (id: space) and Enter (id: action)
-     * key backgrounds with a real GradientDrawable selector, built from the SAME
-     * resolved ?attr/keyAction the rest of the keyboard is already using for that theme
-     * (via [themedContext]) - so it's automatically correct for whichever colour theme +
-     * light/dark combination is active, rather than a second hardcoded colour table that
-     * could drift out of sync with themes.xml. No-op for every non-gradient colorTheme,
-     * so it's safe to call unconditionally from init{}.
+     * 2-stop gradient via style attrs alone. This retints EVERY key on the keyboard
+     * (not just Space/Enter) the same way a static colour theme retints the whole key
+     * bed, except each key's fill is sampled from a position along the SAME
+     * lightVariant->darkVariant gradient (top-left to bottom-right, matching the
+     * diagonal already used on Space/Enter) instead of one flat colour - so the whole
+     * keyboard reads as one continuous gradient sweeping across all the keys, the same
+     * way the flat colour themes tint every key. Built from the SAME resolved
+     * ?attr/keyAction the rest of the keyboard already uses for this theme (via
+     * [themedContext]), so it's automatically correct for whichever colour theme +
+     * light/dark combination is active. No-op for every non-gradient colorTheme, so
+     * it's safe to call unconditionally from init{}.
      */
-    private fun applyGradientActionKeyBackgrounds() {
+    private fun applyGradientToKeyboard() {
         if (!colorTheme.endsWith("_gradient")) return
 
         val typedValue = TypedValue()
@@ -1193,28 +1197,49 @@ class KeyboardView(
         // Settings > Appearance preview, so the real keyboard matches what was picked.
         val lightVariant = lightenColor(baseAccent, 0.35f)
         val darkVariant = darkenColor(baseAccent, 0.30f)
-        val pressedVariant = darkenColor(baseAccent, 0.45f)
 
-        fun buildActionBackground(): android.graphics.drawable.Drawable {
-            val pressedShape = android.graphics.drawable.GradientDrawable().apply {
-                setColor(pressedVariant)
-                cornerRadius = dp(14f).toFloat()
-            }
+        fun lerp(from: Int, to: Int, t: Float): Int {
+            val ct = t.coerceIn(0f, 1f)
+            val r = Color.red(from) + (Color.red(to) - Color.red(from)) * ct
+            val g = Color.green(from) + (Color.green(to) - Color.green(from)) * ct
+            val b = Color.blue(from) + (Color.blue(to) - Color.blue(from)) * ct
+            return Color.rgb(r.toInt().coerceIn(0, 255), g.toInt().coerceIn(0, 255), b.toInt().coerceIn(0, 255))
+        }
+
+        // Space/Enter: the wide action-style shape (18dp/14dp radius, taller insets),
+        // with the gradient running across the key's own width - unchanged from before.
+        fun buildActionKeyDrawable(): android.graphics.drawable.Drawable {
             val normalShape = android.graphics.drawable.GradientDrawable(
                 android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
                 intArrayOf(lightVariant, darkVariant)
             ).apply { cornerRadius = dp(18f).toFloat() }
+            val pressedShape = android.graphics.drawable.GradientDrawable().apply {
+                setColor(darkenColor(baseAccent, 0.45f))
+                cornerRadius = dp(14f).toFloat()
+            }
+            val normalInset = android.graphics.drawable.InsetDrawable(normalShape, dp(2f), dp(3f), dp(2f), dp(3f))
+            val pressedInset = android.graphics.drawable.InsetDrawable(pressedShape, dp(3f), dp(4f), dp(3f), dp(4f))
+            return android.graphics.drawable.StateListDrawable().apply {
+                addState(intArrayOf(android.R.attr.state_pressed), pressedInset)
+                addState(intArrayOf(), normalInset)
+            }
+        }
 
-            // Same insets as key_background_action.xml's selector (3/4dp pressed,
-            // 2/3dp normal) so swapping in a gradient doesn't shift the key's hit box
-            // or visually jump in size relative to the neighbouring solid-colour keys.
-            val pressedInset = android.graphics.drawable.InsetDrawable(
-                pressedShape, dp(3f), dp(4f), dp(3f), dp(4f)
-            )
-            val normalInset = android.graphics.drawable.InsetDrawable(
-                normalShape, dp(2f), dp(3f), dp(2f), dp(3f)
-            )
-
+        // Every other key: the regular 5dp-radius shape (same as key_background.xml /
+        // key_background_function.xml / key_background_special.xml), just filled with
+        // a solid colour sampled from this key's (row, column) position along the
+        // gradient instead of the theme's single flat keyNormal/keyFunction colour.
+        fun buildFlatKeyDrawable(fillColor: Int): android.graphics.drawable.Drawable {
+            val normalShape = android.graphics.drawable.GradientDrawable().apply {
+                setColor(fillColor)
+                cornerRadius = dp(5f).toFloat()
+            }
+            val pressedShape = android.graphics.drawable.GradientDrawable().apply {
+                setColor(darkenColor(fillColor, 0.15f))
+                cornerRadius = dp(5f).toFloat()
+            }
+            val normalInset = android.graphics.drawable.InsetDrawable(normalShape, dp(2f), dp(3f), dp(2f), dp(3f))
+            val pressedInset = android.graphics.drawable.InsetDrawable(pressedShape, dp(2f), dp(3f), dp(2f), dp(3f))
             return android.graphics.drawable.StateListDrawable().apply {
                 addState(intArrayOf(android.R.attr.state_pressed), pressedInset)
                 addState(intArrayOf(), normalInset)
@@ -1222,10 +1247,28 @@ class KeyboardView(
         }
 
         try {
-            binding.space.background = buildActionBackground()
-            binding.action.background = buildActionBackground()
+            binding.space.background = buildActionKeyDrawable()
+            binding.action.background = buildActionKeyDrawable()
+
+            val rows = binding.keyboardRows.children.filterIsInstance<LinearLayout>().toList()
+            val totalRows = rows.size
+            rows.forEachIndexed { rowIndex, row ->
+                val keys = row.children.toList()
+                val totalKeys = keys.size
+                keys.forEachIndexed { keyIndex, keyView ->
+                    // Space/Enter already got their own dedicated shape above - don't
+                    // flatten them to the generic 5dp key shape here.
+                    if (keyView === binding.space || keyView === binding.action) return@forEachIndexed
+                    if (keyView !is KeyboardButton && keyView !is ImageView) return@forEachIndexed
+
+                    val fx = if (totalKeys > 1) keyIndex / (totalKeys - 1).toFloat() else 0f
+                    val fy = if (totalRows > 1) rowIndex / (totalRows - 1).toFloat() else 0f
+                    val fraction = (fx + fy) / 2f
+                    keyView.background = buildFlatKeyDrawable(lerp(lightVariant, darkVariant, fraction))
+                }
+            }
         } catch (t: Throwable) {
-            Log.e("KeyboardView", "Failed to apply gradient action-key background", t)
+            Log.e("KeyboardView", "Failed to apply whole-keyboard gradient", t)
         }
     }
 
