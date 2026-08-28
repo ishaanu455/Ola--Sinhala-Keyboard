@@ -173,7 +173,7 @@ private fun primaryButtonLabel(state: UpdateScreenState): String = when (state) 
 private fun WhatsNewCard(changelog: String, shape: RoundedCornerShape) {
     val lines = changelog
         .lines()
-        .map { it.trim().removePrefix("-").removePrefix("*").trim() }
+        .map { cleanChangelogLine(it) }
         .filter { it.isNotEmpty() }
         .take(6)
 
@@ -215,6 +215,26 @@ private fun WhatsNewCard(changelog: String, shape: RoundedCornerShape) {
             }
         }
     }
+}
+
+/**
+ * Cleans one line of the GitHub release body (release.yml's
+ * "Auto-release from commit ...\n\n**Changes:** <commit message>") for plain-text
+ * display here.
+ *
+ * The old version only stripped a single leading "-" or "*", so a markdown-bold
+ * line like "**Changes:** style(ui): ..." only had one of its two leading
+ * asterisks removed - leaving a stray "*Changes:** ..." on screen (exactly what
+ * showed up in the What's New card). This strips bullet markers first, then
+ * removes "**" bold markers anywhere in the line (leading, trailing, or inline),
+ * so raw markdown never leaks into the card as literal asterisks.
+ */
+private fun cleanChangelogLine(rawLine: String): String {
+    var line = rawLine.trim()
+    line = line.removePrefix("- ").removePrefix("-")
+    line = line.removePrefix("* ").removePrefix("*")
+    line = line.replace("**", "")
+    return line.trim()
 }
 
 @Composable
