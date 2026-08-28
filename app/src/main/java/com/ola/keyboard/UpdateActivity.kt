@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -34,6 +35,7 @@ class UpdateActivity : AppCompatActivity() {
 
     private lateinit var prefs: Prefs
     private var downloadId: Long = -1L
+    private var receiverRegistered = false
 
     private var screenState by mutableStateOf(UpdateScreenState.IDLE)
     // Named downloadProgress (not "progress") - a plain "progress" Compose property
@@ -75,15 +77,28 @@ class UpdateActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         prefs = Prefs(this)
 
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
-            Context.RECEIVER_NOT_EXPORTED
-        else 0
-        ContextCompat.registerReceiver(
-            this,
-            downloadCompleteReceiver,
-            IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
-            flags
-        )
+        // registerReceiver's export-flag requirement is meant to be a plain SDK_INT
+        // check, but some OEM Android forks (seen on Huawei HarmonyOS devices) enforce
+        // it inconsistently with AOSP and throw IllegalArgumentException even when a
+        // valid flag is passed. This receiver only exists to auto-continue the install
+        // the instant a download finishes - losing it just means the user has to tap
+        // the notification/file manually, which is a fine fallback. It's NOT worth
+        // crashing this whole screen (and kicking the user back to the home screen)
+        // over, so any registration failure here is caught and logged instead.
+        try {
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+                Context.RECEIVER_NOT_EXPORTED
+            else 0
+            ContextCompat.registerReceiver(
+                this,
+                downloadCompleteReceiver,
+                IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+                flags
+            )
+            receiverRegistered = true
+        } catch (t: Throwable) {
+            Log.e("UpdateActivity", "Failed to register download-complete receiver", t)
+        }
 
         screenState = if (prefs.updateAvailable) UpdateScreenState.IDLE else UpdateScreenState.UP_TO_DATE
 
@@ -105,6 +120,7 @@ class UpdateActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        if (!receiverRegistered) return
         try {
             unregisterReceiver(downloadCompleteReceiver)
         } catch (_: IllegalArgumentException) {
