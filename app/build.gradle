@@ -8,11 +8,11 @@ android {
     defaultConfig {
         minSdkVersion 21
 <<<<<<< HEAD
-        versionCode 101128
-        versionName "1.1.128"
+        versionCode 102282
+        versionName "1.1.1282"
 =======
-        versionCode 133
-        versionName "1.1.123"
+        versionCode 102282
+        versionName "1.1.1282"
 >>>>>>> 303e5ab (refactor: strip Markdown bold markers from changelog lines in UpdateScreen)
         targetSdkVersion 34
         vectorDrawables.useSupportLibrary = true
