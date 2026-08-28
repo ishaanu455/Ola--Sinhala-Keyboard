@@ -36,7 +36,11 @@ class UpdateActivity : AppCompatActivity() {
     private var downloadId: Long = -1L
 
     private var screenState by mutableStateOf(UpdateScreenState.IDLE)
-    private var progress by mutableIntStateOf(0)
+    // Named downloadProgress (not "progress") - a plain "progress" Compose property
+    // here generates a synthetic setProgress(Int) setter that collides at the JVM
+    // signature level with Activity's own legacy setProgress(int) (old window
+    // progress-bar API), which fails the build with an "Accidental override" error.
+    private var downloadProgress by mutableIntStateOf(0)
     private var errorMessage by mutableStateOf<String?>(null)
 
     private val downloadCompleteReceiver = object : BroadcastReceiver() {
@@ -44,7 +48,7 @@ class UpdateActivity : AppCompatActivity() {
             val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
             if (id != downloadId) return
             if (UpdateDownloader.isDownloadSuccessful(this@UpdateActivity, downloadId)) {
-                progress = 100
+                downloadProgress = 100
                 proceedToInstall()
             } else {
                 screenState = UpdateScreenState.ERROR
@@ -90,7 +94,7 @@ class UpdateActivity : AppCompatActivity() {
                     latestVersion = prefs.latestVersion.ifBlank { BuildConfig.VERSION_NAME },
                     changelog = prefs.latestChangelog,
                     state = screenState,
-                    progress = progress,
+                    progress = downloadProgress,
                     errorMessage = errorMessage,
                     onBackClick = { onBackPressedDispatcher.onBackPressed() },
                     onPrimaryAction = { onPrimaryAction() }
@@ -126,7 +130,7 @@ class UpdateActivity : AppCompatActivity() {
         }
 
         screenState = UpdateScreenState.DOWNLOADING
-        progress = 0
+        downloadProgress = 0
         downloadId = UpdateDownloader.startDownload(this, apkUrl, prefs.latestVersion)
 
         // DownloadManager doesn't push progress callbacks - poll it while the
@@ -137,7 +141,7 @@ class UpdateActivity : AppCompatActivity() {
                 val pct = withContext(Dispatchers.IO) {
                     UpdateDownloader.queryProgress(this@UpdateActivity, downloadId)
                 }
-                if (pct != null) progress = pct
+                if (pct != null) downloadProgress = pct
                 delay(400)
             }
         }
