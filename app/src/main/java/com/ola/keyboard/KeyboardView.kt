@@ -414,6 +414,12 @@ class KeyboardView(
             }
         }
 
+        // *_gradient theme ids only got a flat accentOverlayStyle above (XML
+        // styles/colors can't express a 2-stop gradient) - layer the real gradient
+        // onto the Space/Enter keys now that binding exists. Safe to call
+        // unconditionally: it's a no-op for every non-gradient colorTheme.
+        applyGradientActionKeyBackgrounds()
+
         // Bundled Sinhala/English font, applied everywhere in the keyboard view tree
         // in one sweep - keys, suggestion bar, clipboard/emoji/text-select/font-style
         // panels (all included inside keyboard_layout.xml). Anything added later
@@ -1160,6 +1166,86 @@ class KeyboardView(
         }
 
         // Programmatic creation of suggestion TextViews removed - relies on XML include.
+    }
+
+    /**
+     * "*_gradient" theme ids (Settings > Appearance > Gradient Color Themes) only get a
+     * flat [accentOverlayStyle] from `init{}` above - XML styles/colors can't express a
+     * 2-stop gradient. This replaces just the Space (id: space) and Enter (id: action)
+     * key backgrounds with a real GradientDrawable selector, built from the SAME
+     * resolved ?attr/keyAction the rest of the keyboard is already using for that theme
+     * (via [themedContext]) - so it's automatically correct for whichever colour theme +
+     * light/dark combination is active, rather than a second hardcoded colour table that
+     * could drift out of sync with themes.xml. No-op for every non-gradient colorTheme,
+     * so it's safe to call unconditionally from init{}.
+     */
+    private fun applyGradientActionKeyBackgrounds() {
+        if (!colorTheme.endsWith("_gradient")) return
+
+        val typedValue = TypedValue()
+        themedContext.theme.resolveAttribute(R.attr.keyAction, typedValue, true)
+        val baseAccent = typedValue.data
+
+        val density = resources.displayMetrics.density
+        fun dp(value: Float) = (value * density).toInt()
+
+        // Same two variants (a lighter tint + a darker shade of the SAME accent) as the
+        // Settings > Appearance preview, so the real keyboard matches what was picked.
+        val lightVariant = lightenColor(baseAccent, 0.35f)
+        val darkVariant = darkenColor(baseAccent, 0.30f)
+        val pressedVariant = darkenColor(baseAccent, 0.45f)
+
+        fun buildActionBackground(): android.graphics.drawable.Drawable {
+            val pressedShape = android.graphics.drawable.GradientDrawable().apply {
+                setColor(pressedVariant)
+                cornerRadius = dp(14f).toFloat()
+            }
+            val normalShape = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                intArrayOf(lightVariant, darkVariant)
+            ).apply { cornerRadius = dp(18f).toFloat() }
+
+            // Same insets as key_background_action.xml's selector (3/4dp pressed,
+            // 2/3dp normal) so swapping in a gradient doesn't shift the key's hit box
+            // or visually jump in size relative to the neighbouring solid-colour keys.
+            val pressedInset = android.graphics.drawable.InsetDrawable(
+                pressedShape, dp(3f), dp(4f), dp(3f), dp(4f)
+            )
+            val normalInset = android.graphics.drawable.InsetDrawable(
+                normalShape, dp(2f), dp(3f), dp(2f), dp(3f)
+            )
+
+            return android.graphics.drawable.StateListDrawable().apply {
+                addState(intArrayOf(android.R.attr.state_pressed), pressedInset)
+                addState(intArrayOf(), normalInset)
+            }
+        }
+
+        try {
+            binding.space.background = buildActionBackground()
+            binding.action.background = buildActionBackground()
+        } catch (t: Throwable) {
+            Log.e("KeyboardView", "Failed to apply gradient action-key background", t)
+        }
+    }
+
+    /** Blends [color] toward white by [amount] (0f = unchanged, 1f = white). Mirrors
+     *  lightenColor() in SettingsScreen.kt's Compose preview, kept as a plain Int/ARGB
+     *  version here since the real keyboard has no Compose Color type in scope. */
+    private fun lightenColor(color: Int, amount: Float): Int {
+        val r = Color.red(color) + ((255 - Color.red(color)) * amount).toInt()
+        val g = Color.green(color) + ((255 - Color.green(color)) * amount).toInt()
+        val b = Color.blue(color) + ((255 - Color.blue(color)) * amount).toInt()
+        return Color.rgb(r.coerceIn(0, 255), g.coerceIn(0, 255), b.coerceIn(0, 255))
+    }
+
+    /** Blends [color] toward black by [amount] (0f = unchanged, 1f = black). Mirrors
+     *  darkenColor() in SettingsScreen.kt's Compose preview. */
+    private fun darkenColor(color: Int, amount: Float): Int {
+        val r = (Color.red(color) * (1f - amount)).toInt()
+        val g = (Color.green(color) * (1f - amount)).toInt()
+        val b = (Color.blue(color) * (1f - amount)).toInt()
+        return Color.rgb(r.coerceIn(0, 255), g.coerceIn(0, 255), b.coerceIn(0, 255))
     }
 
     fun setLetterKeys(keySet: Map<String, String>) {
