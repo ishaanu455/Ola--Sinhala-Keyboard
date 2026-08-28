@@ -150,14 +150,38 @@ class UpdateActivity : AppCompatActivity() {
         downloadId = UpdateDownloader.startDownload(this, apkUrl, prefs.latestVersion)
 
         // DownloadManager doesn't push progress callbacks - poll it while the
-        // download is active. Cheap: one Cursor query per tick, cancelled the
-        // moment the screen leaves DOWNLOADING state or the Activity is gone.
+        // download is active. This poll is also now the source of truth for
+        // completion (not just ACTION_DOWNLOAD_COMPLETE via downloadCompleteReceiver
+        // above): that broadcast can be delayed or dropped on some OEM builds, which
+        // used to leave this screen stuck at "100% / Downloading..." with no way to
+        // reach the install step. The receiver is kept as the instant-path when it
+        // does fire; this loop is the guaranteed fallback either way.
         lifecycleScope.launch {
             while (screenState == UpdateScreenState.DOWNLOADING) {
                 val pct = withContext(Dispatchers.IO) {
                     UpdateDownloader.queryProgress(this@UpdateActivity, downloadId)
                 }
+                // The receiver may have already moved us on while we were off-thread.
+                if (screenState != UpdateScreenState.DOWNLOADING) break
                 if (pct != null) downloadProgress = pct
+
+                val status = withContext(Dispatchers.IO) {
+                    UpdateDownloader.queryStatus(this@UpdateActivity, downloadId)
+                }
+                if (screenState != UpdateScreenState.DOWNLOADING) break
+
+                when (status) {
+                    DownloadManager.STATUS_SUCCESSFUL -> {
+                        downloadProgress = 100
+                        proceedToInstall()
+                        break
+                    }
+                    DownloadManager.STATUS_FAILED -> {
+                        screenState = UpdateScreenState.ERROR
+                        errorMessage = "Download failed. Check your connection and try again."
+                        break
+                    }
+                }
                 delay(400)
             }
         }

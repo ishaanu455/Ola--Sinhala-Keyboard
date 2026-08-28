@@ -69,6 +69,26 @@ object UpdateDownloader {
         }
     }
 
+    /**
+     * Raw DownloadManager status (STATUS_SUCCESSFUL, STATUS_FAILED, STATUS_RUNNING, ...)
+     * for the given download, or null once the row can no longer be queried.
+     *
+     * Used to poll for completion as a fallback to ACTION_DOWNLOAD_COMPLETE: that
+     * broadcast is delayed or dropped entirely on some OEM builds (battery
+     * optimizers, background-broadcast restrictions - see the registration
+     * try/catch in UpdateActivity), which used to leave the screen stuck at
+     * "100% / Downloading..." forever with no way forward.
+     */
+    fun queryStatus(context: Context, downloadId: Long): Int? {
+        val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val cursor = manager.query(DownloadManager.Query().setFilterById(downloadId)) ?: return null
+        cursor.use {
+            if (!it.moveToFirst()) return null
+            val statusIdx = it.getColumnIndex(DownloadManager.COLUMN_STATUS)
+            return it.getInt(statusIdx)
+        }
+    }
+
     /** Whether the user still needs to grant "install unknown apps" for us (API 26+). */
     fun needsInstallPermission(context: Context): Boolean {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
