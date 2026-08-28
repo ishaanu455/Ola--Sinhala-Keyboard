@@ -1,6 +1,6 @@
 <div align="center">
 
-TODO: replace with your own Ola Keyboard logo, e.g.:
+
 <img src="docs/logo.png" width="96" alt="Ola Keyboard logo" />
 
 # Ola Keyboard
