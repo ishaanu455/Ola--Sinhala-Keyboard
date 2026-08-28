@@ -80,7 +80,7 @@ The app collects no analytics and requires no unnecessary permissions — everyt
   </p>
 
 
-*Screenshots coming soon.*
+
 
 ## 📥 Installation
 
