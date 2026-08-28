@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Backspace
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.DarkMode
@@ -48,6 +49,7 @@ import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -64,6 +66,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -1094,6 +1097,15 @@ private fun FontPackPickerScreen(
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         SettingsSubScreenHeader(title = "Font Packs", onBack = onBack)
+        // Short caption above the list, same pattern as the note shown on the
+        // classic keyboard's font_style_layout.xml screen, so this sub-screen
+        // doesn't open on a bare list with no context.
+        Text(
+            text = "Choose how emoji look across the keyboard",
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+        )
         Column(modifier = Modifier.padding(vertical = 4.dp)) {
             fonts.forEach { font ->
                 BundledFontOptionPreference(
@@ -1108,12 +1120,21 @@ private fun FontPackPickerScreen(
 
 /**
  * One row in the "Emoji Font Packs" radio list (shown once EmojiStyle.BUNDLED is
- * selected) - a RadioButton plus a small live sample rendered in that pack's own
- * font, so the user can see the actual look before picking it, then the file's
- * display name. Mirrors RadioOptionPreference's layout/behavior; a plain View-based
- * TextView is used for the sample (via AndroidView) rather than a Compose Font, since
- * that renders through the exact same Typeface.createFromAsset path the keyboard
- * itself uses (see BundledEmojiFonts), so the preview never disagrees with reality.
+ * selected) - a RadioButton, a small "preview swatch" chip rendered in that pack's
+ * own font, and the file's display name.
+ *
+ * Rebuilt to sit in the same rounded, gold-bordered card every other Settings row
+ * uses (see `settingsCard()` in SettingsComponents.kt) - this row used to be a bare,
+ * unbordered list item, the only one in all of Settings that didn't match, which
+ * read as unfinished next to RadioOptionPreference etc. The selected pack now also
+ * gets its own highlighted card (gold border + warmed background) instead of relying
+ * on the radio dot alone, mirroring the "selected" ring treatment used elsewhere in
+ * the app (e.g. the emoji-style picker's own selected state).
+ *
+ * A plain View-based TextView is used for the sample (via AndroidView) rather than a
+ * Compose Font, since that renders through the exact same Typeface.createFromAsset
+ * path the keyboard itself uses (see BundledEmojiFonts), so the preview never
+ * disagrees with reality.
  */
 @Composable
 private fun BundledFontOptionPreference(
@@ -1122,11 +1143,24 @@ private fun BundledFontOptionPreference(
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val cardShape = RoundedCornerShape(18.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 5.dp)
+            .clip(cardShape)
+            .background(
+                if (selected) MaterialTheme.colorScheme.primaryContainer
+                else MaterialTheme.colorScheme.surface
+            )
+            .border(
+                width = if (selected) 1.5.dp else 1.dp,
+                color = if (selected) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
+                shape = cardShape
+            )
             .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         RadioButton(
@@ -1137,23 +1171,41 @@ private fun BundledFontOptionPreference(
                 unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
         )
-        Spacer(modifier = Modifier.width(8.dp))
-        AndroidView(
-            factory = { ctx ->
-                TextView(ctx).apply {
-                    text = "\uD83D\uDE00 \uD83D\uDE0D \uD83C\uDF89" // sample emoji: 😀 😍 🎉
-                    textSize = 20f
-                }
-            },
-            update = { tv -> BundledEmojiFonts.loadTypeface(context, font.fileName)?.let { tv.typeface = it } },
-            modifier = Modifier.padding(end = 12.dp)
-        )
+        Spacer(modifier = Modifier.width(10.dp))
+        // Sample rendered inside its own small rounded "swatch" so it reads as a
+        // preview chip rather than loose text floating next to the name.
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.background)
+                .padding(horizontal = 10.dp, vertical = 6.dp)
+        ) {
+            AndroidView(
+                factory = { ctx ->
+                    TextView(ctx).apply {
+                        text = "\uD83D\uDE00 \uD83D\uDE0D \uD83C\uDF89" // sample emoji: 😀 😍 🎉
+                        textSize = 18f
+                    }
+                },
+                update = { tv -> BundledEmojiFonts.loadTypeface(context, font.fileName)?.let { tv.typeface = it } }
+            )
+        }
+        Spacer(modifier = Modifier.width(14.dp))
         Text(
             text = font.displayName,
             fontSize = 16.sp,
-            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
+        if (selected) {
+            Icon(
+                imageVector = Icons.Filled.Check,
+                contentDescription = "Selected",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
 }
 
