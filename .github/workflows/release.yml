@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - '**.md'
+      - 'README*'
+      - '.github/ISSUE_TEMPLATE/**'
+      - 'docs/**'
+      - 'LICENSE*'
 
 jobs:
   build:
