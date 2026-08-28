@@ -617,15 +617,48 @@ private fun TypingSection() {
 @Composable
 private fun EmojiSection() {
     val context = LocalContext.current
+    val prefs = remember { Prefs(context) }
+    val bundledFonts = remember { BundledEmojiFonts.list(context) }
+    var selectedBundledFont by remember { mutableStateOf(prefs.bundledEmojiFontFile) }
+    // Nested one level deeper than the other Settings sub-screens: tapping "Choose
+    // Pack" below swaps this whole section's content for a dedicated font-pack list
+    // (its own SettingsSubScreenHeader + back arrow), rather than showing all 3
+    // packs inline like before - see FontPackPickerScreen. The outer Settings
+    // BackHandler (SettingsScreen, currentSection != null) is still enabled the
+    // whole time, so a second back-press after this one still exits to Settings home.
+    var showFontPackPicker by rememberSaveable { mutableStateOf(false) }
 
-    val showRecentEmojiRow = rememberBooleanPreference(context, "show_recent_emoji_row", false)
-    SwitchPreference(
-        title = "Show Recent Emoji Row",
-        checked = showRecentEmojiRow.value,
-        onCheckedChange = { showRecentEmojiRow.value = it }
-    )
+    BackHandler(enabled = showFontPackPicker) {
+        showFontPackPicker = false
+    }
 
-    EmojiStyleSection()
+    fun selectBundledFont(fileName: String) {
+        selectedBundledFont = fileName
+        prefs.bundledEmojiFontFile = fileName
+    }
+
+    if (showFontPackPicker) {
+        FontPackPickerScreen(
+            fonts = bundledFonts,
+            selectedFileName = selectedBundledFont,
+            onSelect = { selectBundledFont(it) },
+            onBack = { showFontPackPicker = false }
+        )
+    } else {
+        val showRecentEmojiRow = rememberBooleanPreference(context, "show_recent_emoji_row", false)
+        SwitchPreference(
+            title = "Show Recent Emoji Row",
+            checked = showRecentEmojiRow.value,
+            onCheckedChange = { showRecentEmojiRow.value = it }
+        )
+
+        EmojiStyleSection(
+            bundledFonts = bundledFonts,
+            selectedBundledFont = selectedBundledFont,
+            onSelectBundledFont = { selectBundledFont(it) },
+            onOpenFontPackPicker = { showFontPackPicker = true }
+        )
+    }
 }
 
 @Composable
@@ -796,7 +829,12 @@ private fun DictionaryBackupSection() {
  * bundled or redistributed; Twemoji is the closest legally-usable look-alike.
  */
 @Composable
-private fun EmojiStyleSection() {
+private fun EmojiStyleSection(
+    bundledFonts: List<BundledEmojiFonts.BundledFont>,
+    selectedBundledFont: String?,
+    onSelectBundledFont: (String) -> Unit,
+    onOpenFontPackPicker: () -> Unit
+) {
     val context = LocalContext.current
     val prefs = remember { Prefs(context) }
     val scope = rememberCoroutineScope()
@@ -809,8 +847,6 @@ private fun EmojiStyleSection() {
     var downloadFailed by remember { mutableStateOf(false) }
     var hasCustomFont by remember { mutableStateOf(CustomFontManager.hasCustomFont(context)) }
     var customFontImportFailed by remember { mutableStateOf(false) }
-    val bundledFonts = remember { BundledEmojiFonts.list(context) }
-    var selectedBundledFont by remember { mutableStateOf(prefs.bundledEmojiFontFile) }
 
     val fontPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -951,26 +987,23 @@ private fun EmojiStyleSection() {
                 // First time picking this style: default to whatever was saved before,
                 // falling back to the first bundled pack if nothing valid was saved yet.
                 if (selectedBundledFont == null || bundledFonts.none { it.fileName == selectedBundledFont }) {
-                    selectedBundledFont = bundledFonts.first().fileName
-                    prefs.bundledEmojiFontFile = selectedBundledFont
+                    onSelectBundledFont(bundledFonts.first().fileName)
                 }
             }
         }
     )
 
+    // Was an inline list of all 3 packs shown directly here - now a single chevron
+    // row showing the current pick, opening a dedicated sub-screen instead (see
+    // EmojiSection.showFontPackPicker / FontPackPickerScreen below).
     if (selectedStyle == EmojiStyle.BUNDLED && bundledFonts.isNotEmpty()) {
-        Column(modifier = Modifier.padding(start = 24.dp)) {
-            bundledFonts.forEach { font ->
-                BundledFontOptionPreference(
-                    font = font,
-                    selected = selectedBundledFont == font.fileName,
-                    onClick = {
-                        selectedBundledFont = font.fileName
-                        prefs.bundledEmojiFontFile = font.fileName
-                    }
-                )
-            }
-        }
+        val currentPackName = bundledFonts.firstOrNull { it.fileName == selectedBundledFont }?.displayName
+            ?: bundledFonts.first().displayName
+        PreferenceItem(
+            title = "Choose Pack",
+            summary = currentPackName,
+            onClick = onOpenFontPackPicker
+        )
     }
 
     if (showConfirmDialog) {
@@ -1010,6 +1043,35 @@ private fun EmojiStyleSection() {
                 TextButton(onClick = { showConfirmDialog = false }) { Text("Cancel") }
             }
         )
+    }
+}
+
+/**
+ * Dedicated sub-screen for picking a bundled emoji font pack, opened from the
+ * "Choose Pack" row in EmojiStyleSection (see EmojiSection.showFontPackPicker).
+ * Reuses SettingsSubScreenHeader for the same back-arrow + title treatment every
+ * other Settings sub-screen uses, and BundledFontOptionPreference for each row
+ * (radio + live preview in that pack's own font + name) - identical rows to what
+ * used to be shown inline, just on their own screen now.
+ */
+@Composable
+private fun FontPackPickerScreen(
+    fonts: List<BundledEmojiFonts.BundledFont>,
+    selectedFileName: String?,
+    onSelect: (String) -> Unit,
+    onBack: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        SettingsSubScreenHeader(title = "Font Packs", onBack = onBack)
+        Column(modifier = Modifier.padding(vertical = 4.dp)) {
+            fonts.forEach { font ->
+                BundledFontOptionPreference(
+                    font = font,
+                    selected = selectedFileName == font.fileName,
+                    onClick = { onSelect(font.fileName) }
+                )
+            }
+        }
     }
 }
 
