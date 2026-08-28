@@ -1132,13 +1132,19 @@ class KeyboardView(
             // straight to the app's own Settings screen (MainActivity shows
             // SettingsScreen once the keyboard is enabled/selected). Needs
             // FLAG_ACTIVITY_NEW_TASK since we're launching an Activity from the
-            // IME's service context, not from an Activity.
+            // IME's service context, not from an Activity. If an update is pending
+            // (red dot showing), it instead jumps straight to UpdateActivity via
+            // the navigate_to extra - see MainActivity.onCreate/onNewIntent.
             binding.btnSettings.setOnClickListener {
                 val intent = android.content.Intent(context, MainActivity::class.java).apply {
                     flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                    if (Prefs.getUpdateAvailable(context)) {
+                        putExtra(MainActivity.EXTRA_NAVIGATE_TO, MainActivity.NAVIGATE_TO_UPDATE)
+                    }
                 }
                 context.startActivity(intent)
             }
+            updateSettingsBadge()
             applyPanelHeights()
         } catch (t: Throwable) {
             Log.e("KeyboardView", "Error during KeyboardView init configuration", t)
@@ -1487,6 +1493,17 @@ class KeyboardView(
     /** Purple-circle badge on btn_fonts (same treatment as the clipboard's
      *  btn_clip_clear) so it's obvious at a glance that a style is active,
      *  without having to open the panel to check. */
+    /** Small red dot (bg_update_badge_dot) overlaid on btn_settings when
+     *  Prefs.updateAvailable is true - a lightweight SharedPreferences read only,
+     *  no network/IO here. Called once at init and again every time the keyboard
+     *  is (re)shown (InputMethodService.onStartInputView), same pattern as
+     *  updateFontsIconBadge below, so a background update check finishing while
+     *  the keyboard was closed is picked up the next time it opens. */
+    fun updateSettingsBadge() {
+        binding.updateBadgeDot.visibility =
+            if (Prefs.getUpdateAvailable(context)) View.VISIBLE else View.GONE
+    }
+
     /** Purple-circle badge on btn_fonts (same treatment as the clipboard's
      *  btn_clip_clear) so it's obvious at a glance that a style is active, without
      *  having to open the panel to check. Restores the icon's normal circular

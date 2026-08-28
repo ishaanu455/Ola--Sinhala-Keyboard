@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.SwipeLeft
 import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.Update
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
@@ -76,6 +77,8 @@ import com.ola.keyboard.EmojiDownloader
 import com.ola.keyboard.EmojiStyle
 import com.ola.keyboard.Prefs
 import com.ola.keyboard.PredictionManagerActivity
+import com.ola.keyboard.UpdateActivity
+import com.ola.keyboard.UpdateChecker
 import com.ola.keyboard.R
 import com.ola.keyboard.ui.components.PreferenceItem
 import com.ola.keyboard.ui.components.RadioOptionPreference
@@ -674,6 +677,24 @@ private fun DictionarySection() {
 @Composable
 private fun AboutSection() {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var checking by remember { mutableStateOf(false) }
+
+    PreferenceItem(
+        title = "Check for Updates",
+        summary = if (checking) "Checking..." else "Version ${BuildConfig.VERSION_NAME}",
+        icon = Icons.Filled.Update,
+        onClick = {
+            if (!checking) {
+                checking = true
+                scope.launch {
+                    UpdateChecker.checkForUpdate(context, force = true)
+                    checking = false
+                    context.startActivity(Intent(context, UpdateActivity::class.java))
+                }
+            }
+        }
+    )
 
     PreferenceItem(
         title = "Source Code",

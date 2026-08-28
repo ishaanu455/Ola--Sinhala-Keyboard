@@ -40,6 +40,13 @@ class MainActivity : AppCompatActivity() {
 
         updateUIState()
 
+        // The keyboard's settings-gear red dot (see KeyboardView.kt) launches us with
+        // this extra when an update is pending, so tapping it jumps straight to
+        // UpdateActivity instead of landing on the Settings home list first.
+        if (intent?.getStringExtra(EXTRA_NAVIGATE_TO) == NAVIGATE_TO_UPDATE) {
+            startActivity(Intent(this, UpdateActivity::class.java))
+        }
+
         setContent {
             OlaTheme {
                 MainScreen(
@@ -59,6 +66,17 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateUIState()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // MainActivity is launched with FLAG_ACTIVITY_NEW_TASK from the IME (see
+        // KeyboardView.kt) - if it's already on top of its task, onCreate() won't
+        // run again for the new tap, only this. Handle the same extra here too so
+        // the red-dot tap still jumps to UpdateActivity in that case.
+        if (intent.getStringExtra(EXTRA_NAVIGATE_TO) == NAVIGATE_TO_UPDATE) {
+            startActivity(Intent(this, UpdateActivity::class.java))
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -86,6 +104,11 @@ class MainActivity : AppCompatActivity() {
     private fun checkIfKeyboardSelected(): Boolean {
         val defaultIME = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
         return defaultIME != null && defaultIME.contains(BuildConfig.APPLICATION_ID)
+    }
+
+    companion object {
+        const val EXTRA_NAVIGATE_TO = "navigate_to"
+        const val NAVIGATE_TO_UPDATE = "update"
     }
 }
 

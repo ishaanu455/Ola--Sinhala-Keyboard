@@ -12,6 +12,11 @@
          so it fails completely silently: the toggle stays on and no error ever shows,
          it just never actually buzzes. -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Needed to launch the system package installer for the downloaded update APK
+         (Settings > Special app access > Install unknown apps must still be granted
+         by the user per-app on API 26+ - UpdateDownloader checks this and sends the
+         user to that screen first if it isn't granted yet). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:allowBackup="false"
@@ -44,6 +49,20 @@
             android:name="com.ola.keyboard.ClipsManagerActivity"
             android:exported="false"
             android:parentActivityName="com.ola.keyboard.MainActivity" />
+        <activity
+            android:name="com.ola.keyboard.UpdateActivity"
+            android:exported="false"
+            android:parentActivityName="com.ola.keyboard.MainActivity" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
         <service
             android:name="com.ola.keyboard.InputMethodService"
             android:exported="true"

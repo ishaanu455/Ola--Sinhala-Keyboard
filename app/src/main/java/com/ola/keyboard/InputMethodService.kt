@@ -529,6 +529,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         keyboardView.setShowNumberRow(Prefs.getShowNumberRow(this))
         keyboardView.updateRowHeight(Prefs.getRowHeight(this))
         keyboardView.setClipboardEnabled(Prefs.getClipboardEnabled(this))
+        keyboardView.updateSettingsBadge()
         suggestionsEnabled = Prefs.getShowSuggestionBar(this)
         if (!suggestionsEnabled) {
             // Off right now - drop anything left showing from the previous session

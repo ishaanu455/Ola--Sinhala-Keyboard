@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Exposes only the app-specific "Downloads" folder under external-files-dir -
+     where UpdateDownloader saves the update APK - to the system package installer.
+     Nothing else on disk is shared through this provider. -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <external-files-path
+        name="update_downloads"
+        path="Download/" />
+</paths>

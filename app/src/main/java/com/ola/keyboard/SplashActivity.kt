@@ -27,6 +27,7 @@ import com.ola.keyboard.ui.theme.Light1
 import com.ola.keyboard.ui.theme.Light2
 import com.ola.keyboard.ui.theme.OlaTheme
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Launcher activity. Shows the brand mark + app name + version on a dark
@@ -52,6 +53,12 @@ class SplashActivity : ComponentActivity() {
     @Composable
     private fun SplashScreen() {
         LaunchedEffect(Unit) {
+            // Fire-and-forget, throttled to once/24h inside UpdateChecker itself -
+            // runs in the background and never delays the hand-off to MainActivity
+            // below. Its only effect is writing Prefs.updateAvailable, which the
+            // keyboard's settings-icon badge and Settings > About both read later.
+            launch { UpdateChecker.checkForUpdate(this@SplashActivity) }
+
             // Long enough for the brand mark to actually register, short
             // enough that it doesn't feel like a delay.
             delay(900)
