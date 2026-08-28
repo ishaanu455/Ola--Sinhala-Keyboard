@@ -67,11 +67,6 @@ The app collects no analytics and requires no unnecessary permissions — everyt
 
 ## 📸 Screenshots
 
-
-  TODO: Add real screenshots here before publishing.
-  Suggested shots: keyboard (English), keyboard (Wijesekara), Settings home,
-  Appearance / theme picker, Clipboard manager, Emoji panel.
-
   <p align="center">
     <img src="docs/screenshots/keyboard-english.png" width="220" />
     <img src="docs/screenshots/keyboard-wijesekara.png" width="220" />
