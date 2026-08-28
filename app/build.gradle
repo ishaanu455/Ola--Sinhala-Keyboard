@@ -74,4 +74,8 @@ dependencies {
     // Used to download & cache the optional Twemoji-style emoji images (CC-BY 4.0 licensed,
     // NOT Apple's proprietary emoji font/art) shown in Settings > Emoji.
     implementation 'io.coil-kt:coil:2.6.0'
+    // Periodic background "is there an update?" check (see UpdateCheckWorker) - lets
+    // the settings-gear red dot catch up on a new GitHub release without the user
+    // having to reopen the app or tap "Check for Updates" manually.
+    implementation 'androidx.work:work-runtime-ktx:2.9.0'
 }
