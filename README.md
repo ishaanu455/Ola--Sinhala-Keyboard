@@ -1,7 +1,7 @@
 <div align="center">
 
 
-<img src="docs/logo.png" width="120" alt="Ola Keyboard logo" />
+<img src="docs/logo.png" width="200" alt="Ola Keyboard logo" />
 
 # Ola Keyboard
 
