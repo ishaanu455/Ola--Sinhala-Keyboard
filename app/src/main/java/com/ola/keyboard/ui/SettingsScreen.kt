@@ -67,6 +67,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -763,23 +764,78 @@ private fun AboutSection() {
         }
     )
 
-    PreferenceItem(
-        title = "Source Code",
-        summary = "View on GitHub",
-        icon = Icons.Filled.Code,
-        onClick = {
-            val intent = Intent(
-                Intent.ACTION_VIEW,
-                Uri.parse("https://github.com/ishaanu455/Foxkeyboard-Customized.git")
-            )
-            context.startActivity(intent)
-        }
-    )
+    Spacer(modifier = Modifier.height(20.dp))
 
-    PreferenceItem(
-        title = "Version",
-        summary = BuildConfig.VERSION_NAME
+    // GitHub (source code) + Telegram, centered under the list rows above rather
+    // than as their own PreferenceItem rows - these are external/social links, not
+    // settings, so they get a lighter "icon row" treatment instead of full cards.
+    // Telegram has no destination yet (onClick left as a no-op) - link goes in
+    // once we have the channel URL.
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        SocialIconButton(
+            iconRes = R.drawable.ic_github,
+            contentDescription = "Source code on GitHub",
+            onClick = {
+                val intent = Intent(
+                    Intent.ACTION_VIEW,
+                    Uri.parse("https://github.com/ishaanu455/Foxkeyboard-Customized.git")
+                )
+                context.startActivity(intent)
+            }
+        )
+        Spacer(modifier = Modifier.width(24.dp))
+        SocialIconButton(
+            iconRes = R.drawable.ic_telegram,
+            contentDescription = "Telegram",
+            onClick = { /* TODO: open Telegram channel once the link is set */ }
+        )
+    }
+
+    Spacer(modifier = Modifier.height(10.dp))
+
+    Text(
+        text = "Version ${BuildConfig.VERSION_NAME}",
+        fontSize = 13.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
     )
+}
+
+/**
+ * Small circular icon button for an external/social link (GitHub, Telegram) shown
+ * under the About list. Same rounded-card visual language as the rest of Settings
+ * (gold border on a slightly-raised surface) but sized and shaped as a compact
+ * badge rather than a full-width row, since these are quick link-outs rather than
+ * settings a user configures.
+ */
+@Composable
+private fun SocialIconButton(
+    iconRes: Int,
+    contentDescription: String,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(52.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f), CircleShape)
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            painter = painterResource(id = iconRes),
+            contentDescription = contentDescription,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(24.dp)
+        )
+    }
 }
 
 /**

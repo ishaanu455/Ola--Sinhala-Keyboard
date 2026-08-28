@@ -149,10 +149,26 @@ object UpdateChecker {
         }
     }
 
-    /** Simple dotted-integer version comparison, e.g. "2.4" > "1.1.116" > "1.1.2". */
+    /**
+     * Simple dotted-integer version comparison, e.g. "2.4" > "1.1.116" > "1.1.2".
+     *
+     * Guards explicitly against the identical-string case before doing any
+     * part-by-part parsing: the auto-release workflow can end up publishing a new
+     * GitHub Release for a commit without bumping versionName/versionCode (the
+     * version bump lives in the workflow, not here), which re-publishes the exact
+     * same version tag with new binary content. When that happens, remote and
+     * local are the same version number - never "newer" - no matter what the
+     * per-part comparison below would otherwise produce from a stray parsing edge
+     * case. Comparison is case-insensitive and trims whitespace so "V1.1.125" vs
+     * "v1.1.125" can't slip through as different either.
+     */
     private fun isVersionNewer(remote: String, local: String): Boolean {
-        val remoteParts = remote.split(".").map { it.toIntOrNull() ?: 0 }
-        val localParts = local.split(".").map { it.toIntOrNull() ?: 0 }
+        val normalizedRemote = remote.trim().lowercase()
+        val normalizedLocal = local.trim().lowercase()
+        if (normalizedRemote == normalizedLocal) return false
+
+        val remoteParts = normalizedRemote.split(".").map { it.toIntOrNull() ?: 0 }
+        val localParts = normalizedLocal.split(".").map { it.toIntOrNull() ?: 0 }
         val length = maxOf(remoteParts.size, localParts.size)
         for (i in 0 until length) {
             val r = remoteParts.getOrElse(i) { 0 }
