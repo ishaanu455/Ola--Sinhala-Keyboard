@@ -1247,6 +1247,24 @@ class KeyboardView(
         }
 
         try {
+            // The keyboard's own root + top bar normally paint a FLAT ?attr/fox_background
+            // (see keyboard_layout.xml) behind everything - that's what made the gradient
+            // read as "only on the keys": the gaps between keys, the row/edge padding, and
+            // the whole top bar strip stayed the old flat colour. Painting the SAME
+            // lightVariant->darkVariant diagonal there too (root spans the full keyboard
+            // height, so this is one continuous sweep, not a second clashing gradient)
+            // makes every pixel of the keyboard - not just the key faces - read as part of
+            // one gradient, matching the Settings > Appearance preview.
+            val wholeKeyboardGradient = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                intArrayOf(lightVariant, darkVariant)
+            )
+            binding.root.background = wholeKeyboardGradient
+            // Top bar previously drew its own opaque fox_background on top of the root's
+            // background, which would otherwise hide the gradient behind the toolbar row -
+            // clear it so the root's gradient shows through instead.
+            binding.topBar.background = null
+
             binding.space.background = buildActionKeyDrawable()
             binding.action.background = buildActionKeyDrawable()
 

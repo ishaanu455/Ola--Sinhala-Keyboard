@@ -514,10 +514,19 @@ private fun KeyboardPreview(
         .background(brush)
         .border(0.5.dp, borderColor, RoundedCornerShape(6.dp))
 
+    // Whole-keyboard fill: for a "*_gradient" theme this is the SAME lightVariant->
+    // darkVariant brush used for Space/Enter (accentBrush) painted across the entire
+    // preview instead of the flat bg colour, so the preview matches what
+    // applyGradientToKeyboard() now does on the real keyboard - gradient behind every
+    // key and the top bar, not just on the accent keys.
+    val boardBackground = theme.gradientColors
+        ?.let { Brush.linearGradient(it) }
+        ?: SolidColor(bg)
+
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
-            .background(bg)
+            .background(boardBackground)
             .padding(6.dp)
     ) {
         // Top bar: Ola logo mark + the real toolbar icons, same order as
