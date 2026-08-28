@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import android.widget.TextView
+import android.widget.Toast
 import ime.suggest.UserDataBackup
 import kotlinx.coroutines.launch
 import com.ola.keyboard.BundledEmojiFonts
@@ -79,6 +80,7 @@ import com.ola.keyboard.Prefs
 import com.ola.keyboard.PredictionManagerActivity
 import com.ola.keyboard.UpdateActivity
 import com.ola.keyboard.UpdateChecker
+import com.ola.keyboard.UpdateCheckOutcome
 import com.ola.keyboard.R
 import com.ola.keyboard.ui.components.PreferenceItem
 import com.ola.keyboard.ui.components.RadioOptionPreference
@@ -721,9 +723,38 @@ private fun AboutSection() {
             if (!checking) {
                 checking = true
                 scope.launch {
-                    UpdateChecker.checkForUpdate(context, force = true)
+                    val outcome = UpdateChecker.checkForUpdate(context, force = true)
                     checking = false
-                    context.startActivity(Intent(context, UpdateActivity::class.java))
+                    // Only jump to UpdateActivity when the check actually completed -
+                    // on RateLimited/Failed/Throttled there's nothing new to show there,
+                    // and silently opening it anyway (reading whatever stale
+                    // Prefs.updateAvailable was left over from a previous check) is what
+                    // used to make a failed check look "stuck" and do nothing. Show a
+                    // clear Toast instead so the user knows the check itself didn't go
+                    // through, rather than mistaking it for "already up to date".
+                    when (outcome) {
+                        is UpdateCheckOutcome.Completed -> {
+                            context.startActivity(Intent(context, UpdateActivity::class.java))
+                        }
+                        is UpdateCheckOutcome.RateLimited -> {
+                            Toast.makeText(
+                                context,
+                                "GitHub API rate limit hit - please wait a bit and try again",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                        is UpdateCheckOutcome.Failed -> {
+                            Toast.makeText(
+                                context,
+                                "Couldn't check for updates: ${outcome.reason}",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                        is UpdateCheckOutcome.Throttled -> {
+                            // force = true is always passed from this button, so this
+                            // branch is unreachable here - kept only for exhaustiveness.
+                        }
+                    }
                 }
             }
         }
