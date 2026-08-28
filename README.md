@@ -1,8 +1,7 @@
 <div align="center">
 
-<!-- TODO: replace with your own Ola Keyboard logo, e.g.:
+
 <img src="docs/logo.png" width="96" alt="Ola Keyboard logo" />
--->
 
 # Ola Keyboard
 
@@ -72,10 +71,6 @@ The app collects no analytics and requires no unnecessary permissions — everyt
 
 ## 📸 Screenshots
 
-<!--
-  TODO: Add real screenshots here before publishing.
-  Suggested shots: keyboard (Singlish / Smart Phonetic Typing), keyboard (English),
-  keyboard (Wijesekara), Settings home, Appearance / theme picker, Clipboard manager, Emoji panel.
 
   <p align="center">
     <img src="docs/screenshots/keyboard-singlish.png" width="220" />
@@ -83,9 +78,8 @@ The app collects no analytics and requires no unnecessary permissions — everyt
     <img src="docs/screenshots/settings-home.png" width="220" />
     <img src="docs/screenshots/clipboard-manager.png" width="220" />
   </p>
--->
 
-*Screenshots coming soon.*
+
 
 ## 📥 Installation
 
