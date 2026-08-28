@@ -367,7 +367,15 @@ class KeyboardView(
         // key surfaces, pressed states, border, accent) to that theme's hue -
         // split into Light/Dark variants since key surface colors differ
         // between the two, matching whichever the current dark-theme setting is.
-        val accentOverlayStyle = when (colorTheme) {
+        // Gradient theme ids (e.g. "wine_gradient", picked from Settings > Appearance's
+        // "Gradient Color Themes" row) are a Compose-preview-only visual for now - the
+        // native keyboard here still renders a flat accent overlay, not a true gradient
+        // drawable. Stripping the suffix means a gradient pick still shows the right
+        // *hue* on the actual keyboard (e.g. wine, not the "ola" default) instead of
+        // silently falling through to `else -> null` below just because the exact string
+        // doesn't match any case.
+        val baseColorTheme = colorTheme.removeSuffix("_gradient")
+        val accentOverlayStyle = when (baseColorTheme) {
             "wine" -> if (darkTheme) R.style.AccentWineDark else R.style.AccentWineLight
             "slate" -> if (darkTheme) R.style.AccentSlateDark else R.style.AccentSlateLight
             "ocean" -> if (darkTheme) R.style.AccentOceanDark else R.style.AccentOceanLight

@@ -62,8 +62,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -141,19 +143,27 @@ fun SettingsScreen() {
         } else {
             Column(modifier = Modifier.fillMaxSize()) {
                 SettingsSubScreenHeader(title = section.title, onBack = { currentSection = null })
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    when (section) {
-                        SettingsSection.LANGUAGES -> LanguagesSection()
-                        SettingsSection.APPEARANCE -> AppearanceSection()
-                        SettingsSection.TYPING -> TypingSection()
-                        SettingsSection.EMOJI -> EmojiSection()
-                        SettingsSection.CLIPBOARD -> ClipboardSection()
-                        SettingsSection.DICTIONARY -> DictionarySection()
-                        SettingsSection.ABOUT -> AboutSection()
+                if (section == SettingsSection.APPEARANCE) {
+                    // Manages its own sticky-preview-on-top layout internally (fixed
+                    // preview block + a weight(1f) scrollable Column below it) - that
+                    // split needs a bounded-height parent, so it can't be dropped into
+                    // the shared verticalScroll Column below like the other sections.
+                    AppearanceSection()
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        when (section) {
+                            SettingsSection.LANGUAGES -> LanguagesSection()
+                            SettingsSection.APPEARANCE -> Unit
+                            SettingsSection.TYPING -> TypingSection()
+                            SettingsSection.EMOJI -> EmojiSection()
+                            SettingsSection.CLIPBOARD -> ClipboardSection()
+                            SettingsSection.DICTIONARY -> DictionarySection()
+                            SettingsSection.ABOUT -> AboutSection()
+                        }
                     }
                 }
             }
@@ -242,55 +252,80 @@ private fun LanguagesSection() {
     )
 }
 
+/**
+ * Preview stays pinned at the top as its own fixed block (not part of the
+ * scrolling content below) so switching Colour/Gradient themes further down the
+ * list is visible live without having to scroll back up to see it - the keyboard
+ * mock-up is never hidden behind the options that change it.
+ */
 @Composable
 private fun AppearanceSection() {
     val context = LocalContext.current
 
     val automaticTheme = rememberBooleanPreference(context, "automatic_theme", true)
-    SwitchPreference(
-        title = "Automatic Theme",
-        summary = "Follow the system's light/dark setting",
-        icon = Icons.Filled.DarkMode,
-        checked = automaticTheme.value,
-        onCheckedChange = { automaticTheme.value = it }
-    )
-
     val darkTheme = rememberBooleanPreference(context, "dark_theme", false)
-    if (!automaticTheme.value) {
-        SwitchPreference(
-            title = "Dark Theme",
-            checked = darkTheme.value,
-            onCheckedChange = { darkTheme.value = it }
-        )
-    }
-
     val keyBorders = rememberBooleanPreference(context, "key_borders", true)
     val colorTheme = rememberStringPreference(context, "color_theme", "ola")
     val effectiveDark = if (automaticTheme.value) isSystemInDarkTheme() else darkTheme.value
 
-    SettingsCategory(title = "Preview")
-    KeyboardPreview(
-        dark = effectiveDark,
-        keyBorders = keyBorders.value,
-        colorThemeId = colorTheme.value,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-    )
+    Column(modifier = Modifier.fillMaxSize()) {
+        // --- Fixed top block: never scrolls ---
+        SettingsCategory(title = "Preview")
+        KeyboardPreview(
+            dark = effectiveDark,
+            keyBorders = keyBorders.value,
+            colorThemeId = colorTheme.value,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+        )
 
-    SwitchPreference(
-        title = "Border",
-        summary = "Show an outline around each key",
-        checked = keyBorders.value,
-        onCheckedChange = { keyBorders.value = it }
-    )
+        // --- Scrollable rest ---
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+        ) {
+            SwitchPreference(
+                title = "Automatic Theme",
+                summary = "Follow the system's light/dark setting",
+                icon = Icons.Filled.DarkMode,
+                checked = automaticTheme.value,
+                onCheckedChange = { automaticTheme.value = it }
+            )
 
-    SettingsCategory(title = "Colour Themes")
-    ColorThemePicker(
-        selected = colorTheme.value,
-        onSelect = { colorTheme.value = it },
-        modifier = Modifier.padding(horizontal = 16.dp)
-    )
+            if (!automaticTheme.value) {
+                SwitchPreference(
+                    title = "Dark Theme",
+                    checked = darkTheme.value,
+                    onCheckedChange = { darkTheme.value = it }
+                )
+            }
+
+            SwitchPreference(
+                title = "Border",
+                summary = "Show an outline around each key",
+                checked = keyBorders.value,
+                onCheckedChange = { keyBorders.value = it }
+            )
+
+            SettingsCategory(title = "Colour Themes")
+            ColorThemePicker(
+                themes = keyboardColorThemes,
+                selected = colorTheme.value,
+                onSelect = { colorTheme.value = it },
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+
+            SettingsCategory(title = "Gradient Color Themes")
+            ColorThemePicker(
+                themes = gradientColorThemes,
+                selected = colorTheme.value,
+                onSelect = { colorTheme.value = it },
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        }
+    }
 }
 
 /** One entry in the Colour Themes picker - id is what's persisted to
@@ -311,7 +346,33 @@ private data class KeyboardColorTheme(
     val darkKey: Color,
     val darkFunc: Color,
     val darkFuncPressed: Color,
+    // Null for the plain "Colour Themes" row - the swatch and the space/enter keys
+    // just use [accent] as a flat fill. Non-null for a "Gradient Color Themes" entry:
+    // exactly two variants of the SAME main colour (a lighter tint + a darker shade
+    // of [accent], see lightenColor/darkenColor below) - never two unrelated hues -
+    // so the swatch and space/enter keys render as a 2-stop gradient between them.
+    val gradientColors: List<Color>? = null,
 )
+
+/** Blends [color] toward white by [amount] (0f = unchanged, 1f = white). */
+private fun lightenColor(color: Color, amount: Float): Color {
+    return Color(
+        red = color.red + (1f - color.red) * amount,
+        green = color.green + (1f - color.green) * amount,
+        blue = color.blue + (1f - color.blue) * amount,
+        alpha = color.alpha
+    )
+}
+
+/** Blends [color] toward black by [amount] (0f = unchanged, 1f = black). */
+private fun darkenColor(color: Color, amount: Float): Color {
+    return Color(
+        red = color.red * (1f - amount),
+        green = color.green * (1f - amount),
+        blue = color.blue * (1f - amount),
+        alpha = color.alpha
+    )
+}
 
 private val keyboardColorThemes = listOf(
     KeyboardColorTheme(
@@ -351,8 +412,23 @@ private val keyboardColorThemes = listOf(
     ),
 )
 
+/** "Gradient Color Themes" row entries - one per existing main colour above, each
+ *  reusing that theme's own key-bed tokens untouched and swapping only the flat
+ *  [KeyboardColorTheme.accent] for a [gradientColors] pair (a lighter tint + a
+ *  darker shade of that SAME accent). Deliberately not a separate hand-picked
+ *  palette, per the ask: the gradient stops must be variants of the existing main
+ *  colour, not new/unrelated colours. */
+private val gradientColorThemes = keyboardColorThemes.map { theme ->
+    theme.copy(
+        id = "${theme.id}_gradient",
+        label = "${theme.label} Gradient",
+        gradientColors = listOf(lightenColor(theme.accent, 0.35f), darkenColor(theme.accent, 0.30f))
+    )
+}
+
 @Composable
 private fun ColorThemePicker(
+    themes: List<KeyboardColorTheme>,
     selected: String,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -363,7 +439,7 @@ private fun ColorThemePicker(
             .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        keyboardColorThemes.forEach { theme ->
+        themes.forEach { theme ->
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.clickable { onSelect(theme.id) }
@@ -372,7 +448,13 @@ private fun ColorThemePicker(
                     modifier = Modifier
                         .size(52.dp)
                         .clip(CircleShape)
-                        .background(theme.accent)
+                        .then(
+                            if (theme.gradientColors != null) {
+                                Modifier.background(Brush.linearGradient(theme.gradientColors))
+                            } else {
+                                Modifier.background(theme.accent)
+                            }
+                        )
                         .then(
                             if (selected == theme.id) {
                                 Modifier.border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
@@ -407,18 +489,29 @@ private fun KeyboardPreview(
     colorThemeId: String,
     modifier: Modifier = Modifier
 ) {
-    val theme = keyboardColorThemes.first { it.id == colorThemeId }
+    val theme = (keyboardColorThemes + gradientColorThemes).first { it.id == colorThemeId }
     val bg = if (dark) theme.darkBg else theme.lightBg
     val keyColor = if (dark) theme.darkKey else theme.lightKey
     val funcColor = if (dark) theme.darkFunc else theme.lightFunc
     val textColor = if (dark) Color(0xFFFFFFFF) else Color(0xFF000000)
     val borderColor = if (keyBorders) textColor.copy(alpha = 0.18f) else Color.Transparent
-    val accent = theme.accent
+    // Space/enter fill: a 2-stop gradient brush for a "*_gradient" theme, otherwise
+    // the same flat accent SolidColor as before - both go through the same Brush-based
+    // keyMod so the two key rows below don't need their own branching.
+    val accentBrush = theme.gradientColors
+        ?.let { Brush.linearGradient(it) }
+        ?: SolidColor(theme.accent)
 
     fun keyMod(background: Color) = Modifier
         .height(40.dp)
         .clip(RoundedCornerShape(6.dp))
         .background(background)
+        .border(0.5.dp, borderColor, RoundedCornerShape(6.dp))
+
+    fun keyMod(brush: Brush) = Modifier
+        .height(40.dp)
+        .clip(RoundedCornerShape(6.dp))
+        .background(brush)
         .border(0.5.dp, borderColor, RoundedCornerShape(6.dp))
 
     Column(
@@ -544,12 +637,12 @@ private fun KeyboardPreview(
             Box(
                 modifier = Modifier
                     .weight(4f)
-                    .then(keyMod(accent))
+                    .then(keyMod(accentBrush))
             )
             Box(
                 modifier = Modifier
                     .weight(1.4f)
-                    .then(keyMod(accent))
+                    .then(keyMod(accentBrush))
             )
         }
     }
