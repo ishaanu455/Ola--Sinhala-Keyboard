@@ -27,34 +27,67 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Get current version from build.gradle
+      - name: Determine base version from latest release tag
         id: get_version
         run: |
-          VERSION_NAME=$(grep 'versionName' app/build.gradle | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]')
-          VERSION_CODE=$(grep 'versionCode' app/build.gradle | grep -o '[0-9]*' | tr -d '[:space:]')
-          echo "current_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
-          echo "current_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
-          echo "Current version: $VERSION_NAME ($VERSION_CODE)"
+          # The highest "vX.Y.Z" git tag is the authoritative record of what has
+          # actually been released - unlike app/build.gradle on disk, it can never
+          # go stale. If a commit is pushed without first pulling the bot's last
+          # "chore: bump version" commit, build.gradle in that commit can still show
+          # an older version than what's already been published; bumping from THAT
+          # silently re-publishes a version number that already exists (this is why
+          # a GitHub release could appear "duplicated" under the same version twice,
+          # confusing the app's own update check into showing an "update" that's
+          # actually the same version already installed).
+          git fetch --tags --force
+
+          LATEST_TAG_VERSION=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' \
+            | sed 's/^v//' \
+            | sort -t. -k1,1n -k2,2n -k3,3n \
+            | tail -n 1)
+
+          GRADLE_VERSION=$(grep 'versionName' app/build.gradle | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]')
+
+          if [ -z "$LATEST_TAG_VERSION" ]; then
+            # No releases yet (first ever run) - fall back to build.gradle.
+            BASE_VERSION="$GRADLE_VERSION"
+          else
+            # Bump from whichever of the two is higher, in case build.gradle was
+            # ever manually bumped ahead of the last actual release.
+            BASE_VERSION=$(printf '%s\n%s\n' "$LATEST_TAG_VERSION" "$GRADLE_VERSION" \
+              | sort -t. -k1,1n -k2,2n -k3,3n \
+              | tail -n 1)
+          fi
+
+          echo "current_name=$BASE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Latest release tag: v$LATEST_TAG_VERSION | build.gradle: $GRADLE_VERSION -> bumping from $BASE_VERSION"
 
       - name: Bump patch version
         id: bump_version
         run: |
           OLD_NAME="${{ steps.get_version.outputs.current_name }}"
-          OLD_CODE="${{ steps.get_version.outputs.current_code }}"
 
           MAJOR=$(echo "$OLD_NAME" | cut -d. -f1)
           MINOR=$(echo "$OLD_NAME" | cut -d. -f2)
           PATCH=$(echo "$OLD_NAME" | cut -d. -f3)
           NEW_PATCH=$((PATCH + 1))
           NEW_NAME="${MAJOR}.${MINOR}.${NEW_PATCH}"
-          NEW_CODE=$((OLD_CODE + 1))
+          # Derived purely from the new version name (MAJOR*100000 + MINOR*1000 +
+          # PATCH) instead of incrementing whatever versionCode happened to be
+          # sitting in build.gradle - that counter is exactly as susceptible to
+          # going stale as versionName was, and a mismatched versionCode can
+          # confuse installs/updates just as easily as a duplicate versionName.
+          NEW_CODE=$((MAJOR * 100000 + MINOR * 1000 + NEW_PATCH))
 
           echo "new_name=$NEW_NAME" >> "$GITHUB_OUTPUT"
           echo "new_code=$NEW_CODE" >> "$GITHUB_OUTPUT"
-          echo "Bumping $OLD_NAME ($OLD_CODE) -> $NEW_NAME ($NEW_CODE)"
+          echo "Bumping $OLD_NAME -> $NEW_NAME ($NEW_CODE)"
 
-          sed -i "s/versionCode $OLD_CODE/versionCode $NEW_CODE/" app/build.gradle
-          sed -i "s/versionName \"$OLD_NAME\"/versionName \"$NEW_NAME\"/" app/build.gradle
+          # Matches whatever versionCode/versionName is currently on disk (not
+          # tied to $OLD_NAME/$OLD_CODE) since the base version above may now
+          # come from a tag rather than the checked-out file's own content.
+          sed -i "s/versionCode [0-9]*/versionCode $NEW_CODE/" app/build.gradle
+          sed -i "s/versionName \"[^\"]*\"/versionName \"$NEW_NAME\"/" app/build.gradle
 
       - name: Commit and push bumped version
         run: |
