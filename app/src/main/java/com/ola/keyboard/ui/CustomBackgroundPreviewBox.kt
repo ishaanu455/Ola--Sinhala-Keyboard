@@ -1,21 +1,28 @@
 package com.ola.keyboard.ui
 
 import android.os.Build
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 
 /**
@@ -30,6 +37,28 @@ import androidx.compose.ui.unit.dp
  * KeyboardPreview/the glass-key rendering added in Step 5) - this composable
  * is only the background layer underneath them, so both call sites can stack
  * their own foreground content on top of it.
+ *
+ * FIX (was showing solid dark/light fill, a tiny unscaled corner of the photo,
+ * or briefly nothing at all): the old implementation measured its own size via
+ * BoxWithConstraints's `maxWidth`/`maxHeight` and used those px values directly
+ * in the same composition pass to compute the cover-scale AND the pan overflow.
+ * On the very first frame(s) - before layout has actually settled (screen
+ * enter transition, IME window first inflate, recomposition right after
+ * `showAdjustScreen`/`customBgVersion` flips) - that box size can read as 0 or
+ * a transient/incorrect value. `scale` had a 0-guard (falls back to 1f), but
+ * `overflowX`/`overflowY` did NOT share that guard, so on that same bad frame
+ * they were computed from the *unscaled* full image size vs a ~0 box size -
+ * a huge bogus "overflow" - and the pan translation (`-(offsetX * overflowX)`)
+ * then shoved the image thousands of px outside the (correctly clipped) box,
+ * leaving only the flat background fill visible = looked "dark"/blank. Once
+ * things settled, a leftover stale small-scale frame could also render as an
+ * unscaled little chunk of the photo before catching up.
+ *
+ * Now: box size is tracked with `onSizeChanged` (reliable actual pixel size,
+ * not read mid-measurement) into `remember { mutableStateOf(IntSize.Zero) }`,
+ * and nothing is drawn - not even at the wrong scale - until that size is
+ * known to be > 0. `clipToBounds()` is also added as a second safety net so
+ * even a future math mistake can never paint outside this box.
  *
  * @param bitmap the full-resolution image from [com.ola.keyboard.CustomBackgroundManager.loadBitmap].
  *   Null falls back to a flat neutral fill matching the app's own light/dark
@@ -55,30 +84,40 @@ fun CustomBackgroundPreviewBox(
 ) {
     val density = LocalDensity.current
 
-    BoxWithConstraints(
+    // Actual measured pixel size of this box, updated by the layout system
+    // itself (not derived mid-composition) - see the FIX note above.
+    var boxSizePx by remember { mutableStateOf(IntSize.Zero) }
+
+    Box(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
+            .clipToBounds()
             .background(if (dark) Color(0xFF1C1B17) else Color(0xFFFBF8F2))
+            .onSizeChanged { boxSizePx = it }
     ) {
-        if (bitmap == null) {
-            // Step 7 fallback: nothing to show, the neutral background above
-            // is the whole story - caller's own theme/gradient still applies
-            // one layer up since backgroundMode only flips to custom_image
-            // once an import actually succeeds.
-            return@BoxWithConstraints
+        val boxWidthPx = boxSizePx.width.toFloat()
+        val boxHeightPx = boxSizePx.height.toFloat()
+
+        // Step 7 fallback (missing/corrupt file), and also the "not measured
+        // yet" frame - in both cases the neutral fill above is the whole
+        // story; caller's own theme/gradient still applies one layer up
+        // since backgroundMode only flips to custom_image once an import
+        // actually succeeds.
+        if (bitmap == null || boxWidthPx <= 0f || boxHeightPx <= 0f) {
+            return@Box
         }
 
-        val boxWidthPx = with(density) { maxWidth.toPx() }
-        val boxHeightPx = with(density) { maxHeight.toPx() }
         val imgWidth = bitmap.width.toFloat()
         val imgHeight = bitmap.height.toFloat()
+        if (imgWidth <= 0f || imgHeight <= 0f) {
+            return@Box
+        }
 
         // "Cover" scale - same behaviour as ContentScale.Crop, but computed by
         // hand since we need the resulting scaled size below to know how much
         // room there is to pan (the overflow past the box edges).
         val scale = remember(boxWidthPx, boxHeightPx, imgWidth, imgHeight) {
-            if (imgWidth <= 0f || imgHeight <= 0f || boxWidthPx <= 0f || boxHeightPx <= 0f) 1f
-            else maxOf(boxWidthPx / imgWidth, boxHeightPx / imgHeight)
+            maxOf(boxWidthPx / imgWidth, boxHeightPx / imgHeight)
         }
         val scaledWidthPx = imgWidth * scale
         val scaledHeightPx = imgHeight * scale
@@ -89,15 +128,18 @@ fun CustomBackgroundPreviewBox(
         val useLiveBlur = preBlurredBitmap == null && blurAmount > 0f && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
         val liveBlurRadius = with(density) { (blurAmount * 20.dp.toPx()).toDp() }
 
-        androidx.compose.foundation.Image(
+        Image(
             bitmap = displayBitmap,
             contentDescription = null,
             modifier = Modifier
-                .size(
-                    with(density) { scaledWidthPx.toDp() },
-                    with(density) { scaledHeightPx.toDp() }
-                )
+                .fillMaxSize()
                 .graphicsLayer {
+                    // Draw at the actual "cover" scale rather than relying on
+                    // pre-computed Dp sizing, so this never depends on a second
+                    // density round-trip lining up exactly with boxWidthPx/boxHeightPx.
+                    scaleX = scaledWidthPx / boxWidthPx
+                    scaleY = scaledHeightPx / boxHeightPx
+                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
                     // offsetX/offsetY are 0f..1f pan fractions across the
                     // available overflow, 0.5f = centered - never lets the
                     // image's edge come in past the box boundary either side.
@@ -124,9 +166,9 @@ fun CustomBackgroundPreviewBox(
         )
 
         if (darkenAmount > 0f) {
-            androidx.compose.foundation.layout.Box(
+            Box(
                 modifier = Modifier
-                    .matchParentSize()
+                    .fillMaxSize()
                     .background(Color.Black.copy(alpha = (darkenAmount * 0.85f).coerceIn(0f, 0.85f)))
             )
         }
