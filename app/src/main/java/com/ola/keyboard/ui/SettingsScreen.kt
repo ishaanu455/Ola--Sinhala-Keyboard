@@ -274,6 +274,14 @@ private fun AppearanceSection() {
     var customBgVersion by remember { mutableIntStateOf(0) }
     var customBgImportFailed by remember { mutableStateOf(false) }
 
+    // Step 3: full-screen pan/blur/darken adjustment. Opened automatically right
+    // after a new photo import succeeds, and also when re-tapping an already-picked
+    // photo's card ("tap to change photo" -> re-adjust the existing image without
+    // re-opening the system picker). Nothing is written to Prefs until Save inside
+    // that screen - Cancel/back here just closes it, discarding any in-progress drag/
+    // slider changes.
+    var showAdjustScreen by remember { mutableStateOf(false) }
+
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
@@ -284,10 +292,30 @@ private fun AppearanceSection() {
             customBgVersion++
             backgroundMode = "custom_image"
             prefs.backgroundMode = "custom_image"
-            // TODO(step 3): navigate to the pan/blur/darken adjustment screen here
-            // instead of applying the image immediately at its default centered
-            // crop - this just wires the picker + storage + selection for now.
+            showAdjustScreen = true
         }
+    }
+
+    BackHandler(enabled = showAdjustScreen) { showAdjustScreen = false }
+
+    if (showAdjustScreen) {
+        CustomBackgroundAdjustScreen(
+            dark = effectiveDark,
+            initialOffsetX = prefs.customBgOffsetX,
+            initialOffsetY = prefs.customBgOffsetY,
+            initialBlur = prefs.customBgBlur,
+            initialDarken = prefs.customBgDarken,
+            onSave = { x, y, blur, darken ->
+                prefs.customBgOffsetX = x
+                prefs.customBgOffsetY = y
+                prefs.customBgBlur = blur
+                prefs.customBgDarken = darken
+                customBgVersion++
+                showAdjustScreen = false
+            },
+            onCancel = { showAdjustScreen = false }
+        )
+        return
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -368,6 +396,11 @@ private fun AppearanceSection() {
                         )
                     )
                 },
+                onAdjust = {
+                    backgroundMode = "custom_image"
+                    prefs.backgroundMode = "custom_image"
+                    showAdjustScreen = true
+                },
                 onRemoveImage = {
                     CustomBackgroundManager.removeImage(context)
                     customBgVersion++
@@ -403,6 +436,7 @@ private fun CustomBackgroundPicker(
     hasImage: Boolean,
     imageVersion: Int,
     onChooseImage: () -> Unit,
+    onAdjust: () -> Unit,
     onRemoveImage: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -424,7 +458,12 @@ private fun CustomBackgroundPicker(
                 else MaterialTheme.colorScheme.surface,
                 cardShape
             )
-            .clickable(onClick = onChooseImage)
+            // Already have a photo -> tapping the card re-opens the pan/blur/darken
+            // adjustment screen on that same image. No photo yet -> straight to the
+            // system picker. Picking a *different* photo goes through the small
+            // "Change" text action below instead, so this main tap target never has
+            // two different meanings depending on where exactly you touch it.
+            .clickable(onClick = if (hasImage) onAdjust else onChooseImage)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -481,6 +520,9 @@ private fun CustomBackgroundPicker(
         }
 
         if (hasImage) {
+            TextButton(onClick = onChooseImage) {
+                Text(text = "Change", fontSize = 13.sp)
+            }
             IconButton(onClick = onRemoveImage) {
                 Icon(
                     imageVector = Icons.Filled.Close,
