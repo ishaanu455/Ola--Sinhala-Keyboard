@@ -319,22 +319,48 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     private var appliedEmojiStyle = EmojiStyle.SYSTEM
     private var appliedColorTheme = "ola"
 
+    // Step 6: same full-rebuild reasoning as appliedColorTheme above - the
+    // baked custom-image background + glass key drawables are painted once
+    // in KeyboardView's init{} (applyCustomImageToKeyboard/applyGlassKeyStyling),
+    // not hot-swappable in place, so a change to any of these needs a fresh
+    // KeyboardView the same way a colour-theme change does.
+    private var appliedBackgroundMode = "theme"
+    private var appliedCustomBgOffsetX = 0.5f
+    private var appliedCustomBgOffsetY = 0.5f
+    private var appliedCustomBgBlur = 0f
+    private var appliedCustomBgDarken = 0.25f
+    private var appliedCustomBgZoom = 1f
+
     private fun rememberAppliedAppearancePrefs() {
+        val prefs = Prefs(this)
         appliedDarkTheme = Prefs.getDarkTheme(this)
         appliedKeyBorders = Prefs.getKeyBorders(this)
         appliedTextSize = Prefs.getTextSize(this)
         appliedHeightPercentage = Prefs.getRowHeight(this)
         appliedEmojiStyle = Prefs.getEmojiStyle(this)
         appliedColorTheme = Prefs.getColorTheme(this)
+        appliedBackgroundMode = prefs.backgroundMode
+        appliedCustomBgOffsetX = prefs.customBgOffsetX
+        appliedCustomBgOffsetY = prefs.customBgOffsetY
+        appliedCustomBgBlur = prefs.customBgBlur
+        appliedCustomBgDarken = prefs.customBgDarken
+        appliedCustomBgZoom = prefs.customBgZoom
     }
 
     private fun appearancePrefsRequireRebuild(): Boolean {
+        val prefs = Prefs(this)
         return appliedDarkTheme != Prefs.getDarkTheme(this) ||
             appliedKeyBorders != Prefs.getKeyBorders(this) ||
             appliedTextSize != Prefs.getTextSize(this) ||
             appliedHeightPercentage != Prefs.getRowHeight(this) ||
             appliedEmojiStyle != Prefs.getEmojiStyle(this) ||
-            appliedColorTheme != Prefs.getColorTheme(this)
+            appliedColorTheme != Prefs.getColorTheme(this) ||
+            appliedBackgroundMode != prefs.backgroundMode ||
+            appliedCustomBgOffsetX != prefs.customBgOffsetX ||
+            appliedCustomBgOffsetY != prefs.customBgOffsetY ||
+            appliedCustomBgBlur != prefs.customBgBlur ||
+            appliedCustomBgDarken != prefs.customBgDarken ||
+            appliedCustomBgZoom != prefs.customBgZoom
     }
 
     /** Shared by onStartInputView's rebuild-on-reopen path and the live
@@ -381,11 +407,17 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             when (key) {
                 "key_borders", "color_theme", "dark_theme", "automatic_theme",
-                "text_size", "height_percentage", "emoji_style" -> rebuildKeyboardViewForAppearanceChange()
+                "text_size", "height_percentage", "emoji_style",
+                // Step 6: same rebuild trigger as color_theme above - see
+                // appliedBackgroundMode etc.
+                "background_mode", "custom_bg_offset_x", "custom_bg_offset_y",
+                "custom_bg_blur", "custom_bg_darken", "custom_bg_zoom" ->
+                    rebuildKeyboardViewForAppearanceChange()
             }
         }
 
     private fun buildKeyboardView(): KeyboardView {
+        val prefs = Prefs(this)
         return KeyboardView(
             this,
             this,
@@ -401,7 +433,13 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             Prefs.getEmojiStyle(this),
             Prefs.getClipboardEnabled(this),
             Prefs.getFontStyle(this),
-            Prefs.getColorTheme(this)
+            Prefs.getColorTheme(this),
+            prefs.backgroundMode,
+            prefs.customBgOffsetX,
+            prefs.customBgOffsetY,
+            prefs.customBgBlur,
+            prefs.customBgDarken,
+            prefs.customBgZoom
         )
     }
 

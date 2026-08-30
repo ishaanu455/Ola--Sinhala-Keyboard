@@ -19,6 +19,7 @@ import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.core.widget.ImageViewCompat
 import androidx.core.view.children
+import androidx.core.view.doOnLayout
 import androidx.core.view.isVisible
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.recyclerview.widget.GridLayoutManager
@@ -44,7 +45,7 @@ class KeyboardView(
     private val swipeListener: SwipeListener,
     private val rowHeight: Int,
     private val darkTheme: Boolean,
-    keyBorders: Boolean,
+    private val keyBorders: Boolean,
     private val swipeToErase: Boolean,
     private val swipeToMoveCursor: Boolean,
     private val textSize: Int,
@@ -53,7 +54,19 @@ class KeyboardView(
     private val emojiStyle: EmojiStyle = EmojiStyle.SYSTEM,
     private var clipboardEnabled: Boolean = true,
     private var initialFontStyle: FontStyle = FontStyle.NONE,
-    private val colorTheme: String = "ola"
+    private val colorTheme: String = "ola",
+    // --- Custom background image (Step 6 - see CustomBackgroundManager,
+    // CustomBackgroundAdjustScreen, and CustomBackgroundPreviewBox, whose
+    // exact cover-scale/pan/blur/darken math applyCustomImageToKeyboard()
+    // below reproduces for this real, non-Compose keyboard surface). Mirrors
+    // the same primitives-in/Prefs-read-by-the-caller pattern [colorTheme]
+    // above already uses, rather than this class reading Prefs itself. ---
+    private val backgroundMode: String = "theme",
+    private val customBgOffsetX: Float = 0.5f,
+    private val customBgOffsetY: Float = 0.5f,
+    private val customBgBlur: Float = 0f,
+    private val customBgDarken: Float = 0.25f,
+    private val customBgZoom: Float = 1f
 ) : LinearLayout(context) {
 
     companion object {
@@ -419,6 +432,12 @@ class KeyboardView(
         // onto the Space/Enter keys now that binding exists. Safe to call
         // unconditionally: it's a no-op for every non-gradient colorTheme.
         applyGradientToKeyboard()
+
+        // Step 6: the real-keyboard counterpart of Step 5's Settings preview -
+        // no-op whenever backgroundMode isn't "custom_image" (including "no
+        // photo ever saved"), same as applyGradientToKeyboard() above being a
+        // no-op for non-gradient themes, so safe to call unconditionally too.
+        applyCustomImageToKeyboard()
 
         // Bundled Sinhala/English font, applied everywhere in the keyboard view tree
         // in one sweep - keys, suggestion bar, clipboard/emoji/text-select/font-style
@@ -1282,6 +1301,229 @@ class KeyboardView(
         } catch (t: Throwable) {
             Log.e("KeyboardView", "Failed to apply whole-keyboard gradient", t)
         }
+    }
+
+    /**
+     * Step 6: real-keyboard counterpart of Step 5's Settings > Appearance preview
+     * (see KeyboardPreview in SettingsScreen.kt). No-op whenever [backgroundMode]
+     * isn't "custom_image" - including "the adjustment screen exists but the user
+     * never actually picked a photo", since backgroundMode only ever flips to
+     * custom_image once [CustomBackgroundManager.importImage] has actually
+     * succeeded (see Prefs.backgroundMode's own doc comment) - so it's safe to
+     * call unconditionally from init{} right after [applyGradientToKeyboard],
+     * same pattern.
+     *
+     * Step 7 (missing/corrupt file): if [CustomBackgroundManager.loadBitmap]
+     * comes back null, this simply returns - whatever colorTheme/
+     * applyGradientToKeyboard already painted above is left alone. No crash,
+     * no half-applied custom-image state.
+     *
+     * The actual cover-scale/pan/blur/darken math is deferred to
+     * [doOnLayout] because it needs binding.root's actual laid-out width/
+     * height, which aren't known yet at init{} time - measure/layout hasn't
+     * run on the IME window on this first call.
+     */
+    private fun applyCustomImageToKeyboard() {
+        if (backgroundMode != "custom_image") return
+
+        val sourceBitmap = try {
+            CustomBackgroundManager.loadBitmap(context)
+        } catch (t: Throwable) {
+            Log.e("KeyboardView", "Failed to load custom background bitmap", t)
+            null
+        } ?: return
+
+        binding.root.doOnLayout {
+            try {
+                renderCustomImageBackground(sourceBitmap)
+                applyGlassKeyStyling()
+            } catch (t: Throwable) {
+                Log.e("KeyboardView", "Failed to apply custom image background", t)
+            }
+        }
+    }
+
+    /**
+     * Bakes [source] into one bitmap sized to this keyboard's own laid-out
+     * bounds, reproducing the EXACT same cover-scale + pan + blur + darken
+     * math as [com.ola.keyboard.ui.CustomBackgroundPreviewBox] (the
+     * adjustment screen and the Settings preview both use it) so the real
+     * keyboard matches what was saved. Baked once rather than drawn live
+     * since there's no drag gesture on the real keyboard - just the static
+     * values Settings already saved - unlike the RenderEffect-vs-baked-bitmap
+     * split ImageBlurUtils documents for API < 31's Compose preview, this
+     * always bakes, on every API level, because a native View background
+     * drawable has no live-blur equivalent to reach for in the first place.
+     *
+     * Paints the result onto binding.root - the same spot
+     * [applyGradientToKeyboard] paints its gradient - and clears the top
+     * bar's own opaque background for the same reason: it would otherwise
+     * hide whatever's now behind it.
+     */
+    private fun renderCustomImageBackground(source: android.graphics.Bitmap) {
+        val boxW = binding.root.width
+        val boxH = binding.root.height
+        if (boxW <= 0 || boxH <= 0) return
+
+        val imgW = source.width.toFloat()
+        val imgH = source.height.toFloat()
+        if (imgW <= 0f || imgH <= 0f) return
+
+        // Same CUSTOM_BG_MIN_ZOOM/CUSTOM_BG_MAX_ZOOM range as
+        // CustomBackgroundPreviewBox - duplicated as literals here rather
+        // than importing a Compose-file constant into this plain View class.
+        val clampedZoom = customBgZoom.coerceIn(1f, 3f)
+        val baseScale = max(boxW / imgW, boxH / imgH)
+        val scale = baseScale * clampedZoom
+        val scaledW = imgW * scale
+        val scaledH = imgH * scale
+        val overflowX = (scaledW - boxW).coerceAtLeast(0f)
+        val overflowY = (scaledH - boxH).coerceAtLeast(0f)
+
+        val translateX = -(customBgOffsetX.coerceIn(0f, 1f) * overflowX)
+        val translateY = -(customBgOffsetY.coerceIn(0f, 1f) * overflowY)
+
+        val cropped = android.graphics.Bitmap.createBitmap(
+            boxW, boxH, android.graphics.Bitmap.Config.ARGB_8888
+        )
+        val canvas = android.graphics.Canvas(cropped)
+        val matrix = android.graphics.Matrix().apply {
+            setScale(scale, scale)
+            postTranslate(translateX, translateY)
+        }
+        val paint = android.graphics.Paint(
+            android.graphics.Paint.ANTI_ALIAS_FLAG or android.graphics.Paint.FILTER_BITMAP_FLAG
+        )
+        canvas.drawBitmap(source, matrix, paint)
+
+        // ImageBlurUtils fails soft to the sharp bitmap on its own (OEM
+        // RenderScript issues) - the extra try/catch here is only for
+        // anything unexpected happening around that call itself.
+        val blurred = if (customBgBlur > 0f) {
+            try {
+                ImageBlurUtils.blur(context, cropped, customBgBlur)
+            } catch (t: Throwable) {
+                Log.e("KeyboardView", "Custom background blur failed, using sharp image", t)
+                cropped
+            }
+        } else {
+            cropped
+        }
+
+        if (customBgDarken > 0f) {
+            // Same 0.85f alpha cap as CustomBackgroundPreviewBox's darken
+            // overlay - "near-black", never a fully opaque black square.
+            val alpha = (customBgDarken.coerceIn(0f, 1f) * 0.85f * 255f).toInt().coerceIn(0, 255)
+            android.graphics.Canvas(blurred).drawColor(android.graphics.Color.argb(alpha, 0, 0, 0))
+        }
+
+        binding.root.background = android.graphics.drawable.BitmapDrawable(resources, blurred)
+        binding.topBar.background = null
+    }
+
+    /**
+     * Step 6: every key - letters, number row, Space/Enter alike - switches
+     * from a flat/gradient theme fill to a translucent frosted-glass
+     * treatment: semi-transparent fill + border + a small shadow, matching
+     * KeyboardPreview's glass styling in SettingsScreen.kt (same fill/border
+     * alpha values, and the same "respects the Settings Border toggle
+     * instead of always drawing one" fix) so the real keyboard matches the
+     * Settings preview. A solid theme colour would otherwise visually fight
+     * with an arbitrary photo underneath. Only ever called once
+     * [renderCustomImageBackground] has already painted a valid photo behind
+     * everything - see [applyCustomImageToKeyboard].
+     */
+    private fun applyGlassKeyStyling() {
+        val density = resources.displayMetrics.density
+        fun dp(value: Float) = value * density
+
+        val glassFill = if (darkTheme) {
+            android.graphics.Color.argb((0.30f * 255).toInt(), 0, 0, 0)
+        } else {
+            android.graphics.Color.argb((0.22f * 255).toInt(), 255, 255, 255)
+        }
+        // Mirrors KeyboardPreview's own bug fix: no border at all when the
+        // Settings "Border" toggle is off, instead of always drawing one.
+        val glassBorder = if (!keyBorders) {
+            android.graphics.Color.TRANSPARENT
+        } else if (darkTheme) {
+            android.graphics.Color.argb((0.16f * 255).toInt(), 255, 255, 255)
+        } else {
+            android.graphics.Color.argb((0.55f * 255).toInt(), 255, 255, 255)
+        }
+        val strokeWidthPx = dp(0.8f).toInt().coerceAtLeast(1)
+        val elevationPx = dp(2f)
+
+        fun buildGlassDrawable(
+            cornerRadiusDp: Float,
+            insetHDp: Float,
+            insetVDp: Float
+        ): android.graphics.drawable.Drawable {
+            val normalShape = android.graphics.drawable.GradientDrawable().apply {
+                setColor(glassFill)
+                cornerRadius = dp(cornerRadiusDp)
+                if (glassBorder != android.graphics.Color.TRANSPARENT) {
+                    setStroke(strokeWidthPx, glassBorder)
+                }
+            }
+            // Pressed feedback bumps the fill's own alpha up rather than
+            // blending toward black/white (darkenColor()/lightenColor()
+            // below both discard alpha via Color.rgb()) - keeps the glass
+            // look translucent instead of the pressed key suddenly going
+            // opaque.
+            val pressedShape = android.graphics.drawable.GradientDrawable().apply {
+                setColor(pressedGlassFill(glassFill))
+                cornerRadius = dp(cornerRadiusDp)
+                if (glassBorder != android.graphics.Color.TRANSPARENT) {
+                    setStroke(strokeWidthPx, glassBorder)
+                }
+            }
+            val insetH = dp(insetHDp).toInt()
+            val insetV = dp(insetVDp).toInt()
+            val normalInset = android.graphics.drawable.InsetDrawable(normalShape, insetH, insetV, insetH, insetV)
+            val pressedInset = android.graphics.drawable.InsetDrawable(pressedShape, insetH, insetV, insetH, insetV)
+            return android.graphics.drawable.StateListDrawable().apply {
+                addState(intArrayOf(android.R.attr.state_pressed), pressedInset)
+                addState(intArrayOf(), normalInset)
+            }
+        }
+
+        try {
+            // Space/Enter: same wide action-key insets applyGradientToKeyboard
+            // uses (18dp radius, 2dp/3dp insets), just glass-filled instead of
+            // gradient-filled.
+            binding.space.background = buildGlassDrawable(18f, 2f, 3f)
+            binding.space.elevation = elevationPx
+            binding.action.background = buildGlassDrawable(18f, 2f, 3f)
+            binding.action.elevation = elevationPx
+
+            val rows = binding.keyboardRows.children.filterIsInstance<LinearLayout>().toList()
+            rows.forEach { row ->
+                row.children.forEach { keyView ->
+                    if (keyView === binding.space || keyView === binding.action) return@forEach
+                    if (keyView !is KeyboardButton && keyView !is ImageView) return@forEach
+                    // Same regular 5dp-radius shape/insets as
+                    // applyGradientToKeyboard's buildFlatKeyDrawable, glass-filled.
+                    keyView.background = buildGlassDrawable(5f, 2f, 3f)
+                    keyView.elevation = elevationPx
+                }
+            }
+        } catch (t: Throwable) {
+            Log.e("KeyboardView", "Failed to apply glass key styling", t)
+        }
+    }
+
+    /** Bumps an ARGB [color]'s own alpha channel up by a fixed amount (capped at
+     *  fully opaque), keeping its RGB untouched - used for the glass keys' pressed
+     *  state instead of [darkenColor], which discards alpha entirely via Color.rgb(). */
+    private fun pressedGlassFill(color: Int): Int {
+        val alpha = (android.graphics.Color.alpha(color) + (0.20f * 255).toInt()).coerceAtMost(255)
+        return android.graphics.Color.argb(
+            alpha,
+            android.graphics.Color.red(color),
+            android.graphics.Color.green(color),
+            android.graphics.Color.blue(color)
+        )
     }
 
     /** Blends [color] toward white by [amount] (0f = unchanged, 1f = white). Mirrors
