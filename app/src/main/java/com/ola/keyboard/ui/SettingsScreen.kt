@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.matchParentSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -62,6 +63,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -325,6 +327,12 @@ private fun AppearanceSection() {
             dark = effectiveDark,
             keyBorders = keyBorders.value,
             colorThemeId = colorTheme.value,
+            backgroundMode = backgroundMode,
+            customBgOffsetX = prefs.customBgOffsetX,
+            customBgOffsetY = prefs.customBgOffsetY,
+            customBgBlur = prefs.customBgBlur,
+            customBgDarken = prefs.customBgDarken,
+            customBgVersion = customBgVersion,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
@@ -687,34 +695,83 @@ private fun ColorThemePicker(
  * coupled to InputMethodService (key layouts, IME callbacks) and isn't meant to
  * be instantiated standalone inside a Settings screen. Reacts live to dark
  * mode / border / colour-theme selection above, same as the real keyboard does.
+ *
+ * Step 5: when [backgroundMode] is "custom_image" and a saved photo actually
+ * exists, this swaps the theme-coloured background for that photo - panned/
+ * blurred/darkened exactly per the saved [customBgOffsetX]/[customBgOffsetY]/
+ * [customBgBlur]/[customBgDarken] values, via the SAME [CustomBackgroundPreviewBox]
+ * the adjustment screen (Step 3) uses, just non-draggable here - and every key
+ * (letters, function, space/enter alike) switches to a translucent frosted-glass
+ * treatment instead of a flat/gradient fill, since a solid theme colour would
+ * fight with an arbitrary photo underneath. If the saved file is missing/corrupt
+ * (Step 7), [customBitmap] comes back null and this silently falls back to the
+ * normal theme-coloured board below - no separate empty/error state needed.
  */
 @Composable
 private fun KeyboardPreview(
     dark: Boolean,
     keyBorders: Boolean,
     colorThemeId: String,
+    backgroundMode: String,
+    customBgOffsetX: Float,
+    customBgOffsetY: Float,
+    customBgBlur: Float,
+    customBgDarken: Float,
+    customBgVersion: Int,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val theme = (keyboardColorThemes + gradientColorThemes).first { it.id == colorThemeId }
     val bg = if (dark) theme.darkBg else theme.lightBg
     val keyColor = if (dark) theme.darkKey else theme.lightKey
     val funcColor = if (dark) theme.darkFunc else theme.lightFunc
-    val textColor = if (dark) Color(0xFFFFFFFF) else Color(0xFF000000)
-    val borderColor = if (keyBorders) textColor.copy(alpha = 0.18f) else Color.Transparent
+
+    // customBgVersion is bumped by AppearanceSection on import/adjust-save/remove,
+    // so this re-reads the file exactly when it can have actually changed instead
+    // of on every recomposition (see CustomBackgroundManager's own in-memory cache
+    // for the same reasoning at the disk-read level).
+    val customBitmap = if (backgroundMode == "custom_image") {
+        remember(customBgVersion) { CustomBackgroundManager.loadBitmap(context)?.asImageBitmap() }
+    } else null
+    val useGlass = customBitmap != null
+
+    val textColor = if (useGlass) Color.White else if (dark) Color(0xFFFFFFFF) else Color(0xFF000000)
+    val borderColor = if (keyBorders) textColor.copy(alpha = if (useGlass) 0.30f else 0.18f) else Color.Transparent
+
+    // Glass tint switches with light/dark theme, same as every other themed
+    // surface here - a white-ish frosted look in light mode, a darker frosted
+    // look in dark mode, so the keys still read as "this app's dark mode" and
+    // not just "whatever the photo happens to be light/dark at that spot".
+    val glassFill = if (dark) Color.Black.copy(alpha = 0.30f) else Color.White.copy(alpha = 0.22f)
+    val glassBorder = if (dark) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.55f)
+    val glassShape = RoundedCornerShape(6.dp)
+
     // Space/enter fill: a 2-stop gradient brush for a "*_gradient" theme, otherwise
     // the same flat accent SolidColor as before - both go through the same Brush-based
-    // keyMod so the two key rows below don't need their own branching.
+    // keyMod so the two key rows below don't need their own branching. Ignored
+    // entirely once useGlass is true - every key (including these two) gets the
+    // same glass treatment instead, see keyMod() below.
     val accentBrush = theme.gradientColors
         ?.let { Brush.linearGradient(it) }
         ?: SolidColor(theme.accent)
 
-    fun keyMod(background: Color) = Modifier
+    // Small drop shadow under each key - part of the "glassmorphism ... with
+    // small shadow" look asked for; only applied in glass mode, the flat/gradient
+    // theme keys never had a shadow and shouldn't suddenly grow one.
+    fun glassKeyMod() = Modifier
+        .height(40.dp)
+        .shadow(elevation = 2.dp, shape = glassShape, clip = false)
+        .clip(glassShape)
+        .background(glassFill)
+        .border(0.8.dp, glassBorder, glassShape)
+
+    fun keyMod(background: Color) = if (useGlass) glassKeyMod() else Modifier
         .height(40.dp)
         .clip(RoundedCornerShape(6.dp))
         .background(background)
         .border(0.5.dp, borderColor, RoundedCornerShape(6.dp))
 
-    fun keyMod(brush: Brush) = Modifier
+    fun keyMod(brush: Brush) = if (useGlass) glassKeyMod() else Modifier
         .height(40.dp)
         .clip(RoundedCornerShape(6.dp))
         .background(brush)
@@ -724,141 +781,160 @@ private fun KeyboardPreview(
     // darkVariant brush used for Space/Enter (accentBrush) painted across the entire
     // preview instead of the flat bg colour, so the preview matches what
     // applyGradientToKeyboard() now does on the real keyboard - gradient behind every
-    // key and the top bar, not just on the accent keys.
+    // key and the top bar, not just on the accent keys. Only used when useGlass is
+    // false - the photo itself is the background otherwise (see the Box below).
     val boardBackground = theme.gradientColors
         ?.let { Brush.linearGradient(it) }
         ?: SolidColor(bg)
 
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(boardBackground)
-            .padding(6.dp)
+    Box(
+        modifier = modifier.clip(RoundedCornerShape(16.dp))
     ) {
-        // Top bar: Ola logo mark + the real toolbar icons, same order as
-        // keyboard_layout.xml's top_bar_icon_row.
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(38.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.ic_ola_logo_mark),
-                contentDescription = null,
-                modifier = Modifier
-                    .size(30.dp)
-                    .padding(4.dp)
+        if (useGlass) {
+            CustomBackgroundPreviewBox(
+                bitmap = customBitmap,
+                offsetX = customBgOffsetX,
+                offsetY = customBgOffsetY,
+                blurAmount = customBgBlur,
+                darkenAmount = customBgDarken,
+                dark = dark,
+                draggable = false,
+                modifier = Modifier.matchParentSize()
             )
-            Spacer(modifier = Modifier.weight(1f))
-            listOf(R.drawable.ic_clipboard, R.drawable.ic_emoji, R.drawable.ic_text_select, R.drawable.ic_fonts)
-                .forEach { iconRes ->
-                    Image(
-                        painter = painterResource(id = iconRes),
-                        contentDescription = null,
-                        colorFilter = ColorFilter.tint(textColor),
-                        modifier = Modifier
-                            .padding(start = 10.dp)
-                            .size(20.dp)
-                    )
-                }
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        // Number row - shown above the letters, same key styling as the letter
-        // row (KeyboardButton has no explicit background override in
-        // keyboard_layout.xml's key_row_1, so it inherits the same keyNormal
-        // surface as the QWERTY rows on the real keyboard).
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-            "1234567890".forEach { digit ->
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .then(keyMod(keyColor)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(text = digit.toString(), color = textColor, fontSize = 13.sp)
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // Letter row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-            "QWERTYUIOP".forEach { letter ->
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .then(keyMod(keyColor)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(text = letter.toString(), color = textColor, fontSize = 13.sp)
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // Shift / letters / backspace row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
+        } else {
             Box(
                 modifier = Modifier
-                    .weight(1.4f)
-                    .then(keyMod(funcColor))
-            )
-            "ASDFGHJKL".forEach { letter ->
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .then(keyMod(keyColor)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(text = letter.toString(), color = textColor, fontSize = 13.sp)
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .weight(1.4f)
-                    .then(keyMod(funcColor))
+                    .matchParentSize()
+                    .background(boardBackground)
             )
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // Bottom row: 123 / space (accent) / enter (accent)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-            Box(
+        Column(modifier = Modifier.padding(6.dp)) {
+            // Top bar: Ola logo mark + the real toolbar icons, same order as
+            // keyboard_layout.xml's top_bar_icon_row.
+            Row(
                 modifier = Modifier
-                    .weight(1.4f)
-                    .then(keyMod(funcColor)),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .height(38.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = "?123", color = textColor, fontSize = 11.sp)
+                Image(
+                    painter = painterResource(id = R.drawable.ic_ola_logo_mark),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(30.dp)
+                        .padding(4.dp)
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                listOf(R.drawable.ic_clipboard, R.drawable.ic_emoji, R.drawable.ic_text_select, R.drawable.ic_fonts)
+                    .forEach { iconRes ->
+                        Image(
+                            painter = painterResource(id = iconRes),
+                            contentDescription = null,
+                            colorFilter = ColorFilter.tint(textColor),
+                            modifier = Modifier
+                                .padding(start = 10.dp)
+                                .size(20.dp)
+                        )
+                    }
             }
-            Box(
-                modifier = Modifier
-                    .weight(4f)
-                    .then(keyMod(accentBrush))
-            )
-            Box(
-                modifier = Modifier
-                    .weight(1.4f)
-                    .then(keyMod(accentBrush))
-            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Number row - shown above the letters, same key styling as the letter
+            // row (KeyboardButton has no explicit background override in
+            // keyboard_layout.xml's key_row_1, so it inherits the same keyNormal
+            // surface as the QWERTY rows on the real keyboard).
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                "1234567890".forEach { digit ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .then(keyMod(keyColor)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = digit.toString(), color = textColor, fontSize = 13.sp)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Letter row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                "QWERTYUIOP".forEach { letter ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .then(keyMod(keyColor)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = letter.toString(), color = textColor, fontSize = 13.sp)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Shift / letters / backspace row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1.4f)
+                        .then(keyMod(funcColor))
+                )
+                "ASDFGHJKL".forEach { letter ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .then(keyMod(keyColor)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = letter.toString(), color = textColor, fontSize = 13.sp)
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1.4f)
+                        .then(keyMod(funcColor))
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Bottom row: 123 / space (accent) / enter (accent)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .weight(1.4f)
+                        .then(keyMod(funcColor)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "?123", color = textColor, fontSize = 11.sp)
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(4f)
+                        .then(keyMod(accentBrush))
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1.4f)
+                        .then(keyMod(accentBrush))
+                )
+            }
         }
     }
 }
