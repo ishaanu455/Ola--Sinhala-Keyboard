@@ -1819,7 +1819,6 @@ class KeyboardView(
     val clipboardButtonView: ImageView get() = binding.btnClipboard
     val textSelectButtonView: ImageView get() = binding.btnTextSelect
     val fontsButtonView: ImageView get() = binding.btnFonts
-    val settingsButtonView: ImageView get() = binding.btnSettings
     val olaLogoButtonView: ImageView get() = binding.btnOlaLogo
     val logoSpacerView: View get() = binding.logoSpacer
     val topBarIconRowView: LinearLayout get() = binding.topBarIconRow
@@ -1858,6 +1857,14 @@ class KeyboardView(
     }
     // suggestionContainer in the binding is a generated binding object; use its root view when a View is expected
     val suggestionContainerView: View get() = binding.suggestionContainer.root
+    // Returns the FrameLayout that WRAPS btn_settings, not the ImageView itself.
+    // TopBarController only ever uses this for visibility toggling while
+    // suggestion chips are showing - if it were given just the inner ImageView,
+    // hiding that still left this fixed 38dp+8dp-margin wrapper laid out (empty
+    // but taking up space), which ate into the suggestion bar's width and showed
+    // up as a stray gap on the right edge of the row. Hiding the wrapper itself
+    // collapses that space away entirely.
+    val settingsButtonView: View get() = binding.settingsIconWrapper
     fun getSuggestionTextViews(): List<TextView> {
         val list = ArrayList<TextView>()
         // Use the root view of the suggestion container binding to access children

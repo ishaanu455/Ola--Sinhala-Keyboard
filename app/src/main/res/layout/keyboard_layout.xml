@@ -178,6 +178,7 @@
                  the gear icon when Prefs.updateAvailable is true - see
                  KeyboardView.kt updateSettingsBadge(). -->
             <FrameLayout
+                android:id="@+id/settings_icon_wrapper"
                 android:layout_width="38dp"
                 android:layout_height="38dp"
                 android:layout_marginStart="8dp">

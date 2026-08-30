@@ -220,8 +220,17 @@ class KeyboardButton : AppCompatTextView {
             secondaryLabelPaint.alpha = 150
             secondaryLabelPaint.textSize = textSize * 0.5f
 
-            val padding = 8f
-            canvas.drawText(it, width.toFloat() - padding, secondaryLabelPaint.textSize + padding, secondaryLabelPaint)
+            // Horizontal and vertical padding are separate on purpose: bumping
+            // paddingX shifts the hint glyph left, away from the key's right
+            // edge, without touching how far down from the top it sits
+            // (paddingY). Text is right-aligned (Paint.Align.RIGHT, set in
+            // init{}), so the x coordinate passed to drawText is where its
+            // RIGHT edge lands - width - paddingX - and a bigger paddingX
+            // pulls that right edge further from the key's actual right edge,
+            // i.e. further left.
+            val paddingX = 20f
+            val paddingY = 8f
+            canvas.drawText(it, width.toFloat() - paddingX, secondaryLabelPaint.textSize + paddingY, secondaryLabelPaint)
         }
     }
 }
