@@ -83,6 +83,15 @@ object CustomBackgroundManager {
                 bitmap.compress(Bitmap.CompressFormat.JPEG, 92, output)
             }
             bitmap.recycle()
+
+            // BUG FIX: the in-memory cache below is keyed on the *file path*, which
+            // never changes (IMAGE_FILE_NAME is a fixed name) - so re-importing a
+            // *different* photo overwrote the bytes on disk but loadBitmap() kept
+            // returning the old cached Bitmap object (same path = "cache hit") until
+            // the process happened to restart. Must invalidate here, right after a
+            // successful write, so the very next loadBitmap() call re-decodes the
+            // file that's actually on disk now instead of showing/using stale pixels.
+            clearCache()
             true
         } catch (t: Throwable) {
             Log.e(TAG, "importImage: failed with exception, uri=$uri", t)
