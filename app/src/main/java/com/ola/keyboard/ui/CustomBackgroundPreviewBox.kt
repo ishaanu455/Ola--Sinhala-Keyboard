@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
@@ -20,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
@@ -131,14 +133,30 @@ fun CustomBackgroundPreviewBox(
         Image(
             bitmap = displayBitmap,
             contentDescription = null,
+            // BUG FIX: Image() defaults to ContentScale.Fit when none is given, which
+            // itself letterboxes the bitmap to fit inside the fillMaxSize() layout
+            // bounds (preserving aspect ratio, padding the rest with empty space)
+            // BEFORE our own graphicsLayer scale below ever runs - so the manual
+            // "cover" scale was just scaling up an already-letterboxed image, and
+            // the empty bars scaled right along with it (never went away). None +
+            // TopStart draws the bitmap at its native pixel size anchored at this
+            // Image's origin, with zero built-in scaling/centering, which is exactly
+            // what the graphicsLayer transform below (scale from origin (0,0), then
+            // translate) is written to expect.
+            contentScale = ContentScale.None,
+            alignment = Alignment.TopStart,
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    // Draw at the actual "cover" scale rather than relying on
-                    // pre-computed Dp sizing, so this never depends on a second
-                    // density round-trip lining up exactly with boxWidthPx/boxHeightPx.
-                    scaleX = scaledWidthPx / boxWidthPx
-                    scaleY = scaledHeightPx / boxHeightPx
+                    // With contentScale = None above, the Image is drawn at the
+                    // bitmap's own NATIVE pixel size (imgWidth x imgHeight), anchored
+                    // at this layer's origin - so getting to the "cover" size just
+                    // means scaling that native size by `scale` directly. (Scaling by
+                    // scaledWidthPx/boxWidthPx here - as if the Image had already been
+                    // fit down to the tiny box size first - was the bug: see the note
+                    // on contentScale above.)
+                    scaleX = scale
+                    scaleY = scale
                     transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
                     // offsetX/offsetY are 0f..1f pan fractions across the
                     // available overflow, 0.5f = centered - never lets the
