@@ -75,6 +75,42 @@ class Prefs(context: Context) {
         get() = EmojiStyle.fromId(prefs.getString("emoji_style", EmojiStyle.SYSTEM.id))
         set(value) = prefs.edit().putString("emoji_style", value.id).apply()
 
+    // --- Custom background image (see CustomBackgroundManager) ---
+    // "background_mode" is the switch between the existing Colour/Gradient theme grid
+    // and this custom-photo background: "theme" (default) leaves colorTheme in full
+    // control, exactly as before this feature existed. "custom_image" is only ever
+    // set once CustomBackgroundManager.importImage() has actually succeeded and a
+    // valid file is on disk - see the picker flow in SettingsScreen.kt.
+
+    var backgroundMode: String
+        get() = prefs.getString("background_mode", "theme") ?: "theme"
+        set(value) = prefs.edit().putString("background_mode", value).apply()
+
+    /** Horizontal pan position of the image within the keyboard-shaped crop window,
+     *  0f (fully left) .. 1f (fully right), 0.5f = centered. Only meaningful once the
+     *  image is wider (post-cover-scale) than the crop window - see the adjustment
+     *  screen for how this is produced from a drag gesture. */
+    var customBgOffsetX: Float
+        get() = prefs.getFloat("custom_bg_offset_x", 0.5f)
+        set(value) = prefs.edit().putFloat("custom_bg_offset_x", value).apply()
+
+    /** Vertical pan position, same 0f..1f convention as [customBgOffsetX]. */
+    var customBgOffsetY: Float
+        get() = prefs.getFloat("custom_bg_offset_y", 0.5f)
+        set(value) = prefs.edit().putFloat("custom_bg_offset_y", value).apply()
+
+    /** Blur amount applied to the background image, 0f (sharp) .. 1f (max blur). */
+    var customBgBlur: Float
+        get() = prefs.getFloat("custom_bg_blur", 0f)
+        set(value) = prefs.edit().putFloat("custom_bg_blur", value).apply()
+
+    /** Darken overlay strength on the background image, 0f (none) .. 1f (near-black),
+     *  kept separate from blur so either can be tuned independently for legibility. */
+    var customBgDarken: Float
+        get() = prefs.getFloat("custom_bg_darken", 0.25f)
+        set(value) = prefs.edit().putFloat("custom_bg_darken", value).apply()
+
+
     /** Which bundled emoji font pack (see [BundledEmojiFonts]) is selected for
      *  EmojiStyle.BUNDLED - stores the .ttf filename under assets/fonts/, e.g.
      *  "Bubble Style.ttf". Null means "none picked yet"; callers fall back to the

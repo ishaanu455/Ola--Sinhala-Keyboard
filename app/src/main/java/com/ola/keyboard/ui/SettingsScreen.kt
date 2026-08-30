@@ -41,13 +41,16 @@ import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.Height
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.SwipeLeft
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
@@ -63,6 +66,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -75,6 +80,7 @@ import ime.suggest.UserDataBackup
 import kotlinx.coroutines.launch
 import com.ola.keyboard.BundledEmojiFonts
 import com.ola.keyboard.BuildConfig
+import com.ola.keyboard.CustomBackgroundManager
 import com.ola.keyboard.CustomFontManager
 import com.ola.keyboard.EmojiStyle
 import com.ola.keyboard.Prefs
@@ -260,6 +266,30 @@ private fun AppearanceSection() {
     val colorTheme = rememberStringPreference(context, "color_theme", "ola")
     val effectiveDark = if (automaticTheme.value) isSystemInDarkTheme() else darkTheme.value
 
+    val prefs = remember { Prefs(context) }
+    var backgroundMode by remember { mutableStateOf(prefs.backgroundMode) }
+    // Bumped every time the on-disk image file changes (picked/removed) so the
+    // thumbnail AsyncImage-style loader below re-reads it instead of showing a
+    // stale bitmap cached under the same file path.
+    var customBgVersion by remember { mutableIntStateOf(0) }
+    var customBgImportFailed by remember { mutableStateOf(false) }
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val ok = CustomBackgroundManager.importImage(context, uri)
+        customBgImportFailed = !ok
+        if (ok) {
+            customBgVersion++
+            backgroundMode = "custom_image"
+            prefs.backgroundMode = "custom_image"
+            // TODO(step 3): navigate to the pan/blur/darken adjustment screen here
+            // instead of applying the image immediately at its default centered
+            // crop - this just wires the picker + storage + selection for now.
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         // --- Fixed top block: never scrolls ---
         SettingsCategory(title = "Preview")
@@ -305,7 +335,11 @@ private fun AppearanceSection() {
             ColorThemePicker(
                 themes = keyboardColorThemes,
                 selected = colorTheme.value,
-                onSelect = { colorTheme.value = it },
+                onSelect = {
+                    colorTheme.value = it
+                    backgroundMode = "theme"
+                    prefs.backgroundMode = "theme"
+                },
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
 
@@ -313,9 +347,147 @@ private fun AppearanceSection() {
             ColorThemePicker(
                 themes = gradientColorThemes,
                 selected = colorTheme.value,
-                onSelect = { colorTheme.value = it },
+                onSelect = {
+                    colorTheme.value = it
+                    backgroundMode = "theme"
+                    prefs.backgroundMode = "theme"
+                },
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
+
+            SettingsCategory(title = "Custom Background")
+            CustomBackgroundPicker(
+                selected = backgroundMode == "custom_image",
+                hasImage = CustomBackgroundManager.hasCustomBackground(context),
+                imageVersion = customBgVersion,
+                onChooseImage = {
+                    customBgImportFailed = false
+                    imagePickerLauncher.launch(
+                        androidx.activity.result.PickVisualMediaRequest(
+                            ActivityResultContracts.PickVisualMedia.ImageOnly
+                        )
+                    )
+                },
+                onRemoveImage = {
+                    CustomBackgroundManager.removeImage(context)
+                    customBgVersion++
+                    backgroundMode = "theme"
+                    prefs.backgroundMode = "theme"
+                },
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+            if (customBgImportFailed) {
+                Text(
+                    text = "Couldn't use that image. Please pick a different photo.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * "Custom Background" row in Appearance - a single card that either shows a
+ * "Choose from Gallery" prompt (no image picked yet) or the picked image's
+ * thumbnail with a small "Change" / "Remove" action pair once one is selected.
+ * Mirrors the rounded, gold-bordered card language every other Settings row in
+ * this screen uses (see `settingsCard()` in SettingsComponents.kt), with the
+ * same "selected" gold-ring highlight ColorThemePicker's swatches use when this
+ * is the active background mode.
+ */
+@Composable
+private fun CustomBackgroundPicker(
+    selected: Boolean,
+    hasImage: Boolean,
+    imageVersion: Int,
+    onChooseImage: () -> Unit,
+    onRemoveImage: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val cardShape = RoundedCornerShape(18.dp)
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 5.dp)
+            .clip(cardShape)
+            .border(
+                width = if (selected) 1.5.dp else 1.dp,
+                color = if (selected) Color(0xFFD4A62A) else MaterialTheme.colorScheme.outlineVariant,
+                shape = cardShape
+            )
+            .background(
+                if (selected) Color(0xFFD4A62A).copy(alpha = 0.10f)
+                else MaterialTheme.colorScheme.surface,
+                cardShape
+            )
+            .clickable(onClick = onChooseImage)
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // 56x56 thumbnail/placeholder box, same corner treatment as the card itself
+        // scaled down, so it reads as "one photo, framed" rather than a separate
+        // floating element.
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            if (hasImage) {
+                val bitmap = remember(imageVersion) {
+                    CustomBackgroundManager.loadBitmap(context)?.asImageBitmap()
+                }
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap,
+                        contentDescription = "Custom background thumbnail",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            } else {
+                Icon(
+                    imageVector = Icons.Filled.Image,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(14.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = if (hasImage) "Photo Background" else "Choose from Gallery",
+                fontWeight = FontWeight.Medium,
+                fontSize = 15.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = if (hasImage) {
+                    if (selected) "Active - tap to change photo" else "Tap to use this photo"
+                } else {
+                    "Use your own photo as the keyboard background"
+                },
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        if (hasImage) {
+            IconButton(onClick = onRemoveImage) {
+                Icon(
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = "Remove custom background",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
