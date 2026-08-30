@@ -856,12 +856,21 @@ private fun KeyboardPreview(
                     .height(38.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // BUG FIX: was .size(30.dp).padding(4.dp) - since .size() constrains the
+                // box FIRST and .padding() then eats into that already-fixed box, the
+                // logo's actual visible area was only 22dp inside a 38dp-tall row (~58%
+                // of the row). The real keyboard's btn_ola_logo is a 44dp box with just
+                // 2dp padding - a ~40dp visible logo, ~91% of ITS row - so this mockup's
+                // logo read as noticeably smaller/off compared to the real keyboard,
+                // not sitting where a user familiar with the real keyboard would expect.
+                // Sized/padded here to match that same proportion against this row's
+                // own 38dp height instead.
                 Image(
                     painter = painterResource(id = R.drawable.ic_ola_logo_mark),
                     contentDescription = null,
                     modifier = Modifier
-                        .size(30.dp)
-                        .padding(4.dp)
+                        .size(36.dp)
+                        .padding(1.dp)
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 listOf(R.drawable.ic_clipboard, R.drawable.ic_emoji, R.drawable.ic_text_select, R.drawable.ic_fonts)
@@ -921,6 +930,13 @@ private fun KeyboardPreview(
             Spacer(modifier = Modifier.height(4.dp))
 
             // Shift / letters / backspace row
+            // BUG FIX: these two side keys used to be empty colour-only boxes with no
+            // icon at all - on a flat theme colour that blended in well enough not to
+            // notice, but the moment a custom photo background makes every key glassy
+            // and translucent, an icon-less box reads as a broken/missing key (exactly
+            // the "keys awl wela" report) rather than "this is the shift/backspace key,
+            // just simplified". Now uses the SAME ic_shift/ic_backspace drawables the
+            // real keyboard (keyboard_layout.xml) draws in this exact spot.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(3.dp)
@@ -928,8 +944,16 @@ private fun KeyboardPreview(
                 Box(
                     modifier = Modifier
                         .weight(1.4f)
-                        .then(keyMod(funcColor))
-                )
+                        .then(keyMod(funcColor)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_shift),
+                        contentDescription = null,
+                        colorFilter = ColorFilter.tint(textColor),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
                 "ASDFGHJKL".forEach { letter ->
                     Box(
                         modifier = Modifier
@@ -943,20 +967,33 @@ private fun KeyboardPreview(
                 Box(
                     modifier = Modifier
                         .weight(1.4f)
-                        .then(keyMod(funcColor))
-                )
+                        .then(keyMod(funcColor)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_backspace),
+                        contentDescription = null,
+                        colorFilter = ColorFilter.tint(textColor),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Bottom row: 123 / space (accent) / enter (accent)
+            // Bottom row: 123 / lang / comma / space (accent) / dot / enter (accent)
+            // BUG FIX: this row used to skip the language-toggle and comma/period keys
+            // entirely and drew the space and enter keys as plain empty accent-colour
+            // boxes with no icon/label - same "looks broken" issue as the shift/
+            // backspace row above. Now mirrors keyboard_layout.xml's key_row_5: panel
+            // ("?123"), lang, comma, space (ic_space_bar), dot, action/enter (ic_check).
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .weight(1.4f)
+                        .weight(1f)
                         .then(keyMod(funcColor)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -964,14 +1001,59 @@ private fun KeyboardPreview(
                 }
                 Box(
                     modifier = Modifier
-                        .weight(4f)
-                        .then(keyMod(accentBrush))
-                )
+                        .weight(1f)
+                        .then(keyMod(funcColor)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "ENG",
+                        color = textColor,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
                 Box(
                     modifier = Modifier
-                        .weight(1.4f)
-                        .then(keyMod(accentBrush))
-                )
+                        .weight(1f)
+                        .then(keyMod(funcColor)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = ",", color = textColor, fontSize = 15.sp)
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(3f)
+                        .then(keyMod(accentBrush)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_space_bar),
+                        contentDescription = null,
+                        colorFilter = ColorFilter.tint(textColor),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .then(keyMod(funcColor)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = ".", color = textColor, fontSize = 15.sp)
+                }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .then(keyMod(accentBrush)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_check),
+                        contentDescription = null,
+                        colorFilter = ColorFilter.tint(textColor),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
         }
     }

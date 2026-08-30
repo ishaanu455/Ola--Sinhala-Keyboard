@@ -1373,7 +1373,10 @@ class KeyboardView(
         // CustomBackgroundPreviewBox - duplicated as literals here rather
         // than importing a Compose-file constant into this plain View class.
         val clampedZoom = customBgZoom.coerceIn(1f, 3f)
-        val baseScale = max(boxW / imgW, boxH / imgH)
+        // Same CUSTOM_BG_OVERSCAN (1.12f) as CustomBackgroundPreviewBox - guarantees
+        // real pan room in both axes regardless of the photo's own aspect ratio; see
+        // that constant's doc comment for the full reasoning.
+        val baseScale = max(boxW / imgW, boxH / imgH) * 1.12f
         val scale = baseScale * clampedZoom
         val scaledW = imgW * scale
         val scaledH = imgH * scale

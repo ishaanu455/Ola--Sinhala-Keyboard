@@ -36,6 +36,28 @@ const val CUSTOM_BG_MIN_ZOOM = 1f
 const val CUSTOM_BG_MAX_ZOOM = 3f
 
 /**
+ * BUG FIX: a pure "cover" fit (the old `baseScale` with no overscan) makes
+ * scaledWidthPx/scaledHeightPx equal the box's own width/height in whichever
+ * axis is the *tighter* one for the picked photo's aspect ratio - overflow in
+ * that axis is then exactly 0, so at CUSTOM_BG_MIN_ZOOM dragging along that
+ * axis does nothing at all (onOffsetChange only ever gets called with 0.5f,
+ * see the `else 0.5f` branches below and in KeyboardView.renderCustomImageBackground).
+ * A photo whose aspect ratio happens to be close to the crop box's own (e.g. a
+ * portrait photo dropped into this fairly square-ish box) can end up "locked"
+ * in one direction until the user thinks to pinch in first - which reads
+ * exactly like "I can't scroll this to where I want" for that photo, even
+ * though a differently-shaped photo pans just fine. Baking a small constant
+ * overscan into the base scale guarantees a little real overflow (and
+ * therefore real drag room) in BOTH directions for every photo, regardless of
+ * its own dimensions - independent of the min/max zoom range above, which is
+ * still 1f..3f from the user's point of view (the slider/pinch always start
+ * from "just barely more than cover", not from a visibly-already-zoomed-in
+ * frame). Mirrored exactly in KeyboardView.renderCustomImageBackground so the
+ * saved pan position means the same thing in both places.
+ */
+const val CUSTOM_BG_OVERSCAN = 1.12f
+
+/**
  * The one piece of "custom background" render logic - image cover-scale, pan
  * (offsetX/offsetY), blur and darken - shared by:
  *  - the adjustment screen (Step 3), where [draggable] = true and the sliders
@@ -141,7 +163,7 @@ fun CustomBackgroundPreviewBox(
         // one axis - pinching in gives that axis real room to pan instead of
         // the drag being stuck re-centering every frame).
         val baseScale = remember(boxWidthPx, boxHeightPx, imgWidth, imgHeight) {
-            maxOf(boxWidthPx / imgWidth, boxHeightPx / imgHeight)
+            maxOf(boxWidthPx / imgWidth, boxHeightPx / imgHeight) * CUSTOM_BG_OVERSCAN
         }
         val scale = baseScale * clampedZoom
         val scaledWidthPx = imgWidth * scale

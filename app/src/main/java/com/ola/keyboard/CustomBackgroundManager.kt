@@ -3,8 +3,10 @@ package com.ola.keyboard
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.net.Uri
 import android.util.Log
+import androidx.exifinterface.media.ExifInterface
 import java.io.File
 
 /**
@@ -71,17 +73,43 @@ object CustomBackgroundManager {
             }
 
             val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-            val bitmap = resolver.openInputStream(uri)?.use { input ->
+            val decoded = resolver.openInputStream(uri)?.use { input ->
                 BitmapFactory.decodeStream(input, null, decodeOptions)
             }
-            if (bitmap == null) {
+            if (decoded == null) {
                 Log.e(TAG, "importImage: full decode returned null, uri=$uri, sampleSize=$sampleSize")
                 return false
             }
 
+            // BUG FIX: BitmapFactory.decodeStream() ignores EXIF orientation entirely -
+            // it hands back the raw sensor pixel grid, not what a gallery app actually
+            // shows on screen. A huge number of phone-camera photos (portrait shots in
+            // particular) are stored with the pixels in landscape order plus a rotation
+            // tag telling viewers to display them turned 90/180/270 degrees. Every
+            // downstream consumer here (CustomBackgroundAdjustScreen, the Settings
+            // preview, and the real keyboard's cover-scale/pan math) only ever sees the
+            // decoded bitmap's raw width/height - never the original file's EXIF tag -
+            // so an un-rotated photo was being cover-cropped in the WRONG orientation:
+            // e.g. a tall portrait photo decoded as if it were wide landscape gets
+            // "cover" math computed against its actual (wrong-way) pixel dimensions,
+            // which can zoom into a tiny, unrecognizable sliver of the photo instead of
+            // the sensible upright framing the user actually picked. Baking the
+            // rotation in once, right here at import time, means every later reader of
+            // this file (loadBitmap has no idea this ever happened) just sees a normal
+            // upright photo, exactly like the system photo picker showed.
+            val orientation = resolver.openInputStream(uri)?.use { input ->
+                ExifInterface(input).getAttributeInt(
+                    ExifInterface.TAG_ORIENTATION,
+                    ExifInterface.ORIENTATION_NORMAL
+                )
+            } ?: ExifInterface.ORIENTATION_NORMAL
+
+            val bitmap = applyExifOrientation(decoded, orientation)
+
             dest.outputStream().use { output ->
                 bitmap.compress(Bitmap.CompressFormat.JPEG, 92, output)
             }
+            if (bitmap !== decoded) decoded.recycle()
             bitmap.recycle()
 
             // BUG FIX: the in-memory cache below is keyed on the *file path*, which
@@ -97,6 +125,38 @@ object CustomBackgroundManager {
             Log.e(TAG, "importImage: failed with exception, uri=$uri", t)
             dest.delete()
             false
+        }
+    }
+
+    /**
+     * Returns [source] rotated/flipped to match [orientation] (one of EXIF's
+     * ORIENTATION_* constants). Returns [source] itself, unchanged, for the
+     * common ORIENTATION_NORMAL/undefined case - no wasted copy for the
+     * majority of photos that don't need correcting.
+     */
+    private fun applyExifOrientation(source: Bitmap, orientation: Int): Bitmap {
+        val matrix = Matrix()
+        when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
+            ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
+            ExifInterface.ORIENTATION_TRANSPOSE -> {
+                matrix.postRotate(90f)
+                matrix.postScale(-1f, 1f)
+            }
+            ExifInterface.ORIENTATION_TRANSVERSE -> {
+                matrix.postRotate(270f)
+                matrix.postScale(-1f, 1f)
+            }
+            else -> return source
+        }
+        return try {
+            Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
+        } catch (t: Throwable) {
+            Log.e(TAG, "applyExifOrientation: failed, using un-rotated bitmap", t)
+            source
         }
     }
 
