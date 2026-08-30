@@ -3,7 +3,7 @@ package com.ola.keyboard
 /**
  * Finds occurrences of the app's known emoji glyphs inside arbitrary text (a
  * suggestion chip, a copied clip) so they can be re-rendered with whichever
- * Settings > Emoji Style (Twemoji/Custom) the user picked - the same styling
+ * Settings > Emoji Style the user picked - the same styling
  * [EmojiAdapter] already applies inside the emoji picker grid itself.
  *
  * There's no reliable general-purpose way to grapheme-split arbitrary Unicode
@@ -19,7 +19,7 @@ object EmojiMatcher {
 
     // Every emoji the app knows about, excluding "Recent" (just a subset of the
     // others) and "Stylish" (bracket/punctuation glyphs, not pictographic emoji -
-    // matching those here would send ordinary punctuation to the Twemoji CDN).
+    // matching those here would misfire on ordinary punctuation).
     // Grouped by first codepoint and sorted longest-first within each group so a
     // longer sequence sharing a base codepoint is always tried before a shorter
     // prefix of it.

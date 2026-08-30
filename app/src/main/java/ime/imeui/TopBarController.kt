@@ -45,13 +45,13 @@ class TopBarController(
     private val topBarIconRow: View? = null,
     // Settings > Emoji Style - so a suggestion chip that happens to contain an
     // emoji (e.g. echoing back a word the user typed with one in it) matches the
-    // same Twemoji/custom-font look the emoji picker grid uses, instead of
+    // same custom-font look the emoji picker grid uses, instead of
     // always falling back to the device's plain system glyph.
     private var emojiStyle: EmojiStyle = EmojiStyle.SYSTEM
 ) {
 
     // One styler per suggestion chip slot, reused across binds so a previous
-    // chip's in-flight Twemoji image load gets cancelled before a new word's
+    // chip's in-flight styling gets cancelled before a new word's
     // does - otherwise a slow-loading image for an old suggestion could land on
     // a chip that's since moved on to a completely different word.
     private val suggestionStylers = mutableListOf<EmojiTextStyler>()

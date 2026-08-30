@@ -8,9 +8,6 @@ enum class CharType { SWARA, WYANJANA, PILI, LAKUNU, UNKNOWN }
  * The visual style used to render emoji in the keyboard.
  *
  * SYSTEM  - uses whatever emoji font the phone manufacturer ships (default, always works offline).
- * TWEMOJI - downloads and shows the open-source Twemoji artwork (CC-BY 4.0), which has a flat,
- *           colorful look similar in spirit to Apple's style. This is NOT Apple's actual emoji
- *           font/artwork - that is proprietary and can't legally be bundled or redistributed.
  * CUSTOM  - renders emoji using a .ttf/.otf font file the user picks from their own device
  *           storage. The app never bundles or distributes this file; it only reads the one
  *           local copy the user explicitly selected via the system file picker.
@@ -20,7 +17,6 @@ enum class CharType { SWARA, WYANJANA, PILI, LAKUNU, UNKNOWN }
  */
 enum class EmojiStyle(val id: String, val displayName: String) {
     SYSTEM("system", "Mobile (System Default)"),
-    TWEMOJI("twemoji", "iOS-style (Twemoji, open-source)"),
     CUSTOM("custom", "Custom (Your Font File)"),
     BUNDLED("bundled", "Emoji Font Packs");
 

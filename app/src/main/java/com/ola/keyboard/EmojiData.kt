@@ -155,7 +155,7 @@ object EmojiData {
         ),
 
         // Plain Unicode text symbols (not pictorial emoji) - always rendered with the
-        // system font regardless of the user's chosen emoji style (System/Twemoji/Custom),
+        // system font regardless of the user's chosen emoji style (System/Custom/Bundled),
         // so this category works fully offline no matter which emoji pack is installed.
         "Stylish" to listOf(
             // Brackets

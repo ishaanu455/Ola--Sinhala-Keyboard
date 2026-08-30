@@ -83,11 +83,6 @@ class Prefs(context: Context) {
         get() = prefs.getString("bundled_emoji_font_file", null)
         set(value) = prefs.edit().putString("bundled_emoji_font_file", value).apply()
 
-    /** Whether the Twemoji image pack has already been fully downloaded/cached. */
-    var twemojiDownloaded: Boolean
-        get() = prefs.getBoolean("twemoji_downloaded", false)
-        set(value) = prefs.edit().putBoolean("twemoji_downloaded", value).apply()
-
     /** Whether the clipboard manager (auto-capture + panel + icon) is enabled. */
     var clipboardEnabled: Boolean
         get() = prefs.getBoolean("clipboard_enabled", true)
@@ -99,38 +94,6 @@ class Prefs(context: Context) {
     var fontStyle: FontStyle
         get() = FontStyle.fromId(prefs.getString("font_style", FontStyle.NONE.id))
         set(value) = prefs.edit().putString("font_style", value.id).apply()
-
-    // --- App update check (see UpdateChecker.kt) ---
-    // Kept as flat SharedPreferences values (not a data class) so both the IME's
-    // KeyboardView (read-only, just needs the boolean for the red dot) and the
-    // Activity side (UpdateChecker/UpdateScreen, full read+write) can access them
-    // through the same lightweight Prefs wrapper without sharing a model class
-    // across the service/activity boundary.
-
-    /** Whether the last check found a newer release than [BuildConfig.VERSION_NAME]. */
-    var updateAvailable: Boolean
-        get() = prefs.getBoolean("update_available", false)
-        set(value) = prefs.edit().putBoolean("update_available", value).apply()
-
-    /** Latest release tag/version name found on GitHub, e.g. "2.4". */
-    var latestVersion: String
-        get() = prefs.getString("latest_version", "") ?: ""
-        set(value) = prefs.edit().putString("latest_version", value).apply()
-
-    /** Direct download URL of the latest release's APK asset. */
-    var latestApkUrl: String
-        get() = prefs.getString("latest_apk_url", "") ?: ""
-        set(value) = prefs.edit().putString("latest_apk_url", value).apply()
-
-    /** Release notes body for the latest version, shown in the "What's new" card. */
-    var latestChangelog: String
-        get() = prefs.getString("latest_changelog", "") ?: ""
-        set(value) = prefs.edit().putString("latest_changelog", value).apply()
-
-    /** Timestamp of the last successful update check, used to throttle to once/24h. */
-    var lastUpdateCheckMillis: Long
-        get() = prefs.getLong("last_update_check_millis", 0L)
-        set(value) = prefs.edit().putLong("last_update_check_millis", value).apply()
 
     fun getKeyboardLayout(): KeyboardLayout {
         return when {
@@ -235,14 +198,6 @@ class Prefs(context: Context) {
         fun getClipboardEnabled(context: Context): Boolean {
             val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
             return prefs.getBoolean("clipboard_enabled", true)
-        }
-
-        /** Read-only helper for KeyboardView (IME side) - just needs the badge flag
-         *  to decide whether to show the red dot on the settings icon, doesn't need
-         *  a full Prefs instance held on the service. */
-        fun getUpdateAvailable(context: Context): Boolean {
-            val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
-            return prefs.getBoolean("update_available", false)
         }
 
         /** Whether the suggestion bar (the row of word predictions above the keys)

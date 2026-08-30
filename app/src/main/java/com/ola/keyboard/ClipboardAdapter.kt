@@ -213,7 +213,7 @@ class ClipboardAdapter(
 
     override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
         super.onViewRecycled(holder)
-        // Cancel any Twemoji image still loading for a clip row that's about to
+        // Cancel any in-flight styling for a clip row that's about to
         // be rebound to a completely different clip.
         if (holder is ClipViewHolder) holder.textStyler.cancel()
     }
@@ -224,7 +224,7 @@ class ClipboardAdapter(
 
     class ClipViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val text: TextView = itemView.findViewById(R.id.clip_text)
-        // Renders clip_text using Settings > Emoji Style (Twemoji/custom font),
+        // Renders clip_text using Settings > Emoji Style (custom font),
         // same as the emoji picker grid - not just the device's plain glyph.
         val textStyler: EmojiTextStyler = EmojiTextStyler()
         val actions: View = itemView.findViewById(R.id.clip_actions)

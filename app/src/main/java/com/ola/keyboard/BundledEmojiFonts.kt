@@ -6,7 +6,7 @@ import android.graphics.Typeface
 /**
  * Scans the app's own bundled assets/fonts/ folder for .ttf emoji font packs and lets the
  * user pick one from a radio list in Settings (EmojiStyle.BUNDLED) - fully offline, nothing
- * downloaded and no file picker needed, unlike EmojiStyle.TWEMOJI / CUSTOM.
+ * downloaded and no file picker needed, unlike EmojiStyle.CUSTOM.
  *
  * Naming rule: whatever the .ttf file is named (minus the extension) IS the display name
  * shown to the user, exactly as-is - so to add/rename a pack, just drop/rename the file in

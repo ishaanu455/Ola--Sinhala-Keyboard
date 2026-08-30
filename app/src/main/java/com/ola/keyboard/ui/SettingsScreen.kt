@@ -46,11 +46,8 @@ import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.SwipeLeft
 import androidx.compose.material.icons.filled.Translate
-import androidx.compose.material.icons.filled.Update
 import androidx.compose.material.icons.filled.Vibration
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
@@ -74,19 +71,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import android.widget.TextView
-import android.widget.Toast
 import ime.suggest.UserDataBackup
 import kotlinx.coroutines.launch
 import com.ola.keyboard.BundledEmojiFonts
 import com.ola.keyboard.BuildConfig
 import com.ola.keyboard.CustomFontManager
-import com.ola.keyboard.EmojiDownloader
 import com.ola.keyboard.EmojiStyle
 import com.ola.keyboard.Prefs
 import com.ola.keyboard.PredictionManagerActivity
-import com.ola.keyboard.UpdateActivity
-import com.ola.keyboard.UpdateChecker
-import com.ola.keyboard.UpdateCheckOutcome
 import com.ola.keyboard.R
 import com.ola.keyboard.ui.components.PreferenceItem
 import com.ola.keyboard.ui.components.RadioOptionPreference
@@ -818,55 +810,6 @@ private fun DictionarySection() {
 @Composable
 private fun AboutSection() {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var checking by remember { mutableStateOf(false) }
-
-    PreferenceItem(
-        title = "Check for Updates",
-        summary = if (checking) "Checking..." else "Version ${BuildConfig.VERSION_NAME}",
-        icon = Icons.Filled.Update,
-        onClick = {
-            if (!checking) {
-                checking = true
-                scope.launch {
-                    val outcome = UpdateChecker.checkForUpdate(context, force = true)
-                    checking = false
-                    // Only jump to UpdateActivity when the check actually completed -
-                    // on RateLimited/Failed/Throttled there's nothing new to show there,
-                    // and silently opening it anyway (reading whatever stale
-                    // Prefs.updateAvailable was left over from a previous check) is what
-                    // used to make a failed check look "stuck" and do nothing. Show a
-                    // clear Toast instead so the user knows the check itself didn't go
-                    // through, rather than mistaking it for "already up to date".
-                    when (outcome) {
-                        is UpdateCheckOutcome.Completed -> {
-                            context.startActivity(Intent(context, UpdateActivity::class.java))
-                        }
-                        is UpdateCheckOutcome.RateLimited -> {
-                            Toast.makeText(
-                                context,
-                                "GitHub API rate limit hit - please wait a bit and try again",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
-                        is UpdateCheckOutcome.Failed -> {
-                            Toast.makeText(
-                                context,
-                                "Couldn't check for updates: ${outcome.reason}",
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
-                        is UpdateCheckOutcome.Throttled -> {
-                            // force = true is always passed from this button, so this
-                            // branch is unreachable here - kept only for exhaustiveness.
-                        }
-                    }
-                }
-            }
-        }
-    )
-
-    Spacer(modifier = Modifier.height(20.dp))
 
     // GitHub (source code) + Telegram, centered under the list rows above rather
     // than as their own PreferenceItem rows - these are external/social links, not
@@ -1016,9 +959,9 @@ private fun DictionaryBackupSection() {
 
 /**
  * Lets the user pick between the phone's built-in ("Mobile") emoji and an optional
- * downloadable, flat/colorful "iOS-style" pack (Twemoji - open-source, CC-BY 4.0).
+ * a bundled offline font pack (see EmojiStyle.BUNDLED).
  * This is NOT Apple's own emoji artwork, which is proprietary and can't legally be
- * bundled or redistributed; Twemoji is the closest legally-usable look-alike.
+ * bundled/redistributed, so a look-alike bundled pack is offered instead.
  */
 @Composable
 private fun EmojiStyleSection(
@@ -1029,14 +972,8 @@ private fun EmojiStyleSection(
 ) {
     val context = LocalContext.current
     val prefs = remember { Prefs(context) }
-    val scope = rememberCoroutineScope()
 
     var selectedStyle by remember { mutableStateOf(prefs.emojiStyle) }
-    var downloaded by remember { mutableStateOf(prefs.twemojiDownloaded) }
-    var showConfirmDialog by remember { mutableStateOf(false) }
-    var isDownloading by remember { mutableStateOf(false) }
-    var progress by remember { mutableStateOf(0 to 0) }
-    var downloadFailed by remember { mutableStateOf(false) }
     var hasCustomFont by remember { mutableStateOf(CustomFontManager.hasCustomFont(context)) }
     var customFontImportFailed by remember { mutableStateOf(false) }
 
@@ -1064,50 +1001,6 @@ private fun EmojiStyleSection(
             prefs.emojiStyle = EmojiStyle.SYSTEM
         }
     )
-
-    RadioOptionPreference(
-        title = EmojiStyle.TWEMOJI.displayName,
-        summary = when {
-            isDownloading -> "Downloading..."
-            downloaded -> "Downloaded - flat, colorful look"
-            else -> "Free, open-source pack (~3-5 MB, one-time download)"
-        },
-        selected = selectedStyle == EmojiStyle.TWEMOJI,
-        onClick = {
-            if (downloaded) {
-                selectedStyle = EmojiStyle.TWEMOJI
-                prefs.emojiStyle = EmojiStyle.TWEMOJI
-            } else if (!isDownloading) {
-                downloadFailed = false
-                showConfirmDialog = true
-            }
-        }
-    )
-
-    if (isDownloading) {
-        val (done, total) = progress
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-            LinearProgressIndicator(
-                progress = { if (total > 0) done.toFloat() / total else 0f },
-                modifier = Modifier.fillMaxWidth()
-            )
-            Text(
-                text = "$done / $total",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-        }
-    }
-
-    if (downloadFailed) {
-        Text(
-            text = "Download didn't finish - check your internet connection and try again.",
-            fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.error,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-        )
-    }
 
     RadioOptionPreference(
         title = EmojiStyle.CUSTOM.displayName,
@@ -1163,7 +1056,7 @@ private fun EmojiStyleSection(
     }
 
     // Font packs bundled inside the app itself (assets/fonts/) - fully offline, no
-    // download or file picker needed, unlike TWEMOJI/CUSTOM above. See BundledEmojiFonts
+    // download or file picker needed, unlike CUSTOM above. See BundledEmojiFonts
     // for the naming rule: whatever a .ttf is named in that folder is its display name.
     RadioOptionPreference(
         title = EmojiStyle.BUNDLED.displayName,
@@ -1198,44 +1091,6 @@ private fun EmojiStyleSection(
         )
     }
 
-    if (showConfirmDialog) {
-        AlertDialog(
-            onDismissRequest = { showConfirmDialog = false },
-            title = { Text("Download emoji pack?") },
-            text = {
-                Text(
-                    "This downloads Twemoji, a free open-source emoji set (not Apple's own " +
-                        "emoji, which can't legally be bundled). It gives a flat, colorful, " +
-                        "iOS-like look. Needs an internet connection; downloads once and is " +
-                        "then cached for offline use."
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    showConfirmDialog = false
-                    isDownloading = true
-                    progress = 0 to 0
-                    scope.launch {
-                        val success = EmojiDownloader.downloadTwemojiPack(context) { done, total ->
-                            progress = done to total
-                        }
-                        isDownloading = false
-                        if (success) {
-                            downloaded = true
-                            prefs.twemojiDownloaded = true
-                            selectedStyle = EmojiStyle.TWEMOJI
-                            prefs.emojiStyle = EmojiStyle.TWEMOJI
-                        } else {
-                            downloadFailed = true
-                        }
-                    }
-                }) { Text("Download") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showConfirmDialog = false }) { Text("Cancel") }
-            }
-        )
-    }
 }
 
 /**
