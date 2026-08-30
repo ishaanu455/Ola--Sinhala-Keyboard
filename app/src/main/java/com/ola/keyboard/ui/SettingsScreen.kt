@@ -399,39 +399,13 @@ private fun AppearanceSection() {
             )
 
             SettingsCategory(title = "Custom Background")
-            CustomBackgroundPicker(
-                selected = backgroundMode == "custom_image",
-                hasImage = CustomBackgroundManager.hasCustomBackground(context),
-                imageVersion = customBgVersion,
-                onChooseImage = {
-                    customBgImportFailed = false
-                    imagePickerLauncher.launch(
-                        androidx.activity.result.PickVisualMediaRequest(
-                            ActivityResultContracts.PickVisualMedia.ImageOnly
-                        )
-                    )
-                },
-                onAdjust = {
-                    backgroundMode = "custom_image"
-                    prefs.backgroundMode = "custom_image"
-                    showAdjustScreen = true
-                },
-                onRemoveImage = {
-                    CustomBackgroundManager.removeImage(context)
-                    customBgVersion++
-                    backgroundMode = "theme"
-                    prefs.backgroundMode = "theme"
-                },
+            // Feature not released yet - shown as a disabled "Coming Soon" row
+            // instead of the real picker. Not clickable. Swap back to
+            // CustomBackgroundPicker(...) (see git history / previous version)
+            // once the feature is ready to ship.
+            ComingSoonRow(
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
-            if (customBgImportFailed) {
-                Text(
-                    text = "Couldn't use that image. Please pick a different photo.",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp)
-                )
-            }
         }
     }
 }
@@ -545,6 +519,85 @@ private fun CustomBackgroundPicker(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+    }
+}
+
+/**
+ * Placeholder shown in place of [CustomBackgroundPicker] while the custom
+ * background feature is disabled/unreleased. Mirrors the same card language
+ * (rounded corners, border, thumbnail box) but is greyed out, carries a
+ * "Coming Soon" badge, and has no click target at all - so it reads as
+ * "not available yet" rather than a broken/disabled control.
+ */
+@Composable
+private fun ComingSoonRow(modifier: Modifier = Modifier) {
+    val cardShape = RoundedCornerShape(18.dp)
+    val mutedContent = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 5.dp)
+            .clip(cardShape)
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                shape = cardShape
+            )
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                cardShape
+            )
+            // Intentionally no .clickable(...) - the row is inert.
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(56.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Image,
+                contentDescription = null,
+                tint = mutedContent,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(14.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Choose from Gallery",
+                fontWeight = FontWeight.Medium,
+                fontSize = 15.sp,
+                color = mutedContent
+            )
+            Text(
+                text = "Use your own photo as the keyboard background",
+                fontSize = 12.sp,
+                color = mutedContent
+            )
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = "Coming Soon",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = mutedContent
+            )
         }
     }
 }
