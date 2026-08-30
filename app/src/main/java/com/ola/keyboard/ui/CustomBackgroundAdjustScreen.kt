@@ -55,7 +55,8 @@ fun CustomBackgroundAdjustScreen(
     initialOffsetY: Float,
     initialBlur: Float,
     initialDarken: Float,
-    onSave: (offsetX: Float, offsetY: Float, blur: Float, darken: Float) -> Unit,
+    initialZoom: Float = CUSTOM_BG_MIN_ZOOM,
+    onSave: (offsetX: Float, offsetY: Float, blur: Float, darken: Float, zoom: Float) -> Unit,
     onCancel: () -> Unit
 ) {
     val context = LocalContext.current
@@ -66,6 +67,9 @@ fun CustomBackgroundAdjustScreen(
     var offsetY by remember { mutableFloatStateOf(initialOffsetY) }
     var blurAmount by remember { mutableFloatStateOf(initialBlur) }
     var darkenAmount by remember { mutableFloatStateOf(initialDarken) }
+    var zoomAmount by remember {
+        mutableFloatStateOf(initialZoom.coerceIn(CUSTOM_BG_MIN_ZOOM, CUSTOM_BG_MAX_ZOOM))
+    }
 
     // Only meaningful on API < 31, where there's no live Compose blur - see
     // CustomBackgroundPreviewBox's preBlurredBitmap param. Recomputed only
@@ -114,6 +118,7 @@ fun CustomBackgroundAdjustScreen(
                 offsetY = 0.5f
                 blurAmount = 0f
                 darkenAmount = 0.25f
+                zoomAmount = CUSTOM_BG_MIN_ZOOM
                 blurBakeTrigger = 0f
             }) {
                 Icon(
@@ -134,7 +139,7 @@ fun CustomBackgroundAdjustScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Drag the image to reposition it",
+                text = "Drag to reposition \u2022 Pinch to zoom",
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -149,7 +154,9 @@ fun CustomBackgroundAdjustScreen(
                 dark = dark,
                 draggable = true,
                 preBlurredBitmap = bakedBlurredBitmap,
+                zoom = zoomAmount,
                 onOffsetChange = { x, y -> offsetX = x; offsetY = y },
+                onZoomChange = { zoomAmount = it },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(230.dp)
@@ -157,6 +164,13 @@ fun CustomBackgroundAdjustScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
+            // Range is CUSTOM_BG_MIN_ZOOM..CUSTOM_BG_MAX_ZOOM (100%..300%), not the
+            // 0f..1f every other slider here uses - a "Zoom" slider is 100% at rest,
+            // not 0%, so it needs its own value range instead of AdjustSlider's.
+            ZoomSlider(
+                value = zoomAmount,
+                onValueChange = { zoomAmount = it }
+            )
             AdjustSlider(
                 label = "Blur",
                 value = blurAmount,
@@ -185,12 +199,44 @@ fun CustomBackgroundAdjustScreen(
                 Text("Cancel")
             }
             Button(
-                onClick = { onSave(offsetX, offsetY, blurAmount, darkenAmount) },
+                onClick = { onSave(offsetX, offsetY, blurAmount, darkenAmount, zoomAmount) },
                 modifier = Modifier.weight(1f)
             ) {
                 Text("Save")
             }
         }
+    }
+}
+
+@Composable
+private fun ZoomSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(text = "Zoom", fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                text = "${(value * 100).toInt()}%",
+                fontSize = 15.sp,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = CUSTOM_BG_MIN_ZOOM..CUSTOM_BG_MAX_ZOOM,
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary,
+                inactiveTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+            )
+        )
+        Spacer(modifier = Modifier.height(4.dp))
     }
 }
 

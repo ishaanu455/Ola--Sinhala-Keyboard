@@ -3,7 +3,7 @@ package com.ola.keyboard.ui
 import android.os.Build
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,6 +27,13 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+
+/** Extra zoom on top of the automatic "cover" scale - 1f is exactly enough to
+ *  cover the crop window (the old, only, behaviour); 3f is the most a user can
+ *  pinch in. Shared by the gesture handler below and by the caller-facing
+ *  [CustomBackgroundAdjustScreen] slider so both agree on the same range. */
+const val CUSTOM_BG_MIN_ZOOM = 1f
+const val CUSTOM_BG_MAX_ZOOM = 3f
 
 /**
  * The one piece of "custom background" render logic - image cover-scale, pan
@@ -70,6 +78,11 @@ import androidx.compose.ui.unit.dp
  *   caller pre-renders a blurred bitmap via [com.ola.keyboard.ImageBlurUtils]
  *   on drag/slider release and passes it here instead; null means "use the
  *   live blur modifier" (API 31+) or "no blur yet requested".
+ * @param zoom extra zoom on top of the automatic "cover" scale - see
+ *   [CUSTOM_BG_MIN_ZOOM]/[CUSTOM_BG_MAX_ZOOM]. 1f (the default) reproduces the
+ *   old fixed-cover-scale behaviour exactly. Only ever changed via pinch when
+ *   [draggable] is true; the non-draggable Settings-preview call site just
+ *   plays back whatever was saved.
  */
 @Composable
 fun CustomBackgroundPreviewBox(
@@ -81,7 +94,9 @@ fun CustomBackgroundPreviewBox(
     dark: Boolean,
     draggable: Boolean,
     preBlurredBitmap: ImageBitmap? = null,
+    zoom: Float = 1f,
     onOffsetChange: (offsetX: Float, offsetY: Float) -> Unit = { _, _ -> },
+    onZoomChange: (zoom: Float) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
@@ -115,12 +130,20 @@ fun CustomBackgroundPreviewBox(
             return@Box
         }
 
+        val clampedZoom = zoom.coerceIn(CUSTOM_BG_MIN_ZOOM, CUSTOM_BG_MAX_ZOOM)
+
         // "Cover" scale - same behaviour as ContentScale.Crop, but computed by
         // hand since we need the resulting scaled size below to know how much
-        // room there is to pan (the overflow past the box edges).
-        val scale = remember(boxWidthPx, boxHeightPx, imgWidth, imgHeight) {
+        // room there is to pan (the overflow past the box edges). `zoom` is
+        // layered on top of that base cover scale: at zoom = 1f this is
+        // identical to the old fixed-cover behaviour (and, when the photo's
+        // aspect ratio is already close to the box's, overflow can be ~0 in
+        // one axis - pinching in gives that axis real room to pan instead of
+        // the drag being stuck re-centering every frame).
+        val baseScale = remember(boxWidthPx, boxHeightPx, imgWidth, imgHeight) {
             maxOf(boxWidthPx / imgWidth, boxHeightPx / imgHeight)
         }
+        val scale = baseScale * clampedZoom
         val scaledWidthPx = imgWidth * scale
         val scaledHeightPx = imgHeight * scale
         val overflowX = (scaledWidthPx - boxWidthPx).coerceAtLeast(0f)
@@ -167,15 +190,36 @@ fun CustomBackgroundPreviewBox(
                 .then(if (useLiveBlur) Modifier.blur(liveBlurRadius) else Modifier)
                 .then(
                     if (draggable) {
-                        Modifier.pointerInput(overflowX, overflowY) {
-                            detectDragGestures { change, dragAmount ->
-                                change.consume()
-                                val newX = if (overflowX > 0f) {
-                                    (offsetX - dragAmount.x / overflowX).coerceIn(0f, 1f)
+                        // rememberUpdatedState so this long-lived gesture callback always
+                        // reads the LATEST offset/zoom instead of the values that were in
+                        // scope when the pointerInput block itself was (re)installed - a
+                        // plain closure over offsetX/offsetY/clampedZoom would keep using
+                        // whatever they were on the frame the gesture started, which reads
+                        // exactly like the "snaps back to some other spot" bug reported:
+                        // every callback would fight the previous one using stale numbers.
+                        val currentOffsetX by rememberUpdatedState(offsetX)
+                        val currentOffsetY by rememberUpdatedState(offsetY)
+                        val currentZoom by rememberUpdatedState(clampedZoom)
+                        Modifier.pointerInput(boxWidthPx, boxHeightPx, imgWidth, imgHeight, baseScale) {
+                            detectTransformGestures(panZoomLock = true) { _, pan, gestureZoom, _ ->
+                                val newZoom = (currentZoom * gestureZoom)
+                                    .coerceIn(CUSTOM_BG_MIN_ZOOM, CUSTOM_BG_MAX_ZOOM)
+                                // Overflow at the NEW zoom, not the old one - so a pinch and a
+                                // drag reported in the same frame (normal on a real pinch
+                                // gesture) both move the image by a consistent amount instead
+                                // of the pan being computed against a room-to-move figure
+                                // that's about to be stale the instant this callback returns.
+                                val newOverflowX =
+                                    ((imgWidth * baseScale * newZoom) - boxWidthPx).coerceAtLeast(0f)
+                                val newOverflowY =
+                                    ((imgHeight * baseScale * newZoom) - boxHeightPx).coerceAtLeast(0f)
+                                val newX = if (newOverflowX > 0f) {
+                                    (currentOffsetX - pan.x / newOverflowX).coerceIn(0f, 1f)
                                 } else 0.5f
-                                val newY = if (overflowY > 0f) {
-                                    (offsetY - dragAmount.y / overflowY).coerceIn(0f, 1f)
+                                val newY = if (newOverflowY > 0f) {
+                                    (currentOffsetY - pan.y / newOverflowY).coerceIn(0f, 1f)
                                 } else 0.5f
+                                if (newZoom != currentZoom) onZoomChange(newZoom)
                                 onOffsetChange(newX, newY)
                             }
                         }

@@ -110,6 +110,15 @@ class Prefs(context: Context) {
         get() = prefs.getFloat("custom_bg_darken", 0.25f)
         set(value) = prefs.edit().putFloat("custom_bg_darken", value).apply()
 
+    /** Zoom level applied on top of the automatic "cover" scale, 1f (no extra
+     *  zoom - just enough to cover the crop window) .. 3f (300%). Widens the
+     *  pan range so [customBgOffsetX]/[customBgOffsetY] have real room to move
+     *  instead of being stuck near-centered whenever the photo's aspect ratio
+     *  is already close to the crop window's. */
+    var customBgZoom: Float
+        get() = prefs.getFloat("custom_bg_zoom", 1f)
+        set(value) = prefs.edit().putFloat("custom_bg_zoom", value).apply()
+
 
     /** Which bundled emoji font pack (see [BundledEmojiFonts]) is selected for
      *  EmojiStyle.BUNDLED - stores the .ttf filename under assets/fonts/, e.g.

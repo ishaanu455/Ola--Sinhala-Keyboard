@@ -3,6 +3,7 @@ package com.ola.keyboard.ui
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -67,6 +68,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -78,11 +80,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import android.widget.TextView
 import ime.suggest.UserDataBackup
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.ola.keyboard.BundledEmojiFonts
 import com.ola.keyboard.BuildConfig
 import com.ola.keyboard.CustomBackgroundManager
 import com.ola.keyboard.CustomFontManager
+import com.ola.keyboard.ImageBlurUtils
 import com.ola.keyboard.EmojiStyle
 import com.ola.keyboard.Prefs
 import com.ola.keyboard.PredictionManagerActivity
@@ -306,11 +311,13 @@ private fun AppearanceSection() {
             initialOffsetY = prefs.customBgOffsetY,
             initialBlur = prefs.customBgBlur,
             initialDarken = prefs.customBgDarken,
-            onSave = { x, y, blur, darken ->
+            initialZoom = prefs.customBgZoom,
+            onSave = { x, y, blur, darken, zoom ->
                 prefs.customBgOffsetX = x
                 prefs.customBgOffsetY = y
                 prefs.customBgBlur = blur
                 prefs.customBgDarken = darken
+                prefs.customBgZoom = zoom
                 customBgVersion++
                 showAdjustScreen = false
             },
@@ -331,6 +338,7 @@ private fun AppearanceSection() {
             customBgOffsetY = prefs.customBgOffsetY,
             customBgBlur = prefs.customBgBlur,
             customBgDarken = prefs.customBgDarken,
+            customBgZoom = prefs.customBgZoom,
             customBgVersion = customBgVersion,
             modifier = Modifier
                 .fillMaxWidth()
@@ -716,6 +724,7 @@ private fun KeyboardPreview(
     customBgOffsetY: Float,
     customBgBlur: Float,
     customBgDarken: Float,
+    customBgZoom: Float,
     customBgVersion: Int,
     modifier: Modifier = Modifier
 ) {
@@ -734,6 +743,25 @@ private fun KeyboardPreview(
     } else null
     val useGlass = customBitmap != null
 
+    // BUG FIX: this call site used to pass no preBlurredBitmap at all, so on API < 31
+    // (no live Modifier.blur - see CustomBackgroundPreviewBox) customBgBlur was silently
+    // ignored here no matter what the adjustment screen's slider/Save had set - this is
+    // the ONLY thing standing between "sharp photo" and "the blur amount actually saved"
+    // on those devices, exactly the same bake CustomBackgroundAdjustScreen already does
+    // for its own live preview.
+    var bakedBlurredBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    val needsBakedBlur = Build.VERSION.SDK_INT < Build.VERSION_CODES.S
+    LaunchedEffect(needsBakedBlur, customBgBlur, customBitmap) {
+        if (!needsBakedBlur || customBitmap == null || customBgBlur <= 0f) {
+            bakedBlurredBitmap = null
+            return@LaunchedEffect
+        }
+        val source = CustomBackgroundManager.loadBitmap(context) ?: return@LaunchedEffect
+        bakedBlurredBitmap = withContext(Dispatchers.Default) {
+            ImageBlurUtils.blur(context, source, customBgBlur).asImageBitmap()
+        }
+    }
+
     val textColor = if (useGlass) Color.White else if (dark) Color(0xFFFFFFFF) else Color(0xFF000000)
     val borderColor = if (keyBorders) textColor.copy(alpha = if (useGlass) 0.30f else 0.18f) else Color.Transparent
 
@@ -742,7 +770,16 @@ private fun KeyboardPreview(
     // look in dark mode, so the keys still read as "this app's dark mode" and
     // not just "whatever the photo happens to be light/dark at that spot".
     val glassFill = if (dark) Color.Black.copy(alpha = 0.30f) else Color.White.copy(alpha = 0.22f)
-    val glassBorder = if (dark) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.55f)
+    // BUG FIX: this used to be a fixed colour, so a glass key always drew a border even
+    // with "Border" (keyBorders) switched off in Settings - now it respects that toggle
+    // the same way the flat/gradient-theme borderColor above already does.
+    val glassBorder = if (!keyBorders) {
+        Color.Transparent
+    } else if (dark) {
+        Color.White.copy(alpha = 0.16f)
+    } else {
+        Color.White.copy(alpha = 0.55f)
+    }
     val glassShape = RoundedCornerShape(6.dp)
 
     // Space/enter fill: a 2-stop gradient brush for a "*_gradient" theme, otherwise
@@ -798,6 +835,8 @@ private fun KeyboardPreview(
                 darkenAmount = customBgDarken,
                 dark = dark,
                 draggable = false,
+                preBlurredBitmap = bakedBlurredBitmap,
+                zoom = customBgZoom,
                 modifier = Modifier.matchParentSize()
             )
         } else {
