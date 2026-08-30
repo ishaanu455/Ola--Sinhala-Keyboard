@@ -201,6 +201,32 @@ fun CustomBackgroundPreviewBox(
             alignment = Alignment.TopStart,
             modifier = Modifier
                 .fillMaxSize()
+                // BUG FIX: Modifier.blur() used to sit OUTSIDE the graphicsLayer scale
+                // below (i.e. declared before it in the chain). Modifier order = nesting
+                // order - the modifier written first wraps the ones after it, and the one
+                // written LAST sits closest to the actual Image draw call. So with blur
+                // written first, blur was actually the INNER layer wrapping Image
+                // directly, and the scale/translate graphicsLayer was the OUTER layer
+                // wrapping blur's already-rendered output.
+                // Modifier.blur() defaults to BlurredEdgeTreatment.Rectangle, which clips
+                // whatever it wraps to ITS OWN layout bounds (this box's un-scaled
+                // fillMaxSize footprint) before handing the result up. Since blur was the
+                // inner layer, it clipped the huge native-resolution bitmap down to just
+                // the box's small top-left pixel footprint FIRST, and only THEN did the
+                // outer graphicsLayer scale that already-tiny cropped remnant - shrinking
+                // it further and panning it around, instead of scaling the full image up
+                // to cover the box before anything got clipped. That's exactly what
+                // produced the "top sliver of the photo, flat fill color for the rest of
+                // the box" look whenever Blur was above 0%.
+                // Fix: put the cover-scale graphicsLayer LAST (innermost, right around
+                // Image) so it runs first and produces a correctly box-covering image,
+                // and let blur wrap that already-correct result. Blur's clip is then a
+                // no-op (the content already exactly fills the box), and both the
+                // Adjustment screen and the Settings preview - which share this same
+                // composable - match the real keyboard's canvas-baked rendering in
+                // KeyboardView.renderCustomImageBackground (which was never affected,
+                // since it blurs the already-cropped/covered bitmap, not the raw one).
+                .then(if (useLiveBlur) Modifier.blur(liveBlurRadius) else Modifier)
                 .graphicsLayer {
                     // With contentScale = None above, the Image is drawn at the
                     // bitmap's own NATIVE pixel size (imgWidth x imgHeight), anchored
@@ -218,7 +244,6 @@ fun CustomBackgroundPreviewBox(
                     translationX = -(offsetX * overflowX)
                     translationY = -(offsetY * overflowY)
                 }
-                .then(if (useLiveBlur) Modifier.blur(liveBlurRadius) else Modifier)
                 .then(
                     if (draggable) {
                         // rememberUpdatedState so this long-lived gesture callback always
