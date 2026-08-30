@@ -35,11 +35,11 @@ fun MainScreen(
     onSelectKeyboard: () -> Unit
 ) {
     if (isKeyboardEnabled && isKeyboardSelected) {
-        // Settings always renders in the branded matte-black + logo-gold look
-        // (DarkColorScheme in ui/theme/Theme.kt) - it doesn't follow the user's own
-        // light/dark toggle in Appearance, since that toggle is about the keyboard
-        // itself, not this branded settings shell.
-        OlaTheme(darkTheme = true) {
+        // Settings now follows the phone's own light/dark setting (OlaTheme's
+        // default darkTheme = isSystemInDarkTheme()) via LightColorScheme/
+        // DarkColorScheme in ui/theme/Theme.kt, instead of always forcing the
+        // matte-black + logo-gold look regardless of the device's theme.
+        OlaTheme {
             SettingsScaffold()
         }
     } else {

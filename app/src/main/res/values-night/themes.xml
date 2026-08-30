@@ -26,4 +26,14 @@
     <style name="NightNoBorder" parent="Night">
         <item name="border">@android:color/transparent</item>
     </style>
+
+    <!-- Dark-mode override of Theme.Splash from values/themes.xml, so the
+         native pre-Compose window background matches dark mode too instead of
+         always showing the light splash color for a frame first. -->
+    <style name="Theme.Splash" parent="Theme.fox">
+        <item name="android:windowBackground">@color/keyboard_bg_dark</item>
+        <item name="android:statusBarColor">@color/keyboard_bg_dark</item>
+        <item name="android:navigationBarColor">@color/keyboard_bg_dark</item>
+        <item name="android:windowNoTitle">true</item>
+    </style>
 </resources>

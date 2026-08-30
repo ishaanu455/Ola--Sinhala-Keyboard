@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,20 +23,22 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ola.keyboard.ui.theme.Ink1
-import com.ola.keyboard.ui.theme.Light1
-import com.ola.keyboard.ui.theme.Light2
 import com.ola.keyboard.ui.theme.OlaTheme
 import kotlinx.coroutines.delay
 
 /**
- * Launcher activity. Shows the brand mark + app name + version on a dark
- * background (matching the reference splash design) for a short beat, then
- * hands off to MainActivity. This is a plain content screen, not the
+ * Launcher activity. Shows the brand mark + app name + version for a short
+ * beat, then hands off to MainActivity. This is a plain content screen, not the
  * system SplashScreen API - it's what actually renders now, since the
  * previous "blank black screen on open" bug was this screen either not
  * existing or not being the launcher, leaving nothing drawn while
  * MainActivity's Compose content was still being set up.
+ *
+ * Follows the system light/dark setting (OlaTheme's default darkTheme =
+ * isSystemInDarkTheme()) instead of forcing dark, and its background/text
+ * colors come from MaterialTheme.colorScheme rather than fixed Ink1/Light1/
+ * Light2 constants, so it actually looks right in both modes instead of
+ * always rendering as the dark variant regardless of theme.
  */
 class SplashActivity : ComponentActivity() {
 
@@ -43,7 +46,7 @@ class SplashActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
-            OlaTheme(darkTheme = true) {
+            OlaTheme {
                 SplashScreen()
             }
         }
@@ -61,7 +64,7 @@ class SplashActivity : ComponentActivity() {
 
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = Ink1
+            color = MaterialTheme.colorScheme.background
         ) {
             Column(
                 modifier = Modifier.fillMaxSize(),
@@ -78,7 +81,7 @@ class SplashActivity : ComponentActivity() {
 
                 Text(
                     text = stringResource(id = R.string.app_name),
-                    color = Light1,
+                    color = MaterialTheme.colorScheme.onBackground,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -87,7 +90,7 @@ class SplashActivity : ComponentActivity() {
 
                 Text(
                     text = stringResource(id = R.string.splash_version, BuildConfig.VERSION_NAME),
-                    color = Light2,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 14.sp
                 )
             }

@@ -23,10 +23,11 @@ import com.ola.keyboard.ui.theme.OlaTheme
 //  2) The Appearance screen's live KeyboardPreview - that's plain Compose state
 //     (rememberBooleanPreference + isSystemInDarkTheme()), so it already recomposes the
 //     instant the switch is tapped, no Activity involvement needed.
-// SettingsScaffold (MainScreen.kt) is hardcoded to darkTheme = true regardless of this
-// preference, so there was never anything on screen here that setDefaultNightMode()
-// was updating. All it did was force AppCompat to recreate() this Activity on every
-// toggle - the visible flicker - for zero visual benefit.
+// SettingsScaffold (MainScreen.kt) follows the system's own light/dark setting via
+// OlaTheme's default (isSystemInDarkTheme()), which Compose already recomposes
+// reactively on its own - so there was never anything on screen here that
+// setDefaultNightMode() was updating. All it did was force AppCompat to recreate()
+// this Activity on every toggle - the visible flicker - for zero visual benefit.
 class MainActivity : AppCompatActivity() {
 
     private lateinit var inputMethodManager: InputMethodManager
