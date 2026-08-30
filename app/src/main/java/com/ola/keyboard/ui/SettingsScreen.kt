@@ -43,13 +43,13 @@ import androidx.compose.material.icons.filled.EmojiEmotions
 import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.Height
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.SwipeLeft
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -107,8 +107,7 @@ private enum class SettingsSection(val title: String, val summary: String) {
     TYPING("Typing & Layout", "Size, height, vibration, swipe gestures"),
     EMOJI("Emoji", "Emoji row and emoji style"),
     CLIPBOARD("Clipboard", "Clipboard manager and history"),
-    DICTIONARY("Dictionary & Backup", "Suggestion bar, learned words and backups"),
-    ABOUT("About", "Source code and version")
+    DICTIONARY("Dictionary & Backup", "Suggestion bar, learned words and backups")
 }
 
 /**
@@ -166,7 +165,6 @@ fun SettingsScreen() {
                             SettingsSection.EMOJI -> EmojiSection()
                             SettingsSection.CLIPBOARD -> ClipboardSection()
                             SettingsSection.DICTIONARY -> DictionarySection()
-                            SettingsSection.ABOUT -> AboutSection()
                         }
                     }
                 }
@@ -219,13 +217,35 @@ private fun SettingsHome(onSectionSelected: (SettingsSection) -> Unit) {
             summary = SettingsSection.DICTIONARY.summary,
             onClick = { onSectionSelected(SettingsSection.DICTIONARY) }
         )
-        SettingsMenuCard(
-            icon = Icons.Filled.Info,
-            title = SettingsSection.ABOUT.title,
-            summary = SettingsSection.ABOUT.summary,
-            onClick = { onSectionSelected(SettingsSection.ABOUT) }
-        )
+
+        // About used to be its own sub-screen behind a card + chevron, purely for
+        // two social links and a version string - not enough content to justify a
+        // full navigation hop. It now lives directly on the Settings home screen as
+        // a quiet footer instead, so there's one less tap between the user and it.
+        SettingsFooter()
     }
+}
+
+/**
+ * Compact "About" footer shown at the bottom of the Settings home list: source
+ * link, community link, and the current version. Kept visually lighter than the
+ * SettingsMenuCard rows above it (a thin divider + centered content, no card
+ * background/chevron) since it's informational, not a navigable section.
+ */
+@Composable
+private fun SettingsFooter() {
+    Spacer(modifier = Modifier.height(12.dp))
+
+    HorizontalDivider(
+        modifier = Modifier.padding(horizontal = 24.dp),
+        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
+    )
+
+    Spacer(modifier = Modifier.height(20.dp))
+
+    AboutSection()
+
+    Spacer(modifier = Modifier.height(8.dp))
 }
 
 @Composable

@@ -101,13 +101,18 @@ fun SetupScreen(
         verticalArrangement = Arrangement.Center
     ) {
         // Full app-icon tile (the whole Ola mark on its green background) reads better
-        // here than the isolated adaptive-icon foreground layer on its own.
+        // here than the isolated adaptive-icon foreground layer on its own. Sized down
+        // from 120.dp - at that size the mark dominated the whole screen instead of
+        // reading as a small brand accent above the copy, which looked oversized next
+        // to the 28.sp title. 80.dp keeps it a clear focal point without crowding the
+        // text below; corner radius scaled down to match (16.dp is the standard
+        // ~1/5-of-size rounding for an 80.dp tile, same ratio the old 24.dp/120.dp used).
         Image(
             painter = painterResource(id = R.drawable.ic_ola_app_icon),
             contentDescription = null,
             modifier = Modifier
-                .size(120.dp)
-                .clip(RoundedCornerShape(24.dp))
+                .size(80.dp)
+                .clip(RoundedCornerShape(16.dp))
                 .padding(bottom = 24.dp)
         )
 
