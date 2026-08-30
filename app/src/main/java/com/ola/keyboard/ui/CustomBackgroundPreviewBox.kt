@@ -55,7 +55,16 @@ const val CUSTOM_BG_MAX_ZOOM = 3f
  * frame). Mirrored exactly in KeyboardView.renderCustomImageBackground so the
  * saved pan position means the same thing in both places.
  */
-const val CUSTOM_BG_OVERSCAN = 1.12f
+const val CUSTOM_BG_OVERSCAN = 1.35f
+// BUG FIX: 1.12f (12% overscan) was too tight in practice - for a photo whose
+// aspect ratio is anywhere close to the crop box's own, that only gave ~12%
+// of the box's size as real drag travel in the tight axis, which reads as
+// "I dragged and barely anything moved" / "I can't get to the rest of my
+// photo" even though panning itself worked correctly - there just wasn't
+// enough overflow to pan through. Raised to 1.35f so every photo, regardless
+// of its own dimensions, always has comfortably more than a third of the
+// box's size as real travel in BOTH axes before the user even touches
+// pinch-zoom. Mirrored in KeyboardView.renderCustomImageBackground below.
 
 /**
  * The one piece of "custom background" render logic - image cover-scale, pan

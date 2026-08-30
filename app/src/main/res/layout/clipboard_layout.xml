@@ -2,13 +2,16 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="?attr/fox_background">
+    android:orientation="vertical">
 
     <!-- The old header row (back button / title / clear-all) was removed from here.
          Both actions now live in the keyboard's top_bar (see keyboard_layout.xml:
          btn_clipboard doubles as back, btn_clip_clear is the new trash icon), so the
          clipboard list gets the full panel height instead of losing 48dp to a second bar. -->
+
+    <!-- BUG FIX: see emoji_layout.xml's identical note - this root's own opaque
+         ?attr/fox_background used to hide binding.root's gradient/custom-photo
+         background whenever this panel was open. Removed so it shows through. -->
 
     <FrameLayout
         android:layout_width="match_parent"

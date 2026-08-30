@@ -11,8 +11,14 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="?attr/fox_background"
     tools:ignore="ContentDescription">
+
+    <!-- BUG FIX: see emoji_layout.xml's identical note - this root's own opaque
+         ?attr/fox_background used to hide binding.root's gradient/custom-photo
+         background whenever this panel was open. Removed so it shows through.
+         (The right-hand Cut/Copy/Paste/Select-all column keeps its own
+         bg_text_select_side_panel - that's a deliberately distinct card, not
+         the panel backdrop.) -->
 
     <!-- Title bar -->
     <LinearLayout

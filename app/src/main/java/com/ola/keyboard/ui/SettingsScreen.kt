@@ -873,17 +873,47 @@ private fun KeyboardPreview(
                         .padding(1.dp)
                 )
                 Spacer(modifier = Modifier.weight(1f))
-                listOf(R.drawable.ic_clipboard, R.drawable.ic_emoji, R.drawable.ic_text_select, R.drawable.ic_fonts)
-                    .forEach { iconRes ->
+                // BUG FIX: order/icon-set here used to be
+                // [clipboard, emoji, text_select, fonts] - neither the order NOR the
+                // set matched the real keyboard's top_bar_icon_row (keyboard_layout.xml):
+                // emoji, fonts, clipboard, text_select, settings. Settings (the gear)
+                // was missing entirely, and fonts/settings never got the circular
+                // ?attr/keyFunction badge the real keyboard always draws behind those
+                // two specifically (btn_fonts/btn_settings use
+                // @drawable/bg_top_bar_icon_circle; the other three icons have no
+                // background at all) - this read as "keys/bar broken" and "logo not
+                // round" since the one round element the real bar has was missing here.
+                // funcColor (not a glass tint) matches the real keyboard too: even in
+                // custom-image/glass mode, applyGlassKeyStyling() only re-skins the
+                // letter/number/space/enter keys, never these two top-bar badges.
+                listOf(
+                    R.drawable.ic_emoji to false,
+                    R.drawable.ic_fonts to true,
+                    R.drawable.ic_clipboard to false,
+                    R.drawable.ic_text_select to false,
+                    R.drawable.ic_settings to true
+                ).forEach { (iconRes, circleBadge) ->
+                    Box(
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .size(26.dp)
+                            .then(
+                                if (circleBadge) {
+                                    Modifier
+                                        .clip(CircleShape)
+                                        .background(funcColor)
+                                } else Modifier
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Image(
                             painter = painterResource(id = iconRes),
                             contentDescription = null,
                             colorFilter = ColorFilter.tint(textColor),
-                            modifier = Modifier
-                                .padding(start = 10.dp)
-                                .size(20.dp)
+                            modifier = Modifier.size(if (circleBadge) 15.dp else 20.dp)
                         )
                     }
+                }
             }
 
             Spacer(modifier = Modifier.height(6.dp))

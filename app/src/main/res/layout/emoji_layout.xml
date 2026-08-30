@@ -4,8 +4,19 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="?attr/fox_background">
+    android:orientation="vertical">
+
+    <!-- BUG FIX: this root used to paint its own opaque ?attr/fox_background,
+         which sits (via keyboard_layout.xml's <include>) directly on top of
+         binding.root inside the same FrameLayout as keyboard_rows - so opening
+         this panel always hid whatever binding.root was actually showing
+         underneath (the gradient from applyGradientToKeyboard(), or the photo
+         from renderCustomImageBackground()) behind a flat opaque colour,
+         regardless of the selected background mode. No background here at all
+         now, so root's background always shows through - for the plain flat
+         theme this is visually identical (same ?attr/fox_background colour,
+         just inherited instead of redrawn), and for gradient/custom-image mode
+         the panel now actually shows it, matching the main keyboard view. -->
 
     <!-- The category tab strip used to live here as its own row. It now sits in
          keyboard_layout.xml's top_bar, on the same line as the back arrow (see

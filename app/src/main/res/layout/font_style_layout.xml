@@ -2,11 +2,14 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="?attr/fox_background">
+    android:orientation="vertical">
 
     <!-- Same reasoning as clipboard_layout.xml: back arrow / title live in the
          keyboard's top_bar (btn_fonts), not a second header row here. -->
+
+    <!-- BUG FIX: see emoji_layout.xml's identical note - this root's own opaque
+         ?attr/fox_background used to hide binding.root's gradient/custom-photo
+         background whenever this panel was open. Removed so it shows through. -->
 
     <TextView
         android:id="@+id/font_style_note"
