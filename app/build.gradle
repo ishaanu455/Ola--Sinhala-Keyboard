@@ -7,8 +7,8 @@ android {
     namespace "com.ola.keyboard"
     defaultConfig {
         minSdkVersion 21
-        versionCode 102312
-        versionName "1.1.1312"
+        versionCode 102313
+        versionName "1.1.1313"
         targetSdkVersion 34
         vectorDrawables.useSupportLibrary = true
     }
