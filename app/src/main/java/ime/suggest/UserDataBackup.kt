@@ -2,19 +2,26 @@ package ime.suggest
 
 import android.content.Context
 import android.net.Uri
+import com.ola.keyboard.ClipboardData
+import com.ola.keyboard.ClipItem
 import org.json.JSONArray
 import org.json.JSONObject
 
 /**
  * Exports/imports the on-device "learned words" data (word frequency +
- * next-word bigram associations) as a single JSON file the user can save
- * wherever they like and restore later — e.g. after a phone change, or as a
- * manual backup. Nothing here leaves the device on its own: export only
- * happens when the user explicitly picks a save location via the system
- * file picker, same as import.
+ * next-word bigram associations) plus clipboard history as a single JSON
+ * file the user can save wherever they like and restore later — e.g. after
+ * a phone change, or as a manual backup. Nothing here leaves the device on
+ * its own: export only happens when the user explicitly picks a save
+ * location via the system file picker, same as import.
+ *
+ * FORMAT_VERSION 2 added the "clipboard" section (every ClipItem field,
+ * pinned included). A version-1 backup file simply has no "clipboard" key -
+ * optJSONArray returns null for it and import() skips that section
+ * gracefully, so old backups still restore the dictionary parts they have.
  */
 object UserDataBackup {
-    private const val FORMAT_VERSION = 1
+    private const val FORMAT_VERSION = 2
 
     /** Writes a backup of everything learned so far to [uri]. Returns success. */
     fun export(context: Context, uri: Uri): Boolean {
@@ -45,6 +52,22 @@ object UserDataBackup {
             for (w in UserDictionary.snapshot(context)) customWordsArr.put(w)
             root.put("customWords", customWordsArr)
 
+            // Every field of every clip, pinned included - display position is
+            // always re-derived from these fields on read, so backing them up
+            // exactly is enough to reproduce identical pinned/unpinned order.
+            val clipsArr = JSONArray()
+            for (c in ClipboardData.snapshotForBackup(context)) {
+                val entry = JSONObject()
+                entry.put("id", c.id)
+                entry.put("text", c.text)
+                entry.put("timestamp", c.timestamp)
+                entry.put("pinned", c.pinned)
+                entry.put("useCount", c.useCount)
+                entry.put("lastUsedTimestamp", c.lastUsedTimestamp)
+                clipsArr.put(entry)
+            }
+            root.put("clipboard", clipsArr)
+
             context.contentResolver.openOutputStream(uri)?.use { out ->
                 out.write(root.toString().toByteArray(Charsets.UTF_8))
             } ?: return false
@@ -56,8 +79,9 @@ object UserDataBackup {
 
     /**
      * Restores a previously-exported file from [uri]. Merges additively into
-     * whatever's already learned on this device rather than replacing it, so
-     * restoring a backup never discards words learned since. Returns success.
+     * whatever's already on this device rather than replacing it, so
+     * restoring a backup never discards words or clips learned/copied since.
+     * Returns success.
      */
     fun import(context: Context, uri: Uri): Boolean {
         return try {
@@ -106,8 +130,27 @@ object UserDataBackup {
                 UserDictionary.mergeImport(context, words)
             }
 
+            val clipsArr = root.optJSONArray("clipboard")
+            if (clipsArr != null) {
+                val items = ArrayList<ClipItem>(clipsArr.length())
+                for (i in 0 until clipsArr.length()) {
+                    val o = clipsArr.optJSONObject(i) ?: continue
+                    items.add(
+                        ClipItem(
+                            id = o.optLong("id"),
+                            text = o.optString("text"),
+                            timestamp = o.optLong("timestamp"),
+                            pinned = o.optBoolean("pinned", false),
+                            useCount = o.optInt("useCount", 0),
+                            lastUsedTimestamp = o.optLong("lastUsedTimestamp", 0L)
+                        )
+                    )
+                }
+                ClipboardData.restoreFromBackup(context, items)
+            }
+
             // A file with none of the known sections is malformed / not one of our backups.
-            wordsObj != null || bigramObj != null || customWordsArr != null
+            wordsObj != null || bigramObj != null || customWordsArr != null || clipsArr != null
         } catch (_: Exception) {
             false
         }

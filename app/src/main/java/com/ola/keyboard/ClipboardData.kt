@@ -181,6 +181,54 @@ object ClipboardData {
         save(context)
     }
 
+    /** Full-fidelity snapshot of every clip currently stored, in their raw
+     *  (unsorted) storage order - used by [ime.suggest.UserDataBackup] to write
+     *  every field of every clip (pinned included) to a backup file. Display
+     *  order is always re-derived from these fields via [all]/[filtered], so
+     *  restoring every field exactly reproduces the same pinned/unpinned
+     *  positions without needing to store position separately. */
+    fun snapshotForBackup(context: Context): List<ClipItem> {
+        load(context)
+        return clips.toList()
+    }
+
+    /**
+     * Restores clips from a backup, merging additively into whatever's already
+     * on the device - same philosophy as the dictionary import in
+     * [ime.suggest.UserDataBackup]. An id already present on the device is left
+     * untouched (its current state is assumed newer than the backup); every id
+     * from the backup that isn't already present is added back exactly as
+     * backed up, pinned flag included.
+     *
+     * Deliberately bypasses the [MAX_UNPINNED] trim that [add] applies: this is
+     * a restore, not a new copy, so nothing from the backup - pinned or not -
+     * should be dropped for being "too many". The cap resumes applying to any
+     * new clip copied after the restore.
+     */
+    fun restoreFromBackup(context: Context, items: List<ClipItem>) {
+        load(context)
+        val existingIds = clips.map { it.id }.toHashSet()
+        var added = false
+        for (item in items) {
+            if (item.id in existingIds) continue
+            clips.add(item)
+            existingIds.add(item.id)
+            added = true
+        }
+        if (added) save(context)
+    }
+
+    /** Forces the next [load] to re-read from SharedPreferences instead of
+     *  reusing the in-memory list - needed after something *other than this
+     *  object* has written to the "clipboard_history" key directly (currently
+     *  only [ime.suggest.FullBackup]'s restore), since otherwise a later
+     *  ClipboardData.add/setPinned/etc. call would save() the stale in-memory
+     *  list right back over the just-restored data. */
+    fun invalidateCache() {
+        loaded = false
+        clips.clear()
+    }
+
     private fun save(context: Context) {
         val arr = JSONArray()
         for (c in clips) {
