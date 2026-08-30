@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Used by the Space and Enter keys (key_row_5 in keyboard_layout.xml). Recoloured
+     to the SAME neutral keyFunction/keyFunctionPressed tokens every other function
+     key (lang/"?123"/","/".", see key_background_function.xml) uses, instead of the
+     old keyAction/keyActionPressed accent colour - Space/Enter used to stand out as
+     a bright, differently-tinted pill versus the rest of the row, which read as
+     "randomly coloured" rather than intentional. Shape (the taller pill/18dp corner
+     radius vs the other keys' 5dp) is kept as-is - only the fill colour changed, to
+     match KeyboardPreview's identical recolour in SettingsScreen.kt. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- PRESSED STATE -->
@@ -10,7 +18,7 @@
                 android:top="4dp"
                 android:bottom="4dp">
                 <shape>
-                    <solid android:color="?attr/keyActionPressed" />
+                    <solid android:color="?attr/keyFunctionPressed" />
                     <corners android:radius="14dp" />
                 </shape>
             </item>
@@ -26,7 +34,7 @@
                 android:top="3dp"
                 android:bottom="3dp">
                 <shape>
-                    <solid android:color="?attr/keyAction" />
+                    <solid android:color="?attr/keyFunction" />
                     <corners android:radius="18dp" />
                 </shape>
             </item>

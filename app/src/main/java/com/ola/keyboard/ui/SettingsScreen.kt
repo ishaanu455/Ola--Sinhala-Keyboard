@@ -835,15 +835,6 @@ private fun KeyboardPreview(
     }
     val glassShape = RoundedCornerShape(6.dp)
 
-    // Space/enter fill: a 2-stop gradient brush for a "*_gradient" theme, otherwise
-    // the same flat accent SolidColor as before - both go through the same Brush-based
-    // keyMod so the two key rows below don't need their own branching. Ignored
-    // entirely once useGlass is true - every key (including these two) gets the
-    // same glass treatment instead, see keyMod() below.
-    val accentBrush = theme.gradientColors
-        ?.let { Brush.linearGradient(it) }
-        ?: SolidColor(theme.accent)
-
     // Small drop shadow under each key - part of the "glassmorphism ... with
     // small shadow" look asked for; only applied in glass mode, the flat/gradient
     // theme keys never had a shadow and shouldn't suddenly grow one.
@@ -860,18 +851,12 @@ private fun KeyboardPreview(
         .background(background)
         .border(0.5.dp, borderColor, RoundedCornerShape(6.dp))
 
-    fun keyMod(brush: Brush) = if (useGlass) glassKeyMod() else Modifier
-        .height(40.dp)
-        .clip(RoundedCornerShape(6.dp))
-        .background(brush)
-        .border(0.5.dp, borderColor, RoundedCornerShape(6.dp))
-
     // Whole-keyboard fill: for a "*_gradient" theme this is the SAME lightVariant->
-    // darkVariant brush used for Space/Enter (accentBrush) painted across the entire
-    // preview instead of the flat bg colour, so the preview matches what
+    // darkVariant brush the swatch itself uses, painted across the entire preview
+    // instead of the flat bg colour, so the preview matches what
     // applyGradientToKeyboard() now does on the real keyboard - gradient behind every
-    // key and the top bar, not just on the accent keys. Only used when useGlass is
-    // false - the photo itself is the background otherwise (see the Box below).
+    // key and the top bar. Only used when useGlass is false - the photo itself is the
+    // background otherwise (see the Box below).
     val boardBackground = theme.gradientColors
         ?.let { Brush.linearGradient(it) }
         ?: SolidColor(bg)
@@ -930,20 +915,23 @@ private fun KeyboardPreview(
                 // [clipboard, emoji, text_select, fonts] - neither the order NOR the
                 // set matched the real keyboard's top_bar_icon_row (keyboard_layout.xml):
                 // emoji, fonts, clipboard, text_select, settings. Settings (the gear)
-                // was missing entirely, and fonts/settings never got the circular
-                // ?attr/keyFunction badge the real keyboard always draws behind those
-                // two specifically (btn_fonts/btn_settings use
-                // @drawable/bg_top_bar_icon_circle; the other three icons have no
-                // background at all) - this read as "keys/bar broken" and "logo not
-                // round" since the one round element the real bar has was missing here.
+                // was missing entirely.
+                // BUG FIX: this used to give the circular ?attr/keyFunction badge to only
+                // fonts/settings, on the assumption the other three icons have no
+                // background at all - but @style/TopBarIcon (styles.xml) sets
+                // android:background="@drawable/bg_top_bar_icon_circle" as part of the
+                // style itself, and emoji/clipboard/text_select all use that style
+                // without overriding background - so on the real keyboard EVERY one of
+                // these 5 icons gets the same circular badge, not just 2 of them. This
+                // preview now matches: all 5 get circleBadge = true.
                 // funcColor (not a glass tint) matches the real keyboard too: even in
                 // custom-image/glass mode, applyGlassKeyStyling() only re-skins the
-                // letter/number/space/enter keys, never these two top-bar badges.
+                // letter/number/space/enter keys, never these top-bar badges.
                 listOf(
-                    R.drawable.ic_emoji to false,
+                    R.drawable.ic_emoji to true,
                     R.drawable.ic_fonts to true,
-                    R.drawable.ic_clipboard to false,
-                    R.drawable.ic_text_select to false,
+                    R.drawable.ic_clipboard to true,
+                    R.drawable.ic_text_select to true,
                     R.drawable.ic_settings to true
                 ).forEach { (iconRes, circleBadge) ->
                     Box(
@@ -1064,12 +1052,13 @@ private fun KeyboardPreview(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Bottom row: 123 / lang / comma / space (accent) / dot / enter (accent)
-            // BUG FIX: this row used to skip the language-toggle and comma/period keys
-            // entirely and drew the space and enter keys as plain empty accent-colour
-            // boxes with no icon/label - same "looks broken" issue as the shift/
-            // backspace row above. Now mirrors keyboard_layout.xml's key_row_5: panel
-            // ("?123"), lang, comma, space (ic_space_bar), dot, action/enter (ic_check).
+            // Bottom row: 123 / lang / comma / space / dot / enter. Space and Enter now
+            // use the SAME funcColor as every other function key (lang/"?123"/","/".")
+            // instead of the old accent-brush fill - see key_background_action.xml on
+            // the real keyboard side, which got the equivalent recolour so this preview
+            // and the real keyboard match (previously both singled out space/enter with
+            // the theme's bright accent colour, which read as "randomly coloured
+            // differently" rather than intentional).
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(3.dp)
@@ -1106,7 +1095,7 @@ private fun KeyboardPreview(
                 Box(
                     modifier = Modifier
                         .weight(3f)
-                        .then(keyMod(accentBrush)),
+                        .then(keyMod(funcColor)),
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
@@ -1127,7 +1116,7 @@ private fun KeyboardPreview(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .then(keyMod(accentBrush)),
+                        .then(keyMod(funcColor)),
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
