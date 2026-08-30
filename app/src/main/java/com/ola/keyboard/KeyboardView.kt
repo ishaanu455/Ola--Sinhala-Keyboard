@@ -272,6 +272,34 @@ class KeyboardView(
     private var touchStartedInRecentEmojiRow = false
     private val recentEmojiRowScreenLoc = IntArray(2)
 
+    // --- Glassmorphism (custom-image mode) drawable factories, all built once by
+    // applyGlassKeyStyling() and consumed by code further down in init{} (and by
+    // FontStyleAdapter/ClipboardAdapter once they're created) - declared here,
+    // ABOVE init{}, because Kotlin runs property initializers and init{} blocks in
+    // textual order: declaring them after init{} (where they're first read) left
+    // them "not yet initialized" at that point in the constructor sequence, even
+    // though they default to null. See applyGlassKeyStyling() for what fills these.
+
+    /** Handed to both [fontStyleAdapter] and [clipboardAdapter] once they exist, so
+     *  every card in either grid gets the same translucent glass treatment as the
+     *  rest of the keyboard instead of its flat @drawable/bg_clip_card default.
+     *  Stays null outside custom-image mode, which tells both adapters to keep the
+     *  normal theme background. */
+    private var glassCardFactory: (() -> android.graphics.drawable.Drawable)? = null
+
+    /** Handed to categoryClickListener (init{}, emoji category tab strip) since
+     *  that paints the "selected" tab's background by hand with a plain drawable
+     *  resource swap, the exact same pattern the old backspace bug had. Stays null
+     *  outside custom-image mode, which tells the listener to keep using the flat
+     *  key_background_pressed drawable it always has. */
+    private var glassSelectedIndicatorFactory: (() -> android.graphics.drawable.Drawable)? = null
+
+    /** The same glass drawable used for btn_emoji/btn_clipboard/btn_settings, but
+     *  handed to [updateFontsIconBadge] instead of applied directly, since that
+     *  function is the sole owner of btn_fonts's background (it also draws the
+     *  purple "active style" badge). Stays null outside custom-image mode. */
+    private var glassTopBarIconFactory: (() -> android.graphics.drawable.Drawable)? = null
+
     private enum class SwipeActionType { ERASE, MOVE_CURSOR, NONE }
 
     override fun onInterceptTouchEvent(ev: MotionEvent?): Boolean {
@@ -1636,29 +1664,6 @@ class KeyboardView(
             Log.e("KeyboardView", "Failed to apply glass key styling", t)
         }
     }
-
-    /** Built by [applyGlassKeyStyling] (custom-image mode only) and handed to both
-     *  [fontStyleAdapter] and [clipboardAdapter] once they exist, so every card in
-     *  either grid gets the same translucent glass treatment as the rest of the
-     *  keyboard instead of its flat @drawable/bg_clip_card default. Stays null
-     *  outside custom-image mode, which tells both adapters to keep the normal
-     *  theme background. */
-    private var glassCardFactory: (() -> android.graphics.drawable.Drawable)? = null
-
-    /** Built by [applyGlassKeyStyling] (custom-image mode only) - handed to
-     *  categoryClickListener (init{}, emoji category tab strip) since that paints
-     *  the "selected" tab's background by hand with a plain drawable resource
-     *  swap, the exact same pattern the old backspace bug had. Stays null outside
-     *  custom-image mode, which tells the listener to keep using the flat
-     *  key_background_pressed drawable it always has. */
-    private var glassSelectedIndicatorFactory: (() -> android.graphics.drawable.Drawable)? = null
-
-    /** Built by [applyGlassKeyStyling] (custom-image mode only) - the same glass
-     *  drawable used for btn_emoji/btn_clipboard/btn_settings, but handed to
-     *  [updateFontsIconBadge] instead of applied directly, since that function is
-     *  the sole owner of btn_fonts's background (it also draws the purple
-     *  "active style" badge). Stays null outside custom-image mode. */
-    private var glassTopBarIconFactory: (() -> android.graphics.drawable.Drawable)? = null
 
     /** Bumps an ARGB [color]'s own alpha channel up by a fixed amount (capped at
      *  fully opaque), keeping its RGB untouched - used for the glass keys' pressed
