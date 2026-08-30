@@ -1424,14 +1424,34 @@ class KeyboardView(
     /**
      * Step 6: every key - letters, number row, Space/Enter alike - switches
      * from a flat/gradient theme fill to a translucent frosted-glass
-     * treatment: semi-transparent fill + border + a small shadow, matching
-     * KeyboardPreview's glass styling in SettingsScreen.kt (same fill/border
-     * alpha values, and the same "respects the Settings Border toggle
-     * instead of always drawing one" fix) so the real keyboard matches the
-     * Settings preview. A solid theme colour would otherwise visually fight
-     * with an arbitrary photo underneath. Only ever called once
-     * [renderCustomImageBackground] has already painted a valid photo behind
-     * everything - see [applyCustomImageToKeyboard].
+     * treatment: semi-transparent fill + border, matching KeyboardPreview's
+     * glass styling in SettingsScreen.kt (same fill/border alpha values, and
+     * the same "respects the Settings Border toggle instead of always
+     * drawing one" fix) so the real keyboard matches the Settings preview. A
+     * solid theme colour would otherwise visually fight with an arbitrary
+     * photo underneath. Only ever called once [renderCustomImageBackground]
+     * has already painted a valid photo behind everything - see
+     * [applyCustomImageToKeyboard].
+     *
+     * BUG FIX (was showing each key's translucent box looking "shifted"/
+     * smeared rightward, worse toward the end of a row - most visible on
+     * k/l and n/m/backspace): this used to also set `keyView.elevation` on
+     * every key for a drop-shadow accent, same as KeyboardPreview's
+     * `Modifier.shadow(...)` in the Compose preview. But that Compose
+     * preview's keys have real breathing room between them
+     * (`Arrangement.spacedBy(3.dp)`), while these real keys sit edge-to-edge
+     * with zero margin (see keyboard_layout.xml - no layout_margin anywhere
+     * in the letter/number/symbol rows, by design, so the row fills exactly
+     * edge-to-edge). Android draws a View's elevation shadow projecting
+     * OUTSIDE its own bounds, and sibling views don't clip each other's
+     * shadows - so key N's shadow spilled rightward onto key N+1, and
+     * because the glass fill is semi-transparent that spillover showed
+     * through as a dark smear along each key's left edge, compounding
+     * across the row (key N+1's own shadow then spills onto N+2, etc.) -
+     * exactly the "shifted box, worse further right" look reported. Simplest
+     * correct fix for zero-margin siblings: drop the shadow accent here
+     * entirely and keep only fill+border, which was always the load-bearing
+     * part of the "glassmorphism" look anyway.
      */
     private fun applyGlassKeyStyling() {
         val density = resources.displayMetrics.density
@@ -1452,7 +1472,6 @@ class KeyboardView(
             android.graphics.Color.argb((0.55f * 255).toInt(), 255, 255, 255)
         }
         val strokeWidthPx = dp(0.8f).toInt().coerceAtLeast(1)
-        val elevationPx = dp(2f)
 
         fun buildGlassDrawable(
             cornerRadiusDp: Float,
@@ -1493,9 +1512,7 @@ class KeyboardView(
             // uses (18dp radius, 2dp/3dp insets), just glass-filled instead of
             // gradient-filled.
             binding.space.background = buildGlassDrawable(18f, 2f, 3f)
-            binding.space.elevation = elevationPx
             binding.action.background = buildGlassDrawable(18f, 2f, 3f)
-            binding.action.elevation = elevationPx
 
             val rows = binding.keyboardRows.children.filterIsInstance<LinearLayout>().toList()
             rows.forEach { row ->
@@ -1505,7 +1522,6 @@ class KeyboardView(
                     // Same regular 5dp-radius shape/insets as
                     // applyGradientToKeyboard's buildFlatKeyDrawable, glass-filled.
                     keyView.background = buildGlassDrawable(5f, 2f, 3f)
-                    keyView.elevation = elevationPx
                 }
             }
         } catch (t: Throwable) {
