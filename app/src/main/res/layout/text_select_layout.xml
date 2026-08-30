@@ -129,6 +129,7 @@
 
         <!-- Right-side Cut/Copy/Paste/Select-all menu column -->
         <LinearLayout
+            android:id="@+id/text_select_side_panel"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1.4"

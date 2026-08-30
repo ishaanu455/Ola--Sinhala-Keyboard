@@ -2,12 +2,15 @@ package com.ola.keyboard
 
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.drawable.Drawable
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.content.res.AppCompatResources
+import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
@@ -35,6 +38,16 @@ class ClipboardAdapter(
     }
 
     private val rows = ArrayList<Row>()
+
+    /** Set by KeyboardView when custom-image (glassmorphism) mode is active - same
+     *  role as FontStyleAdapter's glassCardDrawableFactory, mirrored here since the
+     *  clip grid is its own recycled RecyclerView. Null outside custom-image mode. */
+    private var glassCardDrawableFactory: (() -> Drawable)? = null
+
+    fun setGlassCardStyling(factory: (() -> Drawable)?) {
+        glassCardDrawableFactory = factory
+        notifyDataSetChanged()
+    }
 
     /** Tracks which clip currently has its action row expanded (long-press), by clip id. */
     private var expandedId: Long? = null
@@ -106,6 +119,8 @@ class ClipboardAdapter(
 
     private fun bindClip(holder: ClipViewHolder, item: ClipItem) {
         val context = holder.itemView.context
+        holder.card.background = glassCardDrawableFactory?.invoke()
+            ?: ContextCompat.getDrawable(context, R.drawable.bg_clip_card)
         holder.textStyler.bind(context, holder.text, item.text, Prefs.getEmojiStyle(context))
         // The pin/share/delete row and the selection checkmark are mutually exclusive -
         // only one indicator makes sense on a card at a time.
@@ -223,6 +238,7 @@ class ClipboardAdapter(
     }
 
     class ClipViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        val card: LinearLayout = itemView.findViewById(R.id.clip_card)
         val text: TextView = itemView.findViewById(R.id.clip_text)
         // Renders clip_text using Settings > Emoji Style (custom font),
         // same as the emoji picker grid - not just the device's plain glyph.

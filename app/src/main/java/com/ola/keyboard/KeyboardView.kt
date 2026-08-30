@@ -589,13 +589,23 @@ class KeyboardView(
             binding.shift.setOnClickListener { clickListener.functionClick(Function.SHIFT) }
             binding.action.setOnTouchListener(fastTouchListener)
 
+            // BUG FIX: this used to swap `v.background` for a brand-new
+            // key_background_pressed/key_background drawable instance on every
+            // down/up, ignoring whatever background the key actually had at the
+            // time (the theme selector normally, but the translucent glass
+            // StateListDrawable built by applyGlassKeyStyling() in custom-image
+            // mode). That overwrite is what made backspace look "stuck" on a
+            // flat theme colour - white in light mode, a solid dark block in
+            // dark mode - instead of glass, and look misaligned next to the
+            // other keys' insets once pressed. Toggling `isPressed` instead
+            // (same pattern as fastTouchListener above) lets whichever
+            // StateListDrawable is already set as the background - theme or
+            // glass - handle its own pressed state, exactly like every other
+            // key on the board.
             val backspaceTouchListener = View.OnTouchListener { v, event ->
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
-                        v.background = AppCompatResources.getDrawable(
-                            contextThemeWrapper,
-                            R.drawable.key_background_pressed
-                        )
+                        v.isPressed = true
                         clickListener.functionClick(Function.BACKSPACE)
                         lastBackspaceDownTime = System.currentTimeMillis()
                         v.performClick()
@@ -604,10 +614,7 @@ class KeyboardView(
                     }
 
                     MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                        v.background = AppCompatResources.getDrawable(
-                            contextThemeWrapper,
-                            R.drawable.key_background
-                        )
+                        v.isPressed = false
                         backspaceRepeaterJob.cancel()
                     }
                 }
@@ -653,10 +660,16 @@ class KeyboardView(
                 for (child in emojiCategories.children) {
                     child.background = null
                 }
-                v.background = AppCompatResources.getDrawable(
-                    contextThemeWrapper,
-                    R.drawable.key_background_pressed
-                )
+                // BUG FIX: same root cause as the old backspace touch listener -
+                // this used to always paint the selected tab with the flat
+                // key_background_pressed drawable, ignoring custom-image/glass
+                // mode entirely. glassSelectedIndicatorFactory is non-null only
+                // when applyGlassKeyStyling() has already run.
+                v.background = glassSelectedIndicatorFactory?.invoke()
+                    ?: AppCompatResources.getDrawable(
+                        contextThemeWrapper,
+                        R.drawable.key_background_pressed
+                    )
             }
 
             // Long-pressing any category icon picks it up; dragging it over its
@@ -900,6 +913,9 @@ class KeyboardView(
                     gapStrategy = StaggeredGridLayoutManager.GAP_HANDLING_NONE
                 }
             binding.clipboardView.clipboardList.adapter = clipboardAdapter
+            // Non-null only when applyGlassKeyStyling() already ran (custom-image
+            // mode) - see glassCardFactory's doc comment.
+            clipboardAdapter.setGlassCardStyling(glassCardFactory)
 
             // Tapping empty space in the clipboard list (not on any clip card) collapses
             // whichever clip currently has its pin/share/delete row expanded.
@@ -1149,6 +1165,9 @@ class KeyboardView(
                 toggleFontStyleView(false)
             }
             fontStyleAdapter.setActiveStyle(activeFontStyle)
+            // Non-null only when applyGlassKeyStyling() already ran (custom-image
+            // mode) - see glassCardFactory's doc comment.
+            fontStyleAdapter.setGlassCardStyling(glassCardFactory)
             binding.fontStyleView.fontStyleList.layoutManager =
                 StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL).apply {
                     gapStrategy = StaggeredGridLayoutManager.GAP_HANDLING_NONE
@@ -1478,14 +1497,26 @@ class KeyboardView(
         }
         val strokeWidthPx = dp(0.8f).toInt().coerceAtLeast(1)
 
+        // Resolved once and reused by btn_ts_toggle_select's glass drawable below -
+        // same ?attr/accent used by @drawable/bg_text_select_pill's state_selected
+        // item, so the "Select" pill still reads as visually "on" instead of losing
+        // its highlight to the plain glass fill once selection mode is toggled.
+        val accentTypedValue = TypedValue()
+        themedContext.theme.resolveAttribute(R.attr.accent, accentTypedValue, true)
+        val accentColor = accentTypedValue.data
+
         fun buildGlassDrawable(
             cornerRadiusDp: Float,
             insetHDp: Float,
-            insetVDp: Float
+            insetVDp: Float,
+            oval: Boolean = false,
+            accentWhenSelected: Boolean = false
         ): android.graphics.drawable.Drawable {
             val normalShape = android.graphics.drawable.GradientDrawable().apply {
+                shape = if (oval) android.graphics.drawable.GradientDrawable.OVAL
+                else android.graphics.drawable.GradientDrawable.RECTANGLE
                 setColor(glassFill)
-                cornerRadius = dp(cornerRadiusDp)
+                if (!oval) cornerRadius = dp(cornerRadiusDp)
                 if (glassBorder != android.graphics.Color.TRANSPARENT) {
                     setStroke(strokeWidthPx, glassBorder)
                 }
@@ -1496,8 +1527,10 @@ class KeyboardView(
             // look translucent instead of the pressed key suddenly going
             // opaque.
             val pressedShape = android.graphics.drawable.GradientDrawable().apply {
+                shape = if (oval) android.graphics.drawable.GradientDrawable.OVAL
+                else android.graphics.drawable.GradientDrawable.RECTANGLE
                 setColor(pressedGlassFill(glassFill))
-                cornerRadius = dp(cornerRadiusDp)
+                if (!oval) cornerRadius = dp(cornerRadiusDp)
                 if (glassBorder != android.graphics.Color.TRANSPARENT) {
                     setStroke(strokeWidthPx, glassBorder)
                 }
@@ -1507,6 +1540,15 @@ class KeyboardView(
             val normalInset = android.graphics.drawable.InsetDrawable(normalShape, insetH, insetV, insetH, insetV)
             val pressedInset = android.graphics.drawable.InsetDrawable(pressedShape, insetH, insetV, insetH, insetV)
             return android.graphics.drawable.StateListDrawable().apply {
+                if (accentWhenSelected) {
+                    val selectedShape = android.graphics.drawable.GradientDrawable().apply {
+                        shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                        setColor(accentColor)
+                        cornerRadius = dp(cornerRadiusDp)
+                    }
+                    val selectedInset = android.graphics.drawable.InsetDrawable(selectedShape, insetH, insetV, insetH, insetV)
+                    addState(intArrayOf(android.R.attr.state_selected), selectedInset)
+                }
                 addState(intArrayOf(android.R.attr.state_pressed), pressedInset)
                 addState(intArrayOf(), normalInset)
             }
@@ -1529,10 +1571,94 @@ class KeyboardView(
                     keyView.background = buildGlassDrawable(5f, 2f, 3f)
                 }
             }
+
+            // Top bar circular icons (back-arrow-doubling buttons for the emoji/
+            // fonts/clipboard panels, plus the settings gear) - these normally use
+            // the static @drawable/bg_top_bar_icon_circle selector, which is an
+            // opaque theme colour and so sat as a solid flat circle on top of the
+            // custom photo instead of matching the glass keys around it.
+            binding.btnEmoji.background = buildGlassDrawable(0f, 0f, 0f, oval = true)
+            binding.btnClipboard.background = buildGlassDrawable(0f, 0f, 0f, oval = true)
+            binding.btnSettings.background = buildGlassDrawable(0f, 0f, 0f, oval = true)
+            // btn_fonts is NOT set directly here - updateFontsIconBadge() (called
+            // later, once per init and again on every style change) unconditionally
+            // overwrites its background to show the purple "active style" badge, so
+            // setting it here would just get clobbered the moment that badge logic
+            // runs. Handing it the factory instead lets it pick the right glass/flat
+            // drawable itself, same as the badge-vs-normal choice it already makes.
+            glassTopBarIconFactory = { buildGlassDrawable(0f, 0f, 0f, oval = true) }
+
+            // Text-select ("Text Editor") panel: back arrow, the up/left/right/down
+            // cursor cross, the Select pill, the Cut/Copy/Paste/Select-all side
+            // menu (panel + its rows), and the bottom bar's jump/backspace keys -
+            // all previously stayed on flat opaque theme colours in custom-image
+            // mode, same issue as the top bar icons above.
+            binding.textSelectView.btnTsAbc.background = buildGlassDrawable(0f, 0f, 0f, oval = true)
+            binding.textSelectView.btnTsUp.background = buildGlassDrawable(0f, 0f, 0f, oval = true)
+            binding.textSelectView.btnTsDown.background = buildGlassDrawable(0f, 0f, 0f, oval = true)
+            binding.textSelectView.btnTsLeft.background = buildGlassDrawable(0f, 0f, 0f, oval = true)
+            binding.textSelectView.btnTsRight.background = buildGlassDrawable(0f, 0f, 0f, oval = true)
+            binding.textSelectView.btnTsToggleSelect.background =
+                buildGlassDrawable(10f, 0f, 0f, accentWhenSelected = true)
+            binding.textSelectView.textSelectSidePanel.background = buildGlassDrawable(0f, 0f, 0f)
+            binding.textSelectView.btnTsCut.background = buildGlassDrawable(0f, 0f, 0f)
+            binding.textSelectView.btnTsCopy.background = buildGlassDrawable(0f, 0f, 0f)
+            binding.textSelectView.btnTsPaste.background = buildGlassDrawable(0f, 0f, 0f)
+            binding.textSelectView.btnTsSelectAll.background = buildGlassDrawable(0f, 0f, 0f)
+            binding.textSelectView.btnTsWordLeft.background = buildGlassDrawable(5f, 2f, 3f)
+            binding.textSelectView.btnTsWordRight.background = buildGlassDrawable(5f, 2f, 3f)
+            binding.textSelectView.btnTsBackspace.background = buildGlassDrawable(5f, 2f, 3f)
+
+            // Language-switch key ("ENG") on the main keyboard row - a TextView,
+            // so it fell through the KeyboardButton/ImageView filter in the row
+            // loop above and was the one main-keyboard key left on a flat theme
+            // colour.
+            binding.lang.background = buildGlassDrawable(5f, 2f, 3f)
+
+            // Emoji panel's own bottom bar (keyboard-switch + backspace) - same
+            // key_background_function flat colour issue as everywhere else above.
+            binding.emojiView.btnAbc.background = buildGlassDrawable(5f, 2f, 3f)
+            binding.emojiView.btnBackspace.background = buildGlassDrawable(5f, 2f, 3f)
+
+            // Emoji category tab strip's "selected" indicator is painted by hand in
+            // categoryClickListener (further down in init{}) rather than through a
+            // theme-attr selector drawable, so it needs its own factory the same way
+            // btn_fonts's badge does - see glassSelectedIndicatorFactory's doc comment.
+            glassSelectedIndicatorFactory = { buildGlassDrawable(5f, 2f, 3f) }
+
+            // Font style panel's grid cards (2nd/3rd screenshot) are recycled
+            // RecyclerView rows, so looping the currently-visible children here
+            // wouldn't survive scrolling - the factory is handed to the adapter
+            // instead and applied per-row in onBindViewHolder (see below, once
+            // fontStyleAdapter exists).
+            glassCardFactory = { buildGlassDrawable(14f, 0f, 0f) }
         } catch (t: Throwable) {
             Log.e("KeyboardView", "Failed to apply glass key styling", t)
         }
     }
+
+    /** Built by [applyGlassKeyStyling] (custom-image mode only) and handed to both
+     *  [fontStyleAdapter] and [clipboardAdapter] once they exist, so every card in
+     *  either grid gets the same translucent glass treatment as the rest of the
+     *  keyboard instead of its flat @drawable/bg_clip_card default. Stays null
+     *  outside custom-image mode, which tells both adapters to keep the normal
+     *  theme background. */
+    private var glassCardFactory: (() -> android.graphics.drawable.Drawable)? = null
+
+    /** Built by [applyGlassKeyStyling] (custom-image mode only) - handed to
+     *  categoryClickListener (init{}, emoji category tab strip) since that paints
+     *  the "selected" tab's background by hand with a plain drawable resource
+     *  swap, the exact same pattern the old backspace bug had. Stays null outside
+     *  custom-image mode, which tells the listener to keep using the flat
+     *  key_background_pressed drawable it always has. */
+    private var glassSelectedIndicatorFactory: (() -> android.graphics.drawable.Drawable)? = null
+
+    /** Built by [applyGlassKeyStyling] (custom-image mode only) - the same glass
+     *  drawable used for btn_emoji/btn_clipboard/btn_settings, but handed to
+     *  [updateFontsIconBadge] instead of applied directly, since that function is
+     *  the sole owner of btn_fonts's background (it also draws the purple
+     *  "active style" badge). Stays null outside custom-image mode. */
+    private var glassTopBarIconFactory: (() -> android.graphics.drawable.Drawable)? = null
 
     /** Bumps an ARGB [color]'s own alpha channel up by a fixed amount (capped at
      *  fully opaque), keeping its RGB untouched - used for the glass keys' pressed
@@ -1920,10 +2046,13 @@ class KeyboardView(
         // to produce a visible color, which is why btn_fonts's circular background
         // (and its back-arrow state, since it's the same ImageView) never showed up
         // even though the XML style/background were both correct.
-        binding.btnFonts.background = AppCompatResources.getDrawable(
-            themedContext,
-            if (active) R.drawable.bg_clip_purple_circle else R.drawable.bg_top_bar_icon_circle
-        )
+        binding.btnFonts.background = when {
+            active -> AppCompatResources.getDrawable(themedContext, R.drawable.bg_clip_purple_circle)
+            // Custom-image mode: glass instead of the flat theme circle, matching
+            // the other top-bar icons - see glassTopBarIconFactory's doc comment.
+            glassTopBarIconFactory != null -> glassTopBarIconFactory!!.invoke()
+            else -> AppCompatResources.getDrawable(themedContext, R.drawable.bg_top_bar_icon_circle)
+        }
     }
 
     /** Closes the emoji panel (e.g. when the input field changes or the keyboard is reopened). */
