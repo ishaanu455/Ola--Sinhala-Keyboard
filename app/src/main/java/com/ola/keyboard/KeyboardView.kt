@@ -831,7 +831,9 @@ class KeyboardView(
                 binding.btnEmoji.setImageResource(if (visible) R.drawable.ic_arrow_back else R.drawable.ic_emoji)
                 binding.btnClipboard.visibility =
                     if (visible) View.GONE else (if (clipboardEnabled) View.VISIBLE else View.GONE)
-                binding.btnTextSelect.visibility = if (visible) View.GONE else View.VISIBLE
+                // Same numeric-field guard as toggleClipboardView/toggleFontStyleView -
+                // text-select has no place in a phone/OTP field's top bar.
+                binding.btnTextSelect.visibility = if (visible || numericModeActive) View.GONE else View.VISIBLE
                 binding.btnFonts.visibility = if (visible) View.GONE else View.VISIBLE
                 // The category tab strip moves onto this same row, right after the
                 // fixed btn_emoji back arrow, and the row itself switches to
@@ -1013,8 +1015,14 @@ class KeyboardView(
                 binding.clipboardRowSpacer.isVisible = visible
                 setTopBarIconRowExpanded(visible)
                 setLogoVisible(!visible)
-                binding.btnEmoji.visibility = if (visible) View.GONE else View.VISIBLE
-                binding.btnTextSelect.visibility = if (visible) View.GONE else View.VISIBLE
+                // In a numeric/phone field (OTP boxes, "Enter your phone number"
+                // screens) the emoji and text-select icons are never shown - see
+                // TopBarController.showNormal(isNumericField) - so closing the
+                // clipboard panel here must NOT force them back to VISIBLE while
+                // numericModeActive, or they'd reappear in the number pad's top bar
+                // even though tapping them wouldn't do anything useful there.
+                binding.btnEmoji.visibility = if (visible || numericModeActive) View.GONE else View.VISIBLE
+                binding.btnTextSelect.visibility = if (visible || numericModeActive) View.GONE else View.VISIBLE
                 binding.btnFonts.visibility = if (visible) View.GONE else View.VISIBLE
                 if (isEmojiPanelOpen) {
                     binding.btnEmoji.setImageResource(R.drawable.ic_emoji)
@@ -1155,8 +1163,11 @@ class KeyboardView(
                 binding.btnFonts.setImageResource(if (visible) R.drawable.ic_arrow_back else R.drawable.ic_fonts)
                 binding.btnClipboard.visibility =
                     if (visible) View.GONE else (if (clipboardEnabled) View.VISIBLE else View.GONE)
-                binding.btnEmoji.visibility = if (visible) View.GONE else View.VISIBLE
-                binding.btnTextSelect.visibility = if (visible) View.GONE else View.VISIBLE
+                // Same numeric-field guard as toggleClipboardView above - don't force
+                // the emoji/text-select icons back on in a phone/OTP field, or they
+                // reappear in the number pad's top bar after closing the fonts panel.
+                binding.btnEmoji.visibility = if (visible || numericModeActive) View.GONE else View.VISIBLE
+                binding.btnTextSelect.visibility = if (visible || numericModeActive) View.GONE else View.VISIBLE
                 setTopBarIconRowExpanded(visible)
                 setLogoVisible(!visible)
                 if (isEmojiPanelOpen) {
@@ -1906,9 +1917,22 @@ class KeyboardView(
         // and only counts when it's actually showing.
         val currentRowHeight = binding.keyRow2.layoutParams.height
         val numRowHeightNow = binding.keyRow1.layoutParams.height
-        val panelHeight = currentRowHeight * 4 +
-            (if (showNumberRow) numRowHeightNow else 0) +
-            recentRowCompensation()
+        // A numeric/phone field always shows the full digit-only keypad (see
+        // setNumericMode()) regardless of the Settings > "show number row" toggle,
+        // and NEVER shows the recent-emoji strip - updateRecentEmojiRowVisibility()
+        // always hides it while numericModeActive. The branch below (showNumberRow +
+        // recentRowCompensation()) is only correct for the normal QWERTY keyboard;
+        // reusing it here made the clipboard/emoji panel taller than the actual
+        // numeric keypad underneath it whenever recent emojis existed, since it kept
+        // adding the (hidden) recent row's height on top. Numeric mode's total is
+        // simply the number row + the 4 full rows, full stop.
+        val panelHeight = if (numericModeActive) {
+            currentRowHeight * 4 + numRowHeightNow
+        } else {
+            currentRowHeight * 4 +
+                (if (showNumberRow) numRowHeightNow else 0) +
+                recentRowCompensation()
+        }
         binding.emojiView.root.layoutParams.height = panelHeight
         binding.clipboardView.root.layoutParams.height = panelHeight
         // The text-select panel additionally swallows the top bar's own row (see
@@ -2302,6 +2326,13 @@ class KeyboardView(
                 binding.keyRow4.layoutParams.height = rowHeightPx
                 binding.keyRow5.layoutParams.height = rowHeightPx
             }
+            // Re-sync the emoji/clipboard/text-select/fonts panel heights for the
+            // mode we just switched to - without this, a numeric-mode change that
+            // arrives via onStartInput() (no follow-up updateRowHeight() call, see
+            // InputMethodService) left those panels sized for whichever mode was
+            // active before, so opening one could come up the wrong height for the
+            // keypad now underneath it.
+            applyPanelHeights()
             requestLayout()
         } catch (t: Throwable) {
             Log.e("KeyboardView", "setNumericMode failed", t)
