@@ -742,8 +742,18 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             suggestionJob?.cancel()
             suggestionJob = serviceScope.launch(kotlinx.coroutines.Dispatchers.Default) {
                 try {
-                    val sList = suggestionEngine?.suggest(Normalizer.normalize(t, Normalizer.Form.NFC), 4, previousWord)
-                        ?: emptyList()
+                    // Empty token means a word was just finished (space/punctuation
+                    // just committed) and nothing's been typed for the next one yet -
+                    // predict likely next words from the previous word instead of a
+                    // prefix match.
+                    val sList = if (t.isEmpty()) {
+                        if (previousWord.isBlank()) emptyList() else {
+                            suggestionEngine?.suggestNextWord(previousWord, 4) ?: emptyList()
+                        }
+                    } else {
+                        suggestionEngine?.suggest(Normalizer.normalize(t, Normalizer.Form.NFC), 4, previousWord)
+                            ?: emptyList()
+                    }
                     // isActive check: if cancelled while suggest() was running, don't
                     // push a now-stale result to the UI.
                     if (!isActive) return@launch

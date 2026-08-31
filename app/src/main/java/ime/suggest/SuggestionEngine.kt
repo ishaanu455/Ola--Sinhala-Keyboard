@@ -28,11 +28,19 @@ class SuggestionEngine(private val context: Context) {
     // ranking falls back to length/alphabetical + on-device learning only.
     private val englishBaseFreq = HashMap<String, Double>()
 
+    // Bundled "previousWord -> common next words" seed data, per language. Only
+    // used to fill in when the user hasn't typed enough themselves yet - see
+    // suggestNextWord(). Keyed by lowercase/NFC-normalized previous word.
+    private val englishNextWordSeed = HashMap<String, List<String>>()
+    private val sinhalaNextWordSeed = HashMap<String, List<String>>()
+
     companion object {
         private const val TAG = "SuggestionEngine"
         private const val ENGLISH_FILE = "english.json"
         private const val SINHALA_FILE = "sinhala.json"
         private const val ENGLISH_FREQ_FILE = "english_freq.json"
+        private const val ENGLISH_NEXT_WORDS_FILE = "english_next_words.json"
+        private const val SINHALA_NEXT_WORDS_FILE = "sinhala_next_words.json"
 
         // How much one prior "previousWord -> this word" occurrence is worth,
         // in the same units as UserWordFrequency's recency-decayed score. Tuned
@@ -126,8 +134,34 @@ class SuggestionEngine(private val context: Context) {
                 Log.w(TAG, "Failed to load Sinhala dictionary (normal in tests)", e)
             }
 
+            loadNextWordSeed(ENGLISH_NEXT_WORDS_FILE, englishNextWordSeed)
+            loadNextWordSeed(SINHALA_NEXT_WORDS_FILE, sinhalaNextWordSeed)
+
             initialized.set(true)
             Log.i(TAG, "SuggestionEngine initialized successfully")
+        }
+    }
+
+    private fun loadNextWordSeed(fileName: String, target: HashMap<String, List<String>>) {
+        try {
+            context.assets.open(fileName).use { stream ->
+                val jsonText = stream.bufferedReader().use { it.readText() }
+                val obj = org.json.JSONObject(jsonText)
+                val keys = obj.keys()
+                while (keys.hasNext()) {
+                    val prev = keys.next()
+                    val arr = obj.optJSONArray(prev) ?: continue
+                    val words = ArrayList<String>(arr.length())
+                    for (i in 0 until arr.length()) {
+                        val w = arr.optString(i)
+                        if (w.isNotEmpty()) words.add(w)
+                    }
+                    if (words.isNotEmpty()) target[prev] = words
+                }
+            }
+            Log.d(TAG, "Loaded ${target.size} next-word seed entries from $fileName")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to load next-word seed data from $fileName (normal in tests)", e)
         }
     }
 
@@ -185,6 +219,43 @@ class SuggestionEngine(private val context: Context) {
         )
 
         return ranked.take(limit)
+    }
+
+    /**
+     * Predicts likely next words right after [previousWord] is finished (e.g. the
+     * user just pressed space), with no prefix typed yet for the new word. Prioritizes
+     * what THIS user has actually typed after this word before (learns from a single
+     * occurrence — no minimum-count gate, so it's usable the very next time), then
+     * fills any remaining slots from bundled common-pairing seed data so a fresh
+     * install still gives useful next-word suggestions from day one.
+     */
+    suspend fun suggestNextWord(previousWord: String, limit: Int = 4): List<String> {
+        if (!initialized.get()) initializeIfNeeded()
+
+        val cleanedPrev = previousWord.trim()
+        if (cleanedPrev.isEmpty()) return emptyList()
+
+        val lang = LanguageDetector.detectLanguage(cleanedPrev)
+        val normalizedPrev = if (lang == LanguageDetector.Language.SINHALA) {
+            Normalizer.normalize(cleanedPrev, Normalizer.Form.NFC)
+        } else {
+            cleanedPrev.lowercase()
+        }
+
+        val learned = UserBigramFrequency.getNextWords(context, normalizedPrev, limit * 3)
+        val seed = if (lang == LanguageDetector.Language.SINHALA) {
+            sinhalaNextWordSeed[normalizedPrev] ?: emptyList()
+        } else {
+            englishNextWordSeed[normalizedPrev] ?: emptyList()
+        }
+
+        // What the user has actually done after this word themselves always comes
+        // first (personal + already proven relevant); bundled seed words only fill
+        // in the remaining slots, in their curated order.
+        val result = LinkedHashSet<String>()
+        result.addAll(learned)
+        result.addAll(seed)
+        return result.take(limit).toList()
     }
 
     /**
