@@ -599,10 +599,16 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         keyboardView.updateRowHeight(Prefs.getRowHeight(this))
         keyboardView.setClipboardEnabled(Prefs.getClipboardEnabled(this))
         suggestionsEnabled = Prefs.getShowSuggestionBar(this)
-        if (!suggestionsEnabled) {
+        if (!suggestionsEnabled || isNumericField) {
             // Off right now - drop anything left showing from the previous session
-            // immediately rather than waiting for the next keystroke.
-            topBarController?.showNormal()
+            // immediately rather than waiting for the next keystroke. Also forced
+            // for a numeric field even when suggestions are otherwise on: without
+            // this, a fresh "Enter your phone number" field would still show the
+            // full icon set (emoji/text-select/logo) from the layout's default
+            // visibility until the user's first keystroke ran showNormal(true)
+            // via requestSuggestionsForToken() - so the icon row would visibly
+            // change/jump mid-typing instead of being correct from the start.
+            topBarController?.showNormal(isNumericField)
         }
         // Pick up any emoji usage from the previous session — kept out of the live
         // typing session (see emojiClick) so the row doesn't reorder under the user's
@@ -695,7 +701,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                     // fall back to the old clear-the-bar behavior.
                     val previousWord = textBefore.trimEnd().takeLastWhile { !it.isWhitespace() }
                     if (previousWord.isBlank()) {
-                        topBarController?.showNormal()
+                        topBarController?.showNormal(isNumericField)
                     } else {
                         requestSuggestionsForToken("", previousWord)
                     }
@@ -760,7 +766,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         // switching to a new app/field, since nothing else here re-derives it.
         debouncer?.cancel()
         suggestionJob?.cancel()
-        topBarController?.showNormal()
+        topBarController?.showNormal(isNumericField)
         // A cached in-progress word belongs to whatever field/app we were just in -
         // carrying it over to a new field would risk learning it under the wrong
         // context (or not at all, since it's stale) if that new field happens to
@@ -777,8 +783,15 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     // Helper to request suggestions for a token. previousWord is the word right
     // before the one being typed (if any) — feeds the bigram next-word boost.
     private fun requestSuggestionsForToken(token: String, previousWord: String = "") {
-        if (!suggestionsEnabled || isInPasswordField()) {
-            topBarController?.showNormal()
+        // Numeric/phone fields (OTP boxes, "Enter your phone number" screens, etc.)
+        // should never show word-suggestion chips - the token being typed is just
+        // digits, and the dictionary/user-dictionary can still return matches for
+        // it (e.g. a previously learned number), which was swapping the clipboard/
+        // settings/fonts icons out for bogus chips like "1155"/"17" on a plain
+        // number keyboard. Numeric fields keep the icon row exactly like any other
+        // suggestions-off case, same as the password-field guard below.
+        if (!suggestionsEnabled || isInPasswordField() || isNumericField) {
+            topBarController?.showNormal(isNumericField)
             return
         }
         // Debounced (short delay) then computed off the main thread. The previous
@@ -828,7 +841,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                     throw e
                 } catch (e: Exception) {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        topBarController?.showNormal()
+                        topBarController?.showNormal(isNumericField)
                     }
                 }
             }
@@ -953,7 +966,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         }
 
         // Hide suggestions now that the word is complete (word + space), same as pressing space.
-        topBarController?.showNormal()
+        topBarController?.showNormal(isNumericField)
         debouncer?.cancel()
         suggestionJob?.cancel()
     }
@@ -1691,7 +1704,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                     Log.w("IME", "currentInputConnection is null in ACTION")
                 }
                 // Hide suggestions explicitly when user presses action
-                topBarController?.showNormal()
+                topBarController?.showNormal(isNumericField)
                 debouncer?.cancel()
                 suggestionJob?.cancel()
             }
@@ -1864,7 +1877,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             // usable previous word at all (e.g. password field, or too short to
             // learn), just clear the bar like before.
             if (justTypedWord.isNullOrBlank()) {
-                topBarController?.showNormal()
+                topBarController?.showNormal(isNumericField)
                 debouncer?.cancel()
                 suggestionJob?.cancel()
             } else {
