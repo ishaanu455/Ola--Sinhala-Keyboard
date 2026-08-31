@@ -1,9 +1,11 @@
 package ime.imeui
 
 import android.graphics.Color
+import android.util.TypedValue
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.widget.TextViewCompat
 import com.ola.keyboard.EmojiStyle
 import com.ola.keyboard.EmojiTextStyler
 
@@ -55,6 +57,17 @@ class TopBarController(
     // does - otherwise a slow-loading image for an old suggestion could land on
     // a chip that's since moved on to a completely different word.
     private val suggestionStylers = mutableListOf<EmojiTextStyler>()
+
+    companion object {
+        // Gboard/SwiftKey-style behavior: a long suggestion shrinks to fit its
+        // fixed-width chip instead of getting cut off with "...". 18sp matches
+        // the chip's original fixed size (short words look exactly as before);
+        // 11sp is the smallest we'll go before it stops being comfortably
+        // readable - beyond that we'd rather truncate than render illegibly.
+        private const val SUGGESTION_MAX_TEXT_SIZE_SP = 18f
+        private const val SUGGESTION_MIN_TEXT_SIZE_SP = 11f
+        private const val SUGGESTION_TEXT_STEP_SP = 1f
+    }
 
     private fun stylerFor(index: Int): EmojiTextStyler {
         while (suggestionStylers.size <= index) suggestionStylers.add(EmojiTextStyler())
@@ -120,6 +133,16 @@ class TopBarController(
             if (tv != null) {
                 applyColors(tv)
                 stylerFor(i).bind(tv.context, tv, text, emojiStyle)
+                // Shrink long words to fit their fixed-width chip instead of
+                // ellipsizing them - see SUGGESTION_MIN/MAX_TEXT_SIZE_SP above.
+                tv.maxLines = 1
+                TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+                    tv,
+                    SUGGESTION_MIN_TEXT_SIZE_SP.toInt(),
+                    SUGGESTION_MAX_TEXT_SIZE_SP.toInt(),
+                    SUGGESTION_TEXT_STEP_SP.toInt(),
+                    TypedValue.COMPLEX_UNIT_SP
+                )
                 tv.visibility = if (text.isEmpty()) View.GONE else View.VISIBLE
                 tv.setOnClickListener { onClick(text) }
             }

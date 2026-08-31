@@ -651,7 +651,18 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                     ?.toString() ?: ""
                 val token = textBefore.takeLastWhile { !it.isWhitespace() }
                 if (token.isEmpty()) {
-                    topBarController?.showNormal()
+                    // No characters typed yet for the next word - if there's a
+                    // previous word right before the cursor, offer next-word
+                    // predictions for it instead of just clearing the bar (mirrors
+                    // the space/punctuation handling in specialClick()). If the
+                    // field is genuinely empty (nothing before the cursor at all),
+                    // fall back to the old clear-the-bar behavior.
+                    val previousWord = textBefore.trimEnd().takeLastWhile { !it.isWhitespace() }
+                    if (previousWord.isBlank()) {
+                        topBarController?.showNormal()
+                    } else {
+                        requestSuggestionsForToken("", previousWord)
+                    }
                     // Might be a normal space/newline (already learned via the
                     // space/Enter handler) or the host app's own Send button
                     // clearing the whole field out from under us - the function
@@ -1801,17 +1812,28 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
 
             // Learn the word the user just finished typing — this is how most words
             // get learned, since users usually type-and-space rather than tapping
-            // the suggestion chip.
-            learnLastTypedWord(ic)
+            // the suggestion chip. Also returns that word so it can feed next-word
+            // predictions below.
+            val justTypedWord = learnLastTypedWord(ic)
 
             lastChar = null
             lastLetter = null
             positionFlag = ""
             inputHistory.clear()
-            // hide suggestions on space/punctuation
-            topBarController?.showNormal()
-            debouncer?.cancel()
-            suggestionJob?.cancel()
+            // A word just finished with nothing typed for the next one yet - ask
+            // for next-word predictions (based on justTypedWord) instead of
+            // unconditionally hiding the bar. requestSuggestionsForToken() itself
+            // falls back to showNormal() when suggestions are off/password field/no
+            // predictions found, so this covers those cases too. If there was no
+            // usable previous word at all (e.g. password field, or too short to
+            // learn), just clear the bar like before.
+            if (justTypedWord.isNullOrBlank()) {
+                topBarController?.showNormal()
+                debouncer?.cancel()
+                suggestionJob?.cancel()
+            } else {
+                requestSuggestionsForToken("", justTypedWord)
+            }
         }
         checkAutoUnshift()
     }
@@ -1847,12 +1869,12 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     private var pendingWordCache: String = ""
     private var pendingWordPreviousCache: String = ""
 
-    private fun learnLastTypedWord(ic: android.view.inputmethod.InputConnection?) {
+    private fun learnLastTypedWord(ic: android.view.inputmethod.InputConnection?): String? {
         // Never learn anything typed in a password field - a single guard here
         // covers all 4 call sites (space/punctuation, Enter/Send action, symbols
         // panel, keyboard close) so the password itself can never end up as a
         // suggestion later in a different field.
-        if (isInPasswordField()) return
+        if (isInPasswordField()) return null
         // Whichever trigger got us here, the in-progress word it was tracking is
         // now resolved one way or another - drop the cache so a later field-clear
         // doesn't try to re-learn a word that's already been handled.
@@ -1874,8 +1896,10 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 if (trimmedEnd == lastLearnedSnapshot) {
                     // Same trailing text as the last successful learn, with nothing new
                     // typed in between - a duplicate trigger for the word we already
-                    // learned, not a new word. Skip it so the count doesn't double.
-                    return
+                    // learned, not a new word. Skip re-learning it, but still hand the
+                    // word back to the caller - next-word suggestions should still be
+                    // requested even when the learn step itself is a no-op this time.
+                    return justTypedWord
                 }
                 lastLearnedSnapshot = trimmedEnd
                 val lang = LanguageDetector.detectLanguage(justTypedWord)
@@ -1884,8 +1908,12 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 serviceScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                     suggestionEngine?.recordAccepted(justTypedWord, lang, previousWord)
                 }
+                return justTypedWord
             }
-        } catch (_: Throwable) {}
+            return null
+        } catch (_: Throwable) {
+            return null
+        }
     }
 
     /**
