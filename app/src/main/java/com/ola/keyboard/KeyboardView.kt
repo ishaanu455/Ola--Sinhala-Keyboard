@@ -1923,7 +1923,7 @@ class KeyboardView(
     private fun updateRecentEmojiRowVisibility() {
         val recent = EmojiData.emojis["Recent"] ?: emptyList()
         binding.recentEmojiRow.visibility =
-            if (showRecentEmojiRow && recent.isNotEmpty() && !isEmojiPanelOpen && !isClipboardPanelOpen && !isTextSelectPanelOpen && !isFontStylePanelOpen) View.VISIBLE else View.GONE
+            if (showRecentEmojiRow && recent.isNotEmpty() && !isEmojiPanelOpen && !isClipboardPanelOpen && !isTextSelectPanelOpen && !isFontStylePanelOpen && !numericModeActive) View.VISIBLE else View.GONE
         // Whether the strip just appeared or disappeared, re-sync the panel heights
         // so the keyboard's total height never jumps when a panel opens/closes.
         applyPanelHeights()
@@ -2140,21 +2140,43 @@ class KeyboardView(
      *  of this), the same values updateRowHeight() itself would set.
      */
     /** Moves [view] out of whatever LinearLayout currently holds it and appends it
-     *  to [newParent] - used by setNumericMode() to reuse the same, already-wired
-     *  key views (click listeners, backspace's hold-to-repeat, the action key's
-     *  dynamic Enter/Go/Done icon, glass/gradient theming references, etc.) in the
-     *  4-column numeric grid instead of duplicating any of that logic. */
-    private fun reparent(view: View, newParent: LinearLayout) {
+     *  to [newParent] with a pinned LinearLayout weight of [weight] - used by
+     *  setNumericMode() to reuse the same, already-wired key views (click
+     *  listeners, backspace's hold-to-repeat, the action key's dynamic Enter/Go/
+     *  Done icon, glass/gradient theming references, etc.) in the 4-column
+     *  numeric grid instead of duplicating any of that logic.
+     *
+     *  The pinned [weight] is the actual alignment fix: every key kept whatever
+     *  weight its ORIGINAL row gave it (backspace=1.5, blank_1/blank_2=0.5,
+     *  everything else=1), so each numeric row ended up with a different total
+     *  weight and therefore a different unit column width - a visibly crooked
+     *  grid where no column lined up with the one above or below it. Forcing
+     *  every cell to weight=1 here makes all 4 rows resolve to the exact same
+     *  unit width, so 1/4/7, 2/5/8/0, 3/6/9/comma and backspace/enter/dot all
+     *  sit in the same vertical column. */
+    private fun reparentWeighted(view: View, newParent: LinearLayout, weight: Float) {
         (view.parent as? ViewGroup)?.removeView(view)
-        newParent.addView(view)
+        val lp = (view.layoutParams as? LinearLayout.LayoutParams)
+            ?: LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT)
+        lp.width = 0
+        lp.weight = weight
+        view.layoutParams = lp
+        newParent.addView(view, lp)
     }
 
-    /** Same as [reparent], but re-inserts [view] back into [newParent] at its
-     *  original child [index] - used on the way OUT of numeric mode, so every
-     *  moved key lands back exactly where key_row_1/3/4/5 had it, in order. */
-    private fun reparentAt(view: View, newParent: LinearLayout, index: Int) {
+    /** Same as [reparentWeighted], but re-inserts [view] back into [newParent] at
+     *  its original child [index] and with its original weight restored - used
+     *  on the way OUT of numeric mode, so every moved key lands back exactly
+     *  where key_row_1/3/4/5 had it, in order, with its normal QWERTY-mode
+     *  proportions (backspace=1.5, blank_1/blank_2=0.5, everything else=1). */
+    private fun reparentAtWeighted(view: View, newParent: LinearLayout, index: Int, weight: Float) {
         (view.parent as? ViewGroup)?.removeView(view)
-        newParent.addView(view, index)
+        val lp = (view.layoutParams as? LinearLayout.LayoutParams)
+            ?: LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT)
+        lp.width = 0
+        lp.weight = weight
+        view.layoutParams = lp
+        newParent.addView(view, index, lp)
     }
 
     /** Switches between the normal 5-row keyboard and a compact 4-column
@@ -2191,52 +2213,57 @@ class KeyboardView(
                 binding.numericRow3.layoutParams.height = rowH
                 binding.numericRow4.layoutParams.height = rowH
 
-                reparent(binding.n1, binding.numericRow1)
-                reparent(binding.n2, binding.numericRow1)
-                reparent(binding.n3, binding.numericRow1)
-                reparent(binding.backspace, binding.numericRow1)
+                // Every cell gets the SAME weight (1f) here regardless of what it
+                // carried in its home row, so all 4 rows resolve to one identical
+                // unit column width - see reparentWeighted's doc for why that's
+                // required for a properly-aligned 4-column grid.
+                reparentWeighted(binding.n1, binding.numericRow1, 1f)
+                reparentWeighted(binding.n2, binding.numericRow1, 1f)
+                reparentWeighted(binding.n3, binding.numericRow1, 1f)
+                reparentWeighted(binding.backspace, binding.numericRow1, 1f)
 
-                reparent(binding.n4, binding.numericRow2)
-                reparent(binding.n5, binding.numericRow2)
-                reparent(binding.n6, binding.numericRow2)
-                reparent(binding.action, binding.numericRow2)
+                reparentWeighted(binding.n4, binding.numericRow2, 1f)
+                reparentWeighted(binding.n5, binding.numericRow2, 1f)
+                reparentWeighted(binding.n6, binding.numericRow2, 1f)
+                reparentWeighted(binding.action, binding.numericRow2, 1f)
 
-                reparent(binding.n7, binding.numericRow3)
-                reparent(binding.n8, binding.numericRow3)
-                reparent(binding.n9, binding.numericRow3)
-                reparent(binding.dot, binding.numericRow3)
+                reparentWeighted(binding.n7, binding.numericRow3, 1f)
+                reparentWeighted(binding.n8, binding.numericRow3, 1f)
+                reparentWeighted(binding.n9, binding.numericRow3, 1f)
+                reparentWeighted(binding.dot, binding.numericRow3, 1f)
 
-                reparent(binding.blank1, binding.numericRow4)
-                reparent(binding.n0, binding.numericRow4)
-                reparent(binding.comma, binding.numericRow4)
-                reparent(binding.blank2, binding.numericRow4)
+                reparentWeighted(binding.blank1, binding.numericRow4, 1f)
+                reparentWeighted(binding.n0, binding.numericRow4, 1f)
+                reparentWeighted(binding.comma, binding.numericRow4, 1f)
+                reparentWeighted(binding.blank2, binding.numericRow4, 1f)
 
                 binding.numericKeypad.visibility = View.VISIBLE
             } else {
                 binding.numericKeypad.visibility = View.GONE
 
-                // Put every borrowed key back at its original index, in ascending
-                // index order (see reparentAt doc) - key_row_1 was left fully
-                // empty, key_row_3/4/5 each just had one or two keys borrowed.
-                reparentAt(binding.n1, binding.keyRow1, 0)
-                reparentAt(binding.n2, binding.keyRow1, 1)
-                reparentAt(binding.n3, binding.keyRow1, 2)
-                reparentAt(binding.n4, binding.keyRow1, 3)
-                reparentAt(binding.n5, binding.keyRow1, 4)
-                reparentAt(binding.n6, binding.keyRow1, 5)
-                reparentAt(binding.n7, binding.keyRow1, 6)
-                reparentAt(binding.n8, binding.keyRow1, 7)
-                reparentAt(binding.n9, binding.keyRow1, 8)
-                reparentAt(binding.n0, binding.keyRow1, 9)
+                // Put every borrowed key back at its original index (and original
+                // weight - see reparentAtWeighted doc), in ascending index order -
+                // key_row_1 was left fully empty, key_row_3/4/5 each just had one
+                // or two keys borrowed.
+                reparentAtWeighted(binding.n1, binding.keyRow1, 0, 1f)
+                reparentAtWeighted(binding.n2, binding.keyRow1, 1, 1f)
+                reparentAtWeighted(binding.n3, binding.keyRow1, 2, 1f)
+                reparentAtWeighted(binding.n4, binding.keyRow1, 3, 1f)
+                reparentAtWeighted(binding.n5, binding.keyRow1, 4, 1f)
+                reparentAtWeighted(binding.n6, binding.keyRow1, 5, 1f)
+                reparentAtWeighted(binding.n7, binding.keyRow1, 6, 1f)
+                reparentAtWeighted(binding.n8, binding.keyRow1, 7, 1f)
+                reparentAtWeighted(binding.n9, binding.keyRow1, 8, 1f)
+                reparentAtWeighted(binding.n0, binding.keyRow1, 9, 1f)
 
-                reparentAt(binding.blank1, binding.keyRow3, 0)
-                reparentAt(binding.blank2, binding.keyRow3, binding.keyRow3.childCount)
+                reparentAtWeighted(binding.blank1, binding.keyRow3, 0, 0.5f)
+                reparentAtWeighted(binding.blank2, binding.keyRow3, binding.keyRow3.childCount, 0.5f)
 
-                reparentAt(binding.backspace, binding.keyRow4, binding.keyRow4.childCount)
+                reparentAtWeighted(binding.backspace, binding.keyRow4, binding.keyRow4.childCount, 1.5f)
 
-                reparentAt(binding.comma, binding.keyRow5, 3)
-                reparentAt(binding.dot, binding.keyRow5, 6)
-                reparentAt(binding.action, binding.keyRow5, binding.keyRow5.childCount)
+                reparentAtWeighted(binding.comma, binding.keyRow5, 3, 1f)
+                reparentAtWeighted(binding.dot, binding.keyRow5, 6, 1f)
+                reparentAtWeighted(binding.action, binding.keyRow5, binding.keyRow5.childCount, 1f)
 
                 binding.keyboardRows.visibility = View.VISIBLE
                 updateRecentEmojiRowVisibility()
