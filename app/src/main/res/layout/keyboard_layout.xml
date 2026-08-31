@@ -681,6 +681,39 @@
             </LinearLayout>
         </LinearLayout>
 
+        <LinearLayout
+            android:id="@+id/numeric_keypad"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/numeric_row_1"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal" />
+
+            <LinearLayout
+                android:id="@+id/numeric_row_2"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal" />
+
+            <LinearLayout
+                android:id="@+id/numeric_row_3"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal" />
+
+            <LinearLayout
+                android:id="@+id/numeric_row_4"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:orientation="horizontal" />
+
+        </LinearLayout>
+
         <include
             android:id="@+id/emoji_view"
             layout="@layout/emoji_layout"

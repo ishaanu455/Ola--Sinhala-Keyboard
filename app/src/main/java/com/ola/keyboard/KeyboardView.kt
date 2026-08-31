@@ -2139,27 +2139,114 @@ class KeyboardView(
      *  mode. Restoring just re-applies the current rowHeightPx (unchanged by any
      *  of this), the same values updateRowHeight() itself would set.
      */
+    /** Moves [view] out of whatever LinearLayout currently holds it and appends it
+     *  to [newParent] - used by setNumericMode() to reuse the same, already-wired
+     *  key views (click listeners, backspace's hold-to-repeat, the action key's
+     *  dynamic Enter/Go/Done icon, glass/gradient theming references, etc.) in the
+     *  4-column numeric grid instead of duplicating any of that logic. */
+    private fun reparent(view: View, newParent: LinearLayout) {
+        (view.parent as? ViewGroup)?.removeView(view)
+        newParent.addView(view)
+    }
+
+    /** Same as [reparent], but re-inserts [view] back into [newParent] at its
+     *  original child [index] - used on the way OUT of numeric mode, so every
+     *  moved key lands back exactly where key_row_1/3/4/5 had it, in order. */
+    private fun reparentAt(view: View, newParent: LinearLayout, index: Int) {
+        (view.parent as? ViewGroup)?.removeView(view)
+        newParent.addView(view, index)
+    }
+
+    /** Switches between the normal 5-row keyboard and a compact 4-column
+     *  digit-only grid (1-2-3-backspace / 4-5-6-enter / 7-8-9-dot / blank-0-comma-blank)
+     *  for OTP/phone-number fields, matching a native-style numeric keypad.
+     *
+     *  Every key in the grid is an EXISTING key view, reparented in from its
+     *  normal row rather than recreated - n_1..n_0 already commit the right
+     *  digit via numberClick() regardless of layout, backspace/action already
+     *  have their hold-to-repeat / dynamic-icon logic wired, and dot/comma
+     *  already commit "." / "," via specialClick(). Reparenting keeps every bit
+     *  of that working with zero duplicated logic, at the cost of key_row_1/3/4/5
+     *  being left temporarily incomplete while their keys are borrowed - which is
+     *  fine, since the whole normal keyboard (key_row_1..5 AND the recent-emoji
+     *  strip) is hidden for the duration; only the icon bar on top and this grid
+     *  are visible, same as the reference numeric keypad.
+     */
     fun setNumericMode(active: Boolean) {
         if (numericModeActive == active) return
         numericModeActive = active
 
         try {
             if (active) {
-                val freedHeight = binding.keyRow2.layoutParams.height + binding.keyRow3.layoutParams.height
+                binding.keyboardRows.visibility = View.GONE
+                binding.recentEmojiRow.visibility = View.GONE
 
-                binding.keyRow1.visibility = View.VISIBLE
-                binding.keyRow1.layoutParams.height = numRowHeight(rowHeightPx) + freedHeight
+                // Same total height the normal 5-row keyboard currently occupies
+                // (number row + 4 full rows), split evenly across this grid's 4
+                // rows - so nothing above the keyboard jumps when a field switches
+                // in or out of numeric mode.
+                val rowH = (numRowHeight(rowHeightPx) + rowHeightPx * 4) / 4
+                binding.numericRow1.layoutParams.height = rowH
+                binding.numericRow2.layoutParams.height = rowH
+                binding.numericRow3.layoutParams.height = rowH
+                binding.numericRow4.layoutParams.height = rowH
 
-                binding.keyRow2.visibility = View.GONE
-                binding.keyRow3.visibility = View.GONE
+                reparent(binding.n1, binding.numericRow1)
+                reparent(binding.n2, binding.numericRow1)
+                reparent(binding.n3, binding.numericRow1)
+                reparent(binding.backspace, binding.numericRow1)
+
+                reparent(binding.n4, binding.numericRow2)
+                reparent(binding.n5, binding.numericRow2)
+                reparent(binding.n6, binding.numericRow2)
+                reparent(binding.action, binding.numericRow2)
+
+                reparent(binding.n7, binding.numericRow3)
+                reparent(binding.n8, binding.numericRow3)
+                reparent(binding.n9, binding.numericRow3)
+                reparent(binding.dot, binding.numericRow3)
+
+                reparent(binding.blank1, binding.numericRow4)
+                reparent(binding.n0, binding.numericRow4)
+                reparent(binding.comma, binding.numericRow4)
+                reparent(binding.blank2, binding.numericRow4)
+
+                binding.numericKeypad.visibility = View.VISIBLE
             } else {
-                binding.keyRow2.visibility = View.VISIBLE
-                binding.keyRow3.visibility = View.VISIBLE
+                binding.numericKeypad.visibility = View.GONE
+
+                // Put every borrowed key back at its original index, in ascending
+                // index order (see reparentAt doc) - key_row_1 was left fully
+                // empty, key_row_3/4/5 each just had one or two keys borrowed.
+                reparentAt(binding.n1, binding.keyRow1, 0)
+                reparentAt(binding.n2, binding.keyRow1, 1)
+                reparentAt(binding.n3, binding.keyRow1, 2)
+                reparentAt(binding.n4, binding.keyRow1, 3)
+                reparentAt(binding.n5, binding.keyRow1, 4)
+                reparentAt(binding.n6, binding.keyRow1, 5)
+                reparentAt(binding.n7, binding.keyRow1, 6)
+                reparentAt(binding.n8, binding.keyRow1, 7)
+                reparentAt(binding.n9, binding.keyRow1, 8)
+                reparentAt(binding.n0, binding.keyRow1, 9)
+
+                reparentAt(binding.blank1, binding.keyRow3, 0)
+                reparentAt(binding.blank2, binding.keyRow3, binding.keyRow3.childCount)
+
+                reparentAt(binding.backspace, binding.keyRow4, binding.keyRow4.childCount)
+
+                reparentAt(binding.comma, binding.keyRow5, 3)
+                reparentAt(binding.dot, binding.keyRow5, 6)
+                reparentAt(binding.action, binding.keyRow5, binding.keyRow5.childCount)
+
+                binding.keyboardRows.visibility = View.VISIBLE
+                updateRecentEmojiRowVisibility()
 
                 binding.keyRow1.visibility = if (showNumberRow) View.VISIBLE else View.GONE
                 binding.keyRow1.layoutParams.height = numRowHeight(rowHeightPx)
                 binding.keyRow2.layoutParams.height = rowHeightPx
                 binding.keyRow3.layoutParams.height = rowHeightPx
+                binding.keyRow4.layoutParams.height = rowHeightPx
+                binding.keyRow5.layoutParams.height = rowHeightPx
             }
             requestLayout()
         } catch (t: Throwable) {
