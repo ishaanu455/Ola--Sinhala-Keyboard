@@ -20,10 +20,19 @@ class SuggestionEngine(private val context: Context) {
     private val englishTrie = Trie()
     private val sinhalaTrie = Trie()
 
+    // Static "how common is this word in real English" score (Zipf frequency,
+    // roughly 0-8), keyed by lowercase word. Lets a common word a user has
+    // never typed before (e.g. "though") still rank above a rare one, instead
+    // of relying purely on trie traversal order. No equivalent bundled data
+    // exists for Sinhala yet, so sinhalaBaseFreq stays empty and Sinhala
+    // ranking falls back to length/alphabetical + on-device learning only.
+    private val englishBaseFreq = HashMap<String, Double>()
+
     companion object {
         private const val TAG = "SuggestionEngine"
         private const val ENGLISH_FILE = "english.json"
         private const val SINHALA_FILE = "sinhala.json"
+        private const val ENGLISH_FREQ_FILE = "english_freq.json"
 
         // How much one prior "previousWord -> this word" occurrence is worth,
         // in the same units as UserWordFrequency's recency-decayed score. Tuned
@@ -36,6 +45,20 @@ class SuggestionEngine(private val context: Context) {
         // above plain dictionary matches, without letting it permanently outrank a
         // word the user actually types often.
         private const val CUSTOM_WORD_BOOST = 1.5
+
+        // Weight applied to englishBaseFreq (itself ~0-8). At 1.0 a very common
+        // word like "the" (~7.7) easily beats an untyped rare word, but a word
+        // the user actually types repeatedly (freqScore compounds with use) can
+        // still overtake it over time - cold-start quality now, personalization
+        // still wins later.
+        private const val BASE_FREQ_WEIGHT = 1.0
+
+        // How many trie matches to pull before ranking. Needs to be large
+        // enough that, for short/common prefixes with thousands of matches,
+        // the actually-frequent words aren't cut off before frequency ranking
+        // ever sees them. Traversal is in-memory and runs off the main thread
+        // (debounced), so a generous cap here is cheap.
+        private const val MAX_TRIE_CANDIDATES = 4000
     }
 
     suspend fun initializeIfNeeded() {
@@ -63,6 +86,24 @@ class SuggestionEngine(private val context: Context) {
                 Log.d(TAG, "Loaded $englishLoaded English words")
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to load English dictionary (normal in tests)", e)
+            }
+
+            try {
+                // Load bundled English frequency scores (word -> Zipf score).
+                // Missing/corrupt file just means every word falls back to 0.0,
+                // i.e. the old length/alphabetical-only behavior.
+                context.assets.open(ENGLISH_FREQ_FILE).use { stream ->
+                    val jsonText = stream.bufferedReader().use { it.readText() }
+                    val obj = org.json.JSONObject(jsonText)
+                    val keys = obj.keys()
+                    while (keys.hasNext()) {
+                        val word = keys.next()
+                        englishBaseFreq[word] = obj.optDouble(word, 0.0)
+                    }
+                }
+                Log.d(TAG, "Loaded ${englishBaseFreq.size} English frequency scores")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to load English frequency data (normal in tests)", e)
             }
 
             try {
@@ -106,13 +147,13 @@ class SuggestionEngine(private val context: Context) {
             if (lang == LanguageDetector.Language.SINHALA) Normalizer.normalize(it, Normalizer.Form.NFC) else it.lowercase()
         }
 
-        // Gather more candidates than we'll show, so frequency-based ranking has
-        // room to reorder — otherwise a frequent word buried deep in the dictionary
-        // BFS order would never surface.
-        val candidatePoolSize = limit * 6
-        val dictionaryCandidates = trie.getByPrefix(queryPrefix, candidatePoolSize)
-        val learnedCandidates = UserWordFrequency.getByPrefix(context, queryPrefix, candidatePoolSize)
-        val customCandidates = UserDictionary.getByPrefix(context, queryPrefix, candidatePoolSize)
+        // Gather far more candidates than we'll show, so frequency-based ranking
+        // has room to reorder — otherwise a frequent word buried deep in the
+        // dictionary's BFS (shortest-first, alphabetical) order for a short,
+        // high-fanout prefix would never even make it into the pool to be ranked.
+        val dictionaryCandidates = trie.getByPrefix(queryPrefix, MAX_TRIE_CANDIDATES)
+        val learnedCandidates = UserWordFrequency.getByPrefix(context, queryPrefix, MAX_TRIE_CANDIDATES)
+        val customCandidates = UserDictionary.getByPrefix(context, queryPrefix, MAX_TRIE_CANDIDATES)
 
         // Custom (manually-added) and learned words go in first so they're never
         // dropped before dictionary candidates when we later cap the pool.
@@ -124,13 +165,20 @@ class SuggestionEngine(private val context: Context) {
 
         // Rank: recency-weighted typing frequency, boosted when this candidate has
         // followed the previous word before (bigram) or was manually added by the
-        // user, then shorter words, then alphabetical.
+        // user, plus a static real-world commonality score (English only, so a
+        // word like "though" outranks a rare word even before it's ever been
+        // typed), then shorter words, then alphabetical.
         val ranked = merged.sortedWith(
             compareByDescending<String> {
                 val freqScore = UserWordFrequency.getScore(context, it)
                 val bigramBoost = UserBigramFrequency.getFollowCount(context, normalizedPreviousWord, it) * BIGRAM_BOOST_WEIGHT
                 val customBoost = if (it in customSet) CUSTOM_WORD_BOOST else 0.0
-                freqScore + bigramBoost + customBoost
+                val baseFreqBoost = if (lang == LanguageDetector.Language.SINHALA) {
+                    0.0
+                } else {
+                    (englishBaseFreq[it] ?: 0.0) * BASE_FREQ_WEIGHT
+                }
+                freqScore + bigramBoost + customBoost + baseFreqBoost
             }
                 .thenBy { it.length }
                 .thenBy { it }
