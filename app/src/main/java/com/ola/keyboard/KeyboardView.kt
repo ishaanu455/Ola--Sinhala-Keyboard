@@ -2115,6 +2115,58 @@ class KeyboardView(
         requestLayout()
     }
 
+    // True while showing the compact digit-only layout for a numeric/phone field
+    // (OTP boxes, mobile-number fields) - see setNumericMode().
+    private var numericModeActive: Boolean = false
+
+    /** Switches between the normal 5-row keyboard and a compact digit-only mode
+     *  for OTP/phone-number fields.
+     *
+     *  key_row_1 already IS a full digit row (n_1..n_0, tag = the digit itself -
+     *  see InputMethodService.numberClick()), so it just needs forcing on
+     *  regardless of the user's "show number row" setting. key_row_2 and
+     *  key_row_3 are pure QWERTY letter rows with nothing a numeric field needs,
+     *  so they're hidden outright. key_row_4 (backspace) and key_row_5 (action /
+     *  comma / dot) are left exactly as-is: still useful for a phone number or
+     *  OTP entry, and - unlike the two rows above - some of their individual keys
+     *  are already conditionally shown per language layout (e.g. comma_wijesekara),
+     *  so toggling them here would mean duplicating that logic. Only ever hiding
+     *  whole rows keeps this function independent of keyboardLayout entirely.
+     *
+     *  The height key_row_2/key_row_3 free up is added to key_row_1 instead of
+     *  shrinking the keyboard, so the total height - and whatever sits above it in
+     *  the host app - doesn't jump when a field switches in or out of numeric
+     *  mode. Restoring just re-applies the current rowHeightPx (unchanged by any
+     *  of this), the same values updateRowHeight() itself would set.
+     */
+    fun setNumericMode(active: Boolean) {
+        if (numericModeActive == active) return
+        numericModeActive = active
+
+        try {
+            if (active) {
+                val freedHeight = binding.keyRow2.layoutParams.height + binding.keyRow3.layoutParams.height
+
+                binding.keyRow1.visibility = View.VISIBLE
+                binding.keyRow1.layoutParams.height = numRowHeight(rowHeightPx) + freedHeight
+
+                binding.keyRow2.visibility = View.GONE
+                binding.keyRow3.visibility = View.GONE
+            } else {
+                binding.keyRow2.visibility = View.VISIBLE
+                binding.keyRow3.visibility = View.VISIBLE
+
+                binding.keyRow1.visibility = if (showNumberRow) View.VISIBLE else View.GONE
+                binding.keyRow1.layoutParams.height = numRowHeight(rowHeightPx)
+                binding.keyRow2.layoutParams.height = rowHeightPx
+                binding.keyRow3.layoutParams.height = rowHeightPx
+            }
+            requestLayout()
+        } catch (t: Throwable) {
+            Log.e("KeyboardView", "setNumericMode failed", t)
+        }
+    }
+
     /** Hot-update all row heights (called when height slider changes without keyboard recreate). */
     fun updateRowHeight(newRowHeight: Int) {
         // newRowHeight is the raw Settings slider value - a percentage of
@@ -2134,6 +2186,16 @@ class KeyboardView(
         binding.emojiView.emojiBottomBar.layoutParams.height = rowHeightPx
         // emoji_categories_scroll no longer needs syncing here - it now lives in the
         // top bar with a fixed match_parent height (see keyboard_layout.xml).
+
+        // If the Settings height slider changes while a numeric field is focused
+        // (key_row_2/3 hidden, their height folded into key_row_1 - see
+        // setNumericMode()), the plain numRowHeight(rowHeightPx) just set above
+        // would undo that fold and key_row_1 would snap back to ordinary
+        // number-row height. Re-fold with the freshly-scaled rowHeightPx instead.
+        if (numericModeActive) {
+            binding.keyRow1.layoutParams.height = numRowHeight(rowHeightPx) + rowHeightPx + rowHeightPx
+        }
+
         applyPanelHeights()
         requestLayout()
     }

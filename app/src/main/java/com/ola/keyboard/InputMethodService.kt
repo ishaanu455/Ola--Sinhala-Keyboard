@@ -51,6 +51,26 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     private lateinit var keyboardView: KeyboardView
     private lateinit var keyboardLayout: KeyboardLayout
 
+    // True while the focused field is TYPE_CLASS_NUMBER or TYPE_CLASS_PHONE (OTP
+    // boxes, mobile-number fields in a browser/WhatsApp/etc.) - drives the compact
+    // digit-only keyboard (see KeyboardView.setNumericMode()). Kept as a field
+    // (not a local val) so rebuildKeyboardViewForAppearanceChange() - which builds
+    // a brand new KeyboardView instance with numericModeActive reset to false -
+    // knows whether to reapply it.
+    private var isNumericField: Boolean = false
+
+    /** [info]'s field is a plain number/phone field - the password-variation check
+     *  just above (isPasswordField) deliberately stays separate: a numeric PIN
+     *  field is both, and should keep getting the password treatment there, not
+     *  this one. */
+    private fun computeIsNumericField(info: EditorInfo?): Boolean {
+        val inputType = info?.inputType ?: return false
+        return when (inputType and InputType.TYPE_MASK_CLASS) {
+            InputType.TYPE_CLASS_NUMBER, InputType.TYPE_CLASS_PHONE -> true
+            else -> false
+        }
+    }
+
     private var caps = false
     private var shift = false
 
@@ -391,6 +411,9 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             suggestionTextViews = keyboardView.getSuggestionTextViews()
             keyboardLayout = Prefs.getSelectedLayout(this)
             setKeyboardLayout(keyboardLayout)
+            // This just built a brand-new KeyboardView (numericModeActive starts
+            // false on it) - reapply whatever field type is currently focused.
+            keyboardView.setNumericMode(isNumericField)
         } catch (t: Throwable) {
             Log.e("IME", "Failed to rebuild keyboard view for changed appearance settings", t)
         }
@@ -549,6 +572,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
          resetKeyboardState()
 
          val desired = Prefs.getSelectedLayout(this)
+         isNumericField = computeIsNumericField(info)
          if (!::keyboardView.isInitialized) {
 
              onCreateInputView()
@@ -560,6 +584,13 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
              // just a safety net for whatever edge case reaches here first.)
              rebuildKeyboardViewForAppearanceChange()
          }
+
+        // Switch the compact digit-only layout on/off for this field. Deliberately
+        // after the onCreateInputView()/rebuild branch above (both can hand back a
+        // freshly-constructed KeyboardView whose numericModeActive starts false)
+        // and before setKeyboardLayout()/updateKeyboard() below, which only ever
+        // touch the letter-key labels/behaviour, not row visibility.
+        keyboardView.setNumericMode(isNumericField)
 
         // Re-apply latest toggle/value settings each time the keyboard is shown,
         // so Settings changes take effect without restarting the app.
@@ -602,6 +633,11 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             resetKeyboardState()
         }
 
+        // Some hosts (e.g. a WhatsApp OTP screen swapping which field has focus)
+        // call onStartInput again without a fresh onStartInputView - re-check the
+        // field type here too so numeric mode still tracks it.
+        isNumericField = computeIsNumericField(attribute)
+        if (::keyboardView.isInitialized) keyboardView.setNumericMode(isNumericField)
 
         try {
             updateKeyboard()
