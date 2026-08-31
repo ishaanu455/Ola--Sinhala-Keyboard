@@ -818,7 +818,7 @@ class KeyboardView(
             })
 
             fun toggleEmojiView(visible: Boolean) {
-                binding.keyboardRows.visibility = if (visible) View.GONE else View.VISIBLE
+                setBaseKeyboardVisible(!visible)
                 binding.emojiView.root.visibility = if (visible) View.VISIBLE else View.GONE
                 if (visible) binding.clipboardView.root.visibility = View.GONE
                 if (visible) binding.textSelectView.root.visibility = View.GONE
@@ -994,7 +994,7 @@ class KeyboardView(
             }
 
             fun toggleClipboardView(visible: Boolean) {
-                binding.keyboardRows.visibility = if (visible) View.GONE else View.VISIBLE
+                setBaseKeyboardVisible(!visible)
                 binding.clipboardView.root.visibility = if (visible) View.VISIBLE else View.GONE
                 if (visible) binding.emojiView.root.visibility = View.GONE
                 if (visible) binding.textSelectView.root.visibility = View.GONE
@@ -1060,7 +1060,7 @@ class KeyboardView(
             // exactly like the emoji/clipboard panels above) so it inherits the same
             // show/hide + height rules automatically.
             fun toggleTextSelectView(visible: Boolean) {
-                binding.keyboardRows.visibility = if (visible) View.GONE else View.VISIBLE
+                setBaseKeyboardVisible(!visible)
                 binding.textSelectView.root.visibility = if (visible) View.VISIBLE else View.GONE
                 // The text-editor panel takes over the whole keyboard area, including
                 // the top bar row (clipboard/emoji/back icons), so it reads as a full
@@ -1147,7 +1147,7 @@ class KeyboardView(
             activeFontStyle = initialFontStyle
 
             fun toggleFontStyleView(visible: Boolean) {
-                binding.keyboardRows.visibility = if (visible) View.GONE else View.VISIBLE
+                setBaseKeyboardVisible(!visible)
                 binding.fontStyleView.root.visibility = if (visible) View.VISIBLE else View.GONE
                 if (visible) binding.emojiView.root.visibility = View.GONE
                 if (visible) binding.clipboardView.root.visibility = View.GONE
@@ -2177,6 +2177,33 @@ class KeyboardView(
         lp.weight = weight
         view.layoutParams = lp
         newParent.addView(view, index, lp)
+    }
+
+    // Shared by toggleEmojiView/toggleClipboardView/toggleTextSelectView/
+    // toggleFontStyleView. "Base keyboard" means whichever of keyboard_rows /
+    // numeric_keypad is the field's normal typing surface - they're siblings
+    // in the same FrameLayout (see keyboard_layout.xml), so leaving both
+    // visible at once makes them overlap and the panel's FrameLayout height
+    // jump between the two heights instead of showing one clean surface.
+    // Previously each toggle*View() hardcoded keyboardRows visible/gone and
+    // never touched numericKeypad, so opening any panel (emoji/clipboard/
+    // text-select/fonts) while a numeric field was focused left numeric_keypad
+    // showing underneath the panel, and closing the panel snapped back to
+    // keyboard_rows - which is missing its number keys since setNumericMode()
+    // had reparented them into numeric_row_1..4 - instead of back to the
+    // numeric pad. That's the "top bar messes up in the phone-number field"
+    // bug: always defer to numericModeActive for which surface comes back.
+    private fun setBaseKeyboardVisible(visible: Boolean) {
+        if (!visible) {
+            binding.keyboardRows.visibility = View.GONE
+            binding.numericKeypad.visibility = View.GONE
+        } else if (numericModeActive) {
+            binding.keyboardRows.visibility = View.GONE
+            binding.numericKeypad.visibility = View.VISIBLE
+        } else {
+            binding.keyboardRows.visibility = View.VISIBLE
+            binding.numericKeypad.visibility = View.GONE
+        }
     }
 
     /** Switches between the normal 5-row keyboard and a compact 4-column
