@@ -90,7 +90,7 @@ class SuggestionEngine(private val context: Context) {
         }
     }
 
-    suspend fun suggest(prefix: String, limit: Int = 5, previousWord: String? = null): List<String> {
+    suspend fun suggest(prefix: String, limit: Int = 4, previousWord: String? = null): List<String> {
         if (!initialized.get()) initializeIfNeeded()
 
         val cleanedPrefix = prefix.trim()
