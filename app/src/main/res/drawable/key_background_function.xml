@@ -6,6 +6,7 @@
                 <shape>
                     <solid android:color="?attr/keyFunctionPressed" />
                     <corners android:radius="5dp" />
+                    <stroke android:width="0.5dp" android:color="?attr/border" />
                 </shape>
             </item>
         </layer-list>
@@ -16,6 +17,7 @@
                 <shape>
                     <solid android:color="?attr/keyFunction" />
                     <corners android:radius="5dp" />
+                    <stroke android:width="0.5dp" android:color="?attr/border" />
                 </shape>
             </item>
         </layer-list>

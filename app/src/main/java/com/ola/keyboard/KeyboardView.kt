@@ -840,9 +840,9 @@ class KeyboardView(
                 binding.btnClipboard.visibility =
                     if (visible) View.GONE else (if (clipboardEnabled) View.VISIBLE else View.GONE)
                 // Same numeric-field guard as toggleClipboardView/toggleFontStyleView -
-                // text-select has no place in a phone/OTP field's top bar.
+                // text-select and fonts have no place in a phone/OTP field's top bar.
                 binding.btnTextSelect.visibility = if (visible || numericModeActive) View.GONE else View.VISIBLE
-                binding.btnFonts.visibility = if (visible) View.GONE else View.VISIBLE
+                binding.btnFonts.visibility = if (visible || numericModeActive) View.GONE else View.VISIBLE
                 // The category tab strip moves onto this same row, right after the
                 // fixed btn_emoji back arrow, and the row itself switches to
                 // width=0dp/weight=1 so the strip has the rest of the line to expand
@@ -1024,14 +1024,14 @@ class KeyboardView(
                 setTopBarIconRowExpanded(visible)
                 setLogoVisible(!visible)
                 // In a numeric/phone field (OTP boxes, "Enter your phone number"
-                // screens) the emoji and text-select icons are never shown - see
-                // TopBarController.showNormal(isNumericField) - so closing the
+                // screens) the emoji, text-select and fonts icons are never shown -
+                // see TopBarController.showNormal(isNumericField) - so closing the
                 // clipboard panel here must NOT force them back to VISIBLE while
                 // numericModeActive, or they'd reappear in the number pad's top bar
                 // even though tapping them wouldn't do anything useful there.
                 binding.btnEmoji.visibility = if (visible || numericModeActive) View.GONE else View.VISIBLE
                 binding.btnTextSelect.visibility = if (visible || numericModeActive) View.GONE else View.VISIBLE
-                binding.btnFonts.visibility = if (visible) View.GONE else View.VISIBLE
+                binding.btnFonts.visibility = if (visible || numericModeActive) View.GONE else View.VISIBLE
                 if (isEmojiPanelOpen) {
                     binding.btnEmoji.setImageResource(R.drawable.ic_emoji)
                     binding.emojiCategoriesScroll.isVisible = false
@@ -1285,16 +1285,32 @@ class KeyboardView(
             return Color.rgb(r.toInt().coerceIn(0, 255), g.toInt().coerceIn(0, 255), b.toInt().coerceIn(0, 255))
         }
 
+        // BUG FIX: gradient-theme keys never drew a border stroke at all, regardless
+        // of the Settings "Border" toggle - key_background.xml etc. (used by every
+        // OTHER theme) do draw one via ?attr/border, but this function builds its
+        // own GradientDrawables from scratch and never referenced that attr, so a
+        // gradient theme silently ignored the toggle. Resolve the same themed
+        // ?attr/border color the rest of the keyboard uses, and only stroke with it
+        // when keyBorders is on - same on/off behaviour as key_background.xml.
+        val borderTypedValue = TypedValue()
+        themedContext.theme.resolveAttribute(R.attr.border, borderTypedValue, true)
+        val borderColor = borderTypedValue.data
+        val borderStrokePx = dp(0.5f).coerceAtLeast(1)
+
         // Space/Enter: the wide action-style shape (18dp/14dp radius, taller insets),
         // with the gradient running across the key's own width - unchanged from before.
         fun buildActionKeyDrawable(): android.graphics.drawable.Drawable {
             val normalShape = android.graphics.drawable.GradientDrawable(
                 android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
                 intArrayOf(lightVariant, darkVariant)
-            ).apply { cornerRadius = dp(18f).toFloat() }
+            ).apply {
+                cornerRadius = dp(18f).toFloat()
+                if (keyBorders) setStroke(borderStrokePx, borderColor)
+            }
             val pressedShape = android.graphics.drawable.GradientDrawable().apply {
                 setColor(darkenColor(baseAccent, 0.45f))
                 cornerRadius = dp(14f).toFloat()
+                if (keyBorders) setStroke(borderStrokePx, borderColor)
             }
             val normalInset = android.graphics.drawable.InsetDrawable(normalShape, dp(2f), dp(3f), dp(2f), dp(3f))
             val pressedInset = android.graphics.drawable.InsetDrawable(pressedShape, dp(3f), dp(4f), dp(3f), dp(4f))
@@ -1312,10 +1328,12 @@ class KeyboardView(
             val normalShape = android.graphics.drawable.GradientDrawable().apply {
                 setColor(fillColor)
                 cornerRadius = dp(5f).toFloat()
+                if (keyBorders) setStroke(borderStrokePx, borderColor)
             }
             val pressedShape = android.graphics.drawable.GradientDrawable().apply {
                 setColor(darkenColor(fillColor, 0.15f))
                 cornerRadius = dp(5f).toFloat()
+                if (keyBorders) setStroke(borderStrokePx, borderColor)
             }
             val normalInset = android.graphics.drawable.InsetDrawable(normalShape, dp(2f), dp(3f), dp(2f), dp(3f))
             val pressedInset = android.graphics.drawable.InsetDrawable(pressedShape, dp(2f), dp(3f), dp(2f), dp(3f))
@@ -2427,14 +2445,18 @@ class KeyboardView(
         // emoji_categories_scroll no longer needs syncing here - it now lives in the
         // top bar with a fixed match_parent height (see keyboard_layout.xml).
 
-        // If the Settings height slider changes while a numeric field is focused
-        // (key_row_2/3 hidden, their height folded into key_row_1 - see
-        // setNumericMode()), the plain numRowHeight(rowHeightPx) just set above
-        // would undo that fold and key_row_1 would snap back to ordinary
-        // number-row height. Re-fold with the freshly-scaled rowHeightPx instead.
-        if (numericModeActive) {
-            binding.keyRow1.layoutParams.height = numRowHeight(rowHeightPx) + rowHeightPx + rowHeightPx
-        }
+        // NOTE: key_row_1's height is intentionally left as the plain
+        // numRowHeight(rowHeightPx) set above, even while numericModeActive.
+        // This used to be re-folded here to numRowHeight + 2*rowHeightPx (to
+        // account for key_row_2/3 being hidden in numeric mode - see
+        // setNumericMode()), but applyPanelHeights()'s own numericModeActive
+        // branch already adds those two rows back in via `currentRowHeight * 4`
+        // - folding them into key_row_1 here as well double-counted key_row_2/3
+        // and made the emoji/clipboard/fonts panel open noticeably taller than
+        // the numeric keypad actually showing underneath it. key_row_1's height
+        // isn't read anywhere else while numeric mode is active (the numeric
+        // keypad's own rows are sized independently in setNumericMode()), so
+        // leaving it unfolded is safe and keeps applyPanelHeights() correct.
 
         applyPanelHeights()
         requestLayout()

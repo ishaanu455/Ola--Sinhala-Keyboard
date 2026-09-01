@@ -103,19 +103,19 @@ class TopBarController(
 
     // isNumericField: true while the focused field is a plain number/phone box
     // (OTP boxes, "Enter your phone number" screens). Those fields have no use
-    // for word suggestions, emoji, or the text-select ("cursor mode") tool, so
-    // only the Ola logo/clipboard/fonts/settings need to be there. logoSpacer
-    // stays VISIBLE in both cases: it's the flex space that pushes the icon
-    // group flush to the right edge of the row (see the comment on logoSpacer
-    // above) while the logo itself stays pinned flush left, exactly like the
-    // full icon set - same size, same positions, nothing shifts.
+    // for word suggestions, emoji, the text-select ("cursor mode") tool, or
+    // font styling, so only the Ola logo/clipboard/settings need to be there.
+    // logoSpacer stays VISIBLE in both cases: it's the flex space that pushes
+    // the icon group flush to the right edge of the row (see the comment on
+    // logoSpacer above) while the logo itself stays pinned flush left, exactly
+    // like the full icon set - same size, same positions, nothing shifts.
     fun showNormal(isNumericField: Boolean = false) {
         setIconRowExpanded(true)
         suggestionContainer?.visibility = View.GONE
         emojiButton?.visibility = if (isNumericField) View.GONE else View.VISIBLE
         textSelectButton?.visibility = if (isNumericField) View.GONE else View.VISIBLE
         olaLogoButton?.visibility = View.VISIBLE
-        fontsButton?.visibility = View.VISIBLE
+        fontsButton?.visibility = if (isNumericField) View.GONE else View.VISIBLE
         settingsButton?.visibility = View.VISIBLE
         logoSpacer?.visibility = View.VISIBLE
         // Restore the clipboard icon only if the feature is actually enabled in
