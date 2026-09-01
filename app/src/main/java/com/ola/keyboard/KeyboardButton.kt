@@ -228,13 +228,15 @@ class KeyboardButton : AppCompatTextView {
             // RIGHT edge lands - width - paddingX - and a bigger paddingX
             // pulls that right edge further from the key's actual right edge,
             // i.e. further left.
-            // Density-scaled (dp, not raw px) so the gap between the primary
-            // key glyph and this hint stays visually consistent across
-            // devices - on high-density screens a fixed px value shrinks
-            // physically, pulling the hint into the primary glyph.
-            val density = resources.displayMetrics.density
-            val paddingX = 20f * density
-            val paddingY = 8f * density
+            // Proportional to the key's own textSize (not screen density).
+            // textSize is already the per-device-correct font size for this
+            // key (resolved from sp/dp in the layout), so tying the gap to
+            // it keeps the hint's position relative to the glyph identical
+            // on every device/density automatically - no density guess
+            // needed, and no double-scaling like the old density-multiply
+            // approach caused.
+            val paddingX = textSize * 0.5f
+            val paddingY = textSize * 0.2f
             canvas.drawText(it, width.toFloat() - paddingX, secondaryLabelPaint.textSize + paddingY, secondaryLabelPaint)
         }
     }
