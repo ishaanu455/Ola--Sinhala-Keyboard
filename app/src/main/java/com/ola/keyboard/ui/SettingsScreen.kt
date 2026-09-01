@@ -49,6 +49,7 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.SwipeLeft
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -1401,6 +1402,8 @@ private fun DictionaryBackupSection() {
 
     var resultMessage by remember { mutableStateOf<String?>(null) }
     var resultIsError by remember { mutableStateOf(false) }
+    var showExportConfirm by remember { mutableStateOf(false) }
+    var showImportConfirm by remember { mutableStateOf(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
@@ -1425,12 +1428,7 @@ private fun DictionaryBackupSection() {
     }
 
     Text(
-        text = "Your learned words and clipboard history stay on this device - " +
-            "they never go anywhere else. If you're switching phones or just want " +
-            "a backup, you can export/import both as a single JSON file. Pinned " +
-            "clips (and everything else in your clip history) restore exactly as " +
-            "they were, positions included - nothing already on the device gets " +
-            "removed by an import.",
+        text = "Learned words and clipboard history, saved or restored as a JSON file.",
         fontSize = 12.sp,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
@@ -1439,17 +1437,11 @@ private fun DictionaryBackupSection() {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
     ) {
-        OutlinedButton(onClick = {
-            resultMessage = null
-            exportLauncher.launch("fox_keyboard_dictionary_backup.json")
-        }) {
+        OutlinedButton(onClick = { showExportConfirm = true }) {
             Text("Export")
         }
         Spacer(modifier = Modifier.padding(start = 8.dp))
-        OutlinedButton(onClick = {
-            resultMessage = null
-            importLauncher.launch(arrayOf("application/json", "*/*"))
-        }) {
+        OutlinedButton(onClick = { showImportConfirm = true }) {
             Text("Import")
         }
     }
@@ -1462,6 +1454,54 @@ private fun DictionaryBackupSection() {
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
         )
     }
+
+    if (showExportConfirm) {
+        AlertDialog(
+            onDismissRequest = { showExportConfirm = false },
+            title = { Text("Export dictionary & clipboard") },
+            text = {
+                Text(
+                    "This saves your learned words and clipboard history to a JSON " +
+                        "file on your device. Nothing leaves your device unless you " +
+                        "share the file yourself."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showExportConfirm = false
+                    resultMessage = null
+                    exportLauncher.launch("fox_keyboard_dictionary_backup.json")
+                }) { Text("Export") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExportConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showImportConfirm) {
+        AlertDialog(
+            onDismissRequest = { showImportConfirm = false },
+            title = { Text("Import dictionary & clipboard") },
+            text = {
+                Text(
+                    "This adds the words and clips from a backup file to what's " +
+                        "already on this device. Nothing currently on your device " +
+                        "will be removed."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showImportConfirm = false
+                    resultMessage = null
+                    importLauncher.launch(arrayOf("application/json", "*/*"))
+                }) { Text("Import") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showImportConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
 }
 
 /**
@@ -1470,8 +1510,8 @@ private fun DictionaryBackupSection() {
  * file - for a full move to a new phone rather than just the dictionary/
  * clipboard covered above. Unlike that one, restoring here replaces the
  * matching values on the device with the backup's (a "put me back exactly
- * how the backup describes" restore rather than a merge), so the warning
- * text is explicit about that before the user taps Import.
+ * how the backup describes" restore rather than a merge), so the confirmation
+ * dialog is explicit about that before the user taps Restore.
  */
 @Composable
 private fun FullBackupSection() {
@@ -1480,6 +1520,8 @@ private fun FullBackupSection() {
 
     var resultMessage by remember { mutableStateOf<String?>(null) }
     var resultIsError by remember { mutableStateOf(false) }
+    var showExportConfirm by remember { mutableStateOf(false) }
+    var showImportConfirm by remember { mutableStateOf(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
@@ -1513,11 +1555,7 @@ private fun FullBackupSection() {
     SettingsCategory(title = "Full Backup")
 
     Text(
-        text = "Everything at once - every setting, theme/background choice, " +
-            "recent emoji, clipboard and the dictionary - as one JSON file. " +
-            "Nothing leaves this device unless you share the file yourself. " +
-            "Importing replaces the matching values with the backup's, so use " +
-            "this for moving to a new phone rather than merging two devices.",
+        text = "Every setting and all your data, saved or restored as one JSON file.",
         fontSize = 12.sp,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
@@ -1526,17 +1564,11 @@ private fun FullBackupSection() {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
     ) {
-        OutlinedButton(onClick = {
-            resultMessage = null
-            exportLauncher.launch("ola_keyboard_full_backup.json")
-        }) {
+        OutlinedButton(onClick = { showExportConfirm = true }) {
             Text("Export Everything")
         }
         Spacer(modifier = Modifier.padding(start = 8.dp))
-        OutlinedButton(onClick = {
-            resultMessage = null
-            importLauncher.launch(arrayOf("application/json", "*/*"))
-        }) {
+        OutlinedButton(onClick = { showImportConfirm = true }) {
             Text("Restore Everything")
         }
     }
@@ -1547,6 +1579,54 @@ private fun FullBackupSection() {
             fontSize = 13.sp,
             color = if (resultIsError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+        )
+    }
+
+    if (showExportConfirm) {
+        AlertDialog(
+            onDismissRequest = { showExportConfirm = false },
+            title = { Text("Export everything") },
+            text = {
+                Text(
+                    "This saves every setting, your theme and background choices, " +
+                        "recent emoji, clipboard and dictionary as one JSON file. " +
+                        "Nothing leaves your device unless you share the file yourself."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showExportConfirm = false
+                    resultMessage = null
+                    exportLauncher.launch("ola_keyboard_full_backup.json")
+                }) { Text("Export") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExportConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showImportConfirm) {
+        AlertDialog(
+            onDismissRequest = { showImportConfirm = false },
+            title = { Text("Restore everything") },
+            text = {
+                Text(
+                    "This replaces your current settings and data with what's in the " +
+                        "backup file. This can't be undone - use it when moving to a " +
+                        "new phone rather than merging two devices."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showImportConfirm = false
+                    resultMessage = null
+                    importLauncher.launch(arrayOf("application/json", "*/*"))
+                }) { Text("Restore") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showImportConfirm = false }) { Text("Cancel") }
+            }
         )
     }
 }
