@@ -9,7 +9,7 @@
         <item name="isLight">true</item>
 
         <!-- Key surfaces and borders -->
-        <item name="border">@color/keyboard_bg_light</item>
+        <item name="border">@color/key_border_light</item>
         <item name="keyNormal">@color/keyboard_key_light</item>
         <item name="keyFunction">@color/keyboard_func_light</item>
         <item name="keyAction">@color/accent_amber</item>
@@ -76,7 +76,7 @@
         <item name="fox_background">@color/keyboard_bg_dark</item>
         <item name="foreground">@color/text_on_dark</item>
         <item name="foreground_2">@color/text_on_dark_variant</item>
-        <item name="border">@color/keyboard_bg_dark</item>
+        <item name="border">@color/key_border_dark</item>
 
         <!-- Keys -->
         <item name="keyNormal">@color/keyboard_key_dark</item>
@@ -113,7 +113,6 @@
         <item name="keyAction">@color/accent_wine</item>
         <item name="keyActionPressed">@color/accent_wine_pressed</item>
         <item name="fox_background">@color/wine_bg_light</item>
-        <item name="border">@color/wine_bg_light</item>
         <item name="keyNormal">@color/wine_key_light</item>
         <item name="keyFunction">@color/wine_func_light</item>
         <item name="keyNormalPressed">@color/wine_func_pressed_light</item>
@@ -129,7 +128,6 @@
         <item name="keyAction">@color/accent_wine</item>
         <item name="keyActionPressed">@color/accent_wine_pressed</item>
         <item name="fox_background">@color/wine_bg_dark</item>
-        <item name="border">@color/wine_bg_dark</item>
         <item name="keyNormal">@color/wine_key_dark</item>
         <item name="keyFunction">@color/wine_func_dark</item>
         <item name="keyNormalPressed">@color/wine_func_pressed_dark</item>
@@ -145,7 +143,6 @@
         <item name="keyAction">@color/accent_slate</item>
         <item name="keyActionPressed">@color/accent_slate_pressed</item>
         <item name="fox_background">@color/slate_bg_light</item>
-        <item name="border">@color/slate_bg_light</item>
         <item name="keyNormal">@color/slate_key_light</item>
         <item name="keyFunction">@color/slate_func_light</item>
         <item name="keyNormalPressed">@color/slate_func_pressed_light</item>
@@ -161,7 +158,6 @@
         <item name="keyAction">@color/accent_slate</item>
         <item name="keyActionPressed">@color/accent_slate_pressed</item>
         <item name="fox_background">@color/slate_bg_dark</item>
-        <item name="border">@color/slate_bg_dark</item>
         <item name="keyNormal">@color/slate_key_dark</item>
         <item name="keyFunction">@color/slate_func_dark</item>
         <item name="keyNormalPressed">@color/slate_func_pressed_dark</item>
@@ -177,7 +173,6 @@
         <item name="keyAction">@color/accent_ocean</item>
         <item name="keyActionPressed">@color/accent_ocean_pressed</item>
         <item name="fox_background">@color/ocean_bg_light</item>
-        <item name="border">@color/ocean_bg_light</item>
         <item name="keyNormal">@color/ocean_key_light</item>
         <item name="keyFunction">@color/ocean_func_light</item>
         <item name="keyNormalPressed">@color/ocean_func_pressed_light</item>
@@ -193,7 +188,6 @@
         <item name="keyAction">@color/accent_ocean</item>
         <item name="keyActionPressed">@color/accent_ocean_pressed</item>
         <item name="fox_background">@color/ocean_bg_dark</item>
-        <item name="border">@color/ocean_bg_dark</item>
         <item name="keyNormal">@color/ocean_key_dark</item>
         <item name="keyFunction">@color/ocean_func_dark</item>
         <item name="keyNormalPressed">@color/ocean_func_pressed_dark</item>
@@ -209,7 +203,6 @@
         <item name="keyAction">@color/accent_forest</item>
         <item name="keyActionPressed">@color/accent_forest_pressed</item>
         <item name="fox_background">@color/forest_bg_light</item>
-        <item name="border">@color/forest_bg_light</item>
         <item name="keyNormal">@color/forest_key_light</item>
         <item name="keyFunction">@color/forest_func_light</item>
         <item name="keyNormalPressed">@color/forest_func_pressed_light</item>
@@ -225,7 +218,6 @@
         <item name="keyAction">@color/accent_forest</item>
         <item name="keyActionPressed">@color/accent_forest_pressed</item>
         <item name="fox_background">@color/forest_bg_dark</item>
-        <item name="border">@color/forest_bg_dark</item>
         <item name="keyNormal">@color/forest_key_dark</item>
         <item name="keyFunction">@color/forest_func_dark</item>
         <item name="keyNormalPressed">@color/forest_func_pressed_dark</item>
@@ -241,7 +233,6 @@
         <item name="keyAction">@color/accent_onyx</item>
         <item name="keyActionPressed">@color/accent_onyx_pressed</item>
         <item name="fox_background">@color/onyx_bg_light</item>
-        <item name="border">@color/onyx_bg_light</item>
         <item name="keyNormal">@color/onyx_key_light</item>
         <item name="keyFunction">@color/onyx_func_light</item>
         <item name="keyNormalPressed">@color/onyx_func_pressed_light</item>
@@ -257,7 +248,6 @@
         <item name="keyAction">@color/accent_onyx</item>
         <item name="keyActionPressed">@color/accent_onyx_pressed</item>
         <item name="fox_background">@color/onyx_bg_dark</item>
-        <item name="border">@color/onyx_bg_dark</item>
         <item name="keyNormal">@color/onyx_key_dark</item>
         <item name="keyFunction">@color/onyx_func_dark</item>
         <item name="keyNormalPressed">@color/onyx_func_pressed_dark</item>
@@ -273,7 +263,6 @@
         <item name="keyAction">@color/accent_navy</item>
         <item name="keyActionPressed">@color/accent_navy_pressed</item>
         <item name="fox_background">@color/navy_bg_light</item>
-        <item name="border">@color/navy_bg_light</item>
         <item name="keyNormal">@color/navy_key_light</item>
         <item name="keyFunction">@color/navy_func_light</item>
         <item name="keyNormalPressed">@color/navy_func_pressed_light</item>
@@ -289,7 +278,6 @@
         <item name="keyAction">@color/accent_navy</item>
         <item name="keyActionPressed">@color/accent_navy_pressed</item>
         <item name="fox_background">@color/navy_bg_dark</item>
-        <item name="border">@color/navy_bg_dark</item>
         <item name="keyNormal">@color/navy_key_dark</item>
         <item name="keyFunction">@color/navy_func_dark</item>
         <item name="keyNormalPressed">@color/navy_func_pressed_dark</item>

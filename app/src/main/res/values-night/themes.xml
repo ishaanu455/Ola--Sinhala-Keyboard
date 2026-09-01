@@ -7,7 +7,7 @@
         <item name="foreground">@color/text_on_dark</item>
         <item name="foreground_2">@color/text_on_dark_variant</item>
         <item name="isLight">false</item>
-        <item name="border">@color/keyboard_bg_dark</item>
+        <item name="border">@color/key_border_dark</item>
 
         <!-- Keys -->
         <item name="keyNormal">@color/keyboard_key_dark</item>

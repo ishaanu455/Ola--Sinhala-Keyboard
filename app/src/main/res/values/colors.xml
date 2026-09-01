@@ -118,6 +118,14 @@
     <color name="navy_func_dark">#252B34</color>
     <color name="navy_func_pressed_dark">#2C3440</color>
 
+    <!-- Physical-keyboard key border colour (Settings > Appearance > "Border" toggle).
+         Previously every theme set `border` equal to its own fox_background/bg colour,
+         which made the border invisible no matter whether the toggle was on or off -
+         a translucent black/white hairline instead, so it reads clearly against any
+         key/background colour, light or dark, across every colour theme. -->
+    <color name="key_border_light">#33000000</color>
+    <color name="key_border_dark">#40FFFFFF</color>
+
     <!-- Misc tokens kept for compatibility (unused by any layout/theme currently) -->
     <color name="blue">#3956aa</color>
     <color name="yellow">#dfc540</color>

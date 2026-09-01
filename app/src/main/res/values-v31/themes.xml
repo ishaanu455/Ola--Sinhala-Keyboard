@@ -8,7 +8,7 @@
         <item name="foreground">@android:color/system_neutral1_900</item>
         <item name="foreground_2">@android:color/system_neutral2_600</item>
         <item name="isLight">true</item>
-        <item name="border">@android:color/system_neutral1_100</item>
+        <item name="border">@color/key_border_light</item>
         
         <!-- Keys -->
         <item name="keyNormal">@android:color/system_neutral1_50</item>
@@ -33,7 +33,7 @@
         <item name="foreground">@android:color/system_neutral1_100</item>
         <item name="foreground_2">@android:color/system_neutral2_400</item>
         <item name="isLight">false</item>
-        <item name="border">@android:color/system_neutral1_900</item>
+        <item name="border">@color/key_border_dark</item>
         
         <!-- Keys -->
         <item name="keyNormal">@android:color/system_neutral1_800</item>
