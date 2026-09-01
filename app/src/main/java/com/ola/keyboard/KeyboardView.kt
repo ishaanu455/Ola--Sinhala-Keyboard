@@ -93,16 +93,13 @@ class KeyboardView(
         // text_select_layout.xml's cursor-cross column uses fixed (not weighted) dp
         // sizes: 56dp title bar + (68dp up-chevron + 24dp margin + 68dp mid row +
         // 24dp margin + 68dp down-chevron = 252dp cross) + 56dp bottom bar = 364dp.
-        // Before the row-height fix above, rowHeightPx worked out to roughly double
-        // BASE_ROW_HEIGHT_DP even at the slider's default, so the panel height derived
-        // from it (see applyPanelHeights) was comfortably over this floor and nobody
-        // noticed the panel's own content was fixed-size. Now that the default panel
-        // height is correctly smaller, it can fall under what this fixed content
-        // actually needs, and a LinearLayout doesn't shrink non-weighted children to
-        // fit - it just centers-and-clips them, which is what was chopping the up/down
-        // chevrons down to slivers. Flooring the panel height at this fixed minimum
-        // keeps the cross fully visible regardless of the height slider. If the fixed
-        // dp values in text_select_layout.xml change, update this to match.
+        // This is the panel's NATURAL content height at 1x scale. It's used as the
+        // reference applyPanelHeights() divides the actually-available height by,
+        // to work out how much to shrink the buttons/arrows (applyTsContentScale)
+        // when the keyboard - and so the panel - is shorter than this. The panel
+        // itself is never forced taller than the keyboard to fit this; the content
+        // scales down to fit the panel instead. If the fixed dp values in
+        // text_select_layout.xml change, update this to match.
         private const val TEXT_SELECT_MIN_CONTENT_HEIGHT_DP = 364f
     }
 
@@ -192,6 +189,17 @@ class KeyboardView(
     private var resetEmojiPanelStateFn: (() -> Unit)? = null
     private var isTextSelectPanelOpen = false
     private var closeTextSelectPanelFn: (() -> Unit)? = null
+    // The fixed dp sizes text_select_layout.xml bakes into its buttons/arrows/
+    // margins (chevrons, cut/copy/paste, etc.), captured once in their natural,
+    // un-scaled form. Re-applied at a shrunk scale by applyTsContentScale()
+    // whenever the panel is shorter than what that fixed content needs, instead
+    // of either clipping the buttons or forcing the panel taller than the
+    // keyboard itself (see applyPanelHeights).
+    private data class TsChildNaturalSize(
+        val view: View, val width: Int, val height: Int,
+        val marginTop: Int, val marginBottom: Int, val marginLeft: Int, val marginRight: Int
+    )
+    private var tsNaturalSizes: List<TsChildNaturalSize>? = null
     // True while the Fonts ("fancy text" style picker) panel is open.
     private var isFontStylePanelOpen = false
     private var closeFontStylePanelFn: (() -> Unit)? = null
@@ -1910,7 +1918,55 @@ class KeyboardView(
         return if (showRecentEmojiRow && recent.isNotEmpty()) binding.recentEmojiRow.layoutParams.height else 0
     }
 
-    /** Keeps the emoji/clipboard panels exactly as tall as the keyboard they cover. */
+    /** Walks the text-select panel's view tree once and records every child's
+     *  fixed (XML-defined) width/height/margins - the actual sizes the chevrons,
+     *  cut/copy/paste buttons etc. were designed at. Skips WRAP_CONTENT/
+     *  MATCH_PARENT children (negative width/height constants) since those
+     *  already flex on their own. No-ops after the first call. */
+    private fun captureTsNaturalSizesIfNeeded() {
+        if (tsNaturalSizes != null) return
+        val sizes = mutableListOf<TsChildNaturalSize>()
+        fun walk(view: View) {
+            val lp = view.layoutParams
+            if (lp != null && lp.width > 0 && lp.height > 0) {
+                val margins = lp as? ViewGroup.MarginLayoutParams
+                sizes.add(
+                    TsChildNaturalSize(
+                        view, lp.width, lp.height,
+                        margins?.topMargin ?: 0, margins?.bottomMargin ?: 0,
+                        margins?.leftMargin ?: 0, margins?.rightMargin ?: 0
+                    )
+                )
+            }
+            if (view is ViewGroup) for (child in view.children) walk(child)
+        }
+        walk(binding.textSelectView.root)
+        tsNaturalSizes = sizes
+    }
+
+    /** Scales every fixed-size child of the text-select panel (buttons, arrows,
+     *  their margins) relative to its natural XML size. scale = 1f reproduces
+     *  the original design exactly; smaller values shrink everything together
+     *  so the cut/copy/paste buttons and the arrow cross stay proportional and
+     *  fully visible instead of being clipped when the panel is shorter than
+     *  their natural combined height. */
+    private fun applyTsContentScale(scale: Float) {
+        val sizes = tsNaturalSizes ?: return
+        for (s in sizes) {
+            val lp = s.view.layoutParams
+            lp.width = (s.width * scale).toInt()
+            lp.height = (s.height * scale).toInt()
+            (lp as? ViewGroup.MarginLayoutParams)?.let {
+                it.topMargin = (s.marginTop * scale).toInt()
+                it.bottomMargin = (s.marginBottom * scale).toInt()
+                it.leftMargin = (s.marginLeft * scale).toInt()
+                it.rightMargin = (s.marginRight * scale).toInt()
+            }
+            s.view.layoutParams = lp
+        }
+    }
+
+
     private fun applyPanelHeights() {
         // keyRow2-5 (letter/space rows) are always the 4 "full height" rows; the
         // number row (keyRow1) is intentionally shorter (see NUM_ROW_HEIGHT_RATIO)
@@ -1939,8 +1995,20 @@ class KeyboardView(
         // toggleTextSelectView), so while it's open it needs that row's height
         // added back on top, or the panel would come up short by exactly that much.
         val textSelectExtra = if (isTextSelectPanelOpen) binding.topBar.layoutParams.height else 0
-        binding.textSelectView.root.layoutParams.height =
-            max(panelHeight + textSelectExtra, dp(TEXT_SELECT_MIN_CONTENT_HEIGHT_DP))
+        val textSelectAvailable = panelHeight + textSelectExtra
+        // The panel itself must never exceed the keyboard's own height - it used
+        // to be floored at TEXT_SELECT_MIN_CONTENT_HEIGHT_DP (364dp, what its
+        // fixed-size buttons/arrows need at their natural size) so they wouldn't
+        // get clipped, but that meant on a small Settings > Keyboard Height the
+        // panel opened taller than the keyboard underneath it. Instead: keep the
+        // panel's height matched to the keyboard like every other panel, and
+        // shrink its buttons/arrows together to fit whatever room is actually
+        // available (floored at 50% scale so they stay tappable).
+        captureTsNaturalSizesIfNeeded()
+        val naturalContentHeightPx = dp(TEXT_SELECT_MIN_CONTENT_HEIGHT_DP)
+        val tsScale = (textSelectAvailable.toFloat() / naturalContentHeightPx).coerceIn(0.5f, 1f)
+        applyTsContentScale(tsScale)
+        binding.textSelectView.root.layoutParams.height = textSelectAvailable
         binding.fontStyleView.root.layoutParams.height = panelHeight
     }
 
