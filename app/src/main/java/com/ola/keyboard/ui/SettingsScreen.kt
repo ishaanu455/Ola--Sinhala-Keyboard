@@ -50,6 +50,7 @@ import androidx.compose.material.icons.filled.SwipeLeft
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -1400,6 +1401,7 @@ private fun DictionaryBackupSection() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    var isBusy by remember { mutableStateOf(false) }
     var resultMessage by remember { mutableStateOf<String?>(null) }
     var resultIsError by remember { mutableStateOf(false) }
     var showExportConfirm by remember { mutableStateOf(false) }
@@ -1409,10 +1411,12 @@ private fun DictionaryBackupSection() {
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
+        isBusy = true
         scope.launch {
             val ok = UserDataBackup.export(context, uri)
             resultIsError = !ok
             resultMessage = if (ok) "Backup saved successfully" else "Backup failed"
+            isBusy = false
         }
     }
 
@@ -1420,10 +1424,12 @@ private fun DictionaryBackupSection() {
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
+        isBusy = true
         scope.launch {
             val ok = UserDataBackup.import(context, uri)
             resultIsError = !ok
             resultMessage = if (ok) "Restore successful" else "Couldn't read that file"
+            isBusy = false
         }
     }
 
@@ -1435,22 +1441,27 @@ private fun DictionaryBackupSection() {
     )
 
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        OutlinedButton(onClick = { showExportConfirm = true }) {
+        OutlinedButton(onClick = { showExportConfirm = true }, enabled = !isBusy) {
             Text("Export")
         }
         Spacer(modifier = Modifier.padding(start = 8.dp))
-        OutlinedButton(onClick = { showImportConfirm = true }) {
+        OutlinedButton(onClick = { showImportConfirm = true }, enabled = !isBusy) {
             Text("Import")
+        }
+        if (isBusy) {
+            Spacer(modifier = Modifier.padding(start = 12.dp))
+            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
         }
     }
 
-    resultMessage?.let { message ->
+    if (isBusy) {
         Text(
-            text = message,
+            text = "Working on it…",
             fontSize = 13.sp,
-            color = if (resultIsError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
         )
     }
@@ -1502,6 +1513,17 @@ private fun DictionaryBackupSection() {
             }
         )
     }
+
+    resultMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = { resultMessage = null },
+            title = { Text(if (resultIsError) "Something went wrong" else "Success") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { resultMessage = null }) { Text("OK") }
+            }
+        )
+    }
 }
 
 /**
@@ -1518,6 +1540,7 @@ private fun FullBackupSection() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    var isBusy by remember { mutableStateOf(false) }
     var resultMessage by remember { mutableStateOf<String?>(null) }
     var resultIsError by remember { mutableStateOf(false) }
     var showExportConfirm by remember { mutableStateOf(false) }
@@ -1527,10 +1550,12 @@ private fun FullBackupSection() {
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
+        isBusy = true
         scope.launch {
             val ok = ime.suggest.FullBackup.export(context, uri)
             resultIsError = !ok
             resultMessage = if (ok) "Full backup saved successfully" else "Backup failed"
+            isBusy = false
         }
     }
 
@@ -1538,10 +1563,12 @@ private fun FullBackupSection() {
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
+        isBusy = true
         scope.launch {
             val ok = ime.suggest.FullBackup.import(context, uri)
             resultIsError = !ok
             resultMessage = if (ok) "Restore successful - restart the keyboard to see everything applied" else "Couldn't read that file"
+            isBusy = false
         }
     }
 
@@ -1562,22 +1589,27 @@ private fun FullBackupSection() {
     )
 
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        OutlinedButton(onClick = { showExportConfirm = true }) {
+        OutlinedButton(onClick = { showExportConfirm = true }, enabled = !isBusy) {
             Text("Export Everything")
         }
         Spacer(modifier = Modifier.padding(start = 8.dp))
-        OutlinedButton(onClick = { showImportConfirm = true }) {
+        OutlinedButton(onClick = { showImportConfirm = true }, enabled = !isBusy) {
             Text("Restore Everything")
+        }
+        if (isBusy) {
+            Spacer(modifier = Modifier.padding(start = 12.dp))
+            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
         }
     }
 
-    resultMessage?.let { message ->
+    if (isBusy) {
         Text(
-            text = message,
+            text = "Working on it…",
             fontSize = 13.sp,
-            color = if (resultIsError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
         )
     }
@@ -1626,6 +1658,17 @@ private fun FullBackupSection() {
             },
             dismissButton = {
                 TextButton(onClick = { showImportConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    resultMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = { resultMessage = null },
+            title = { Text(if (resultIsError) "Something went wrong" else "Success") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { resultMessage = null }) { Text("OK") }
             }
         )
     }

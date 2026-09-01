@@ -272,8 +272,8 @@ private fun ClipRow(
             }
             Text(
                 text = clip.text,
-                fontSize = 15.sp,
-                maxLines = 3,
+                fontSize = 13.sp,
+                maxLines = 6,
                 overflow = TextOverflow.Ellipsis,
                 // Explicit full-contrast color instead of the Card's auto-picked
                 // content color: unselected cards use surfaceVariant as their
