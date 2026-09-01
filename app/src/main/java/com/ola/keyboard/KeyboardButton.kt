@@ -243,7 +243,8 @@ class KeyboardButton : AppCompatTextView {
 
             val edgeMargin = secondaryLabelPaint.textSize * 0.35f   // default distance from the key's own top/right edges
             val requiredGap = secondaryLabelPaint.textSize * 0.28f  // minimum breathing room from the primary glyph
-            val hintDescent = secondaryLabelPaint.fontMetrics.descent
+            val hintFm = secondaryLabelPaint.fontMetrics
+            val hintDescent = hintFm.descent
 
             // Default: sit in the tight top-right corner (matches the look
             // in the reference screenshot). Only pulled further up if the
@@ -252,8 +253,18 @@ class KeyboardButton : AppCompatTextView {
             // corner look and only tall ones (Shift/Caps) get pushed clear.
             val cornerBaselineY = secondaryLabelPaint.textSize + edgeMargin
             val clearanceBaselineY = primaryTop - requiredGap - hintDescent
-            val baselineY = minOf(cornerBaselineY, clearanceBaselineY)
-                .coerceAtLeast(secondaryLabelPaint.textSize * 0.6f) // never push it above the key's own top edge
+
+            // Floor: the hint's TOP edge (baseline + ascent - ascent is
+            // negative, so this is baseline minus a positive distance)
+            // must never render above the key's own top edge (y =
+            // edgeMargin). The old floor (a flat textSize*0.6f) didn't
+            // account for the hint glyph's actual ascent, so on tall
+            // clearance pushes the glyph's top could still land above y=0
+            // - outside the key's border. This floor is derived from the
+            // real font metrics instead, so it's always correct regardless
+            // of hint text size or device.
+            val minBaselineY = edgeMargin - hintFm.ascent
+            val baselineY = minOf(cornerBaselineY, clearanceBaselineY).coerceAtLeast(minBaselineY)
 
             val paddingX = textSize * 0.28f
             canvas.drawText(hint, width.toFloat() - paddingX, baselineY, secondaryLabelPaint)
