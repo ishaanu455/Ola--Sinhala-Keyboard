@@ -81,8 +81,12 @@ object FullBackup {
             // "prefs" backs ClipboardData's and EmojiData's own in-memory caches -
             // without this, an old cache loaded earlier in this process would
             // save() itself back over the restore on the next clip/emoji action.
+            // ClipboardData.invalidateCache() also immediately reloads from the
+            // just-restored file (see its doc) - required so the clipboard panel
+            // shows the restored clips (pinned included) right away, not just on
+            // the IME's next cold start.
             if (filesObj.has("prefs")) {
-                ClipboardData.invalidateCache()
+                ClipboardData.invalidateCache(context)
                 EmojiData.loadRecentEmojis(context)
             }
 

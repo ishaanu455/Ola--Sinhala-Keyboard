@@ -218,15 +218,26 @@ object ClipboardData {
         if (added) save(context)
     }
 
-    /** Forces the next [load] to re-read from SharedPreferences instead of
-     *  reusing the in-memory list - needed after something *other than this
-     *  object* has written to the "clipboard_history" key directly (currently
-     *  only [ime.suggest.FullBackup]'s restore), since otherwise a later
-     *  ClipboardData.add/setPinned/etc. call would save() the stale in-memory
-     *  list right back over the just-restored data. */
-    fun invalidateCache() {
+    /** Forces the next clipboard read to reflect what's on disk right now,
+     *  instead of reusing the in-memory list - needed after something *other
+     *  than this object* has written to the "clipboard_history" key directly
+     *  (currently only [ime.suggest.FullBackup]'s restore).
+     *
+     *  BUG FIX: this used to only clear the cache (loaded = false, clips
+     *  cleared) and rely on some later load(context) call to repopulate it -
+     *  but load(context) is only ever called once, from InputMethodService's
+     *  onCreate(), and every other read here (all()/filtered(), which back
+     *  the clipboard panel) reads the in-memory `clips` list directly without
+     *  ever calling load() again. So after a Full Backup restore, the
+     *  clipboard panel kept showing an empty list (including previously
+     *  pinned clips) even though the restored data was correctly on disk -
+     *  simply clearing the cache was never followed by anything that actually
+     *  reloaded it. Reloading immediately here, synchronously, fixes that:
+     *  by the time this returns, `clips` already reflects the restored file. */
+    fun invalidateCache(context: Context) {
         loaded = false
         clips.clear()
+        load(context)
     }
 
     private fun save(context: Context) {
