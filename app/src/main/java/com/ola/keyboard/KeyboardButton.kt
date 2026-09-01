@@ -215,29 +215,48 @@ class KeyboardButton : AppCompatTextView {
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        secondaryLabel?.let {
+        secondaryLabel?.let { hint ->
             secondaryLabelPaint.color = currentTextColor
             secondaryLabelPaint.alpha = 150
-            secondaryLabelPaint.textSize = textSize * 0.5f
+            // Slightly smaller than before (0.5f -> 0.42f) - the old size
+            // left almost no spare room in the corner, so on any key whose
+            // primary glyph rendered a bit tall (uppercase, some Sinhala
+            // conjuncts) the hint had nowhere to go but into it.
+            secondaryLabelPaint.textSize = textSize * 0.42f
 
-            // Horizontal and vertical padding are separate on purpose: bumping
-            // paddingX shifts the hint glyph left, away from the key's right
-            // edge, without touching how far down from the top it sits
-            // (paddingY). Text is right-aligned (Paint.Align.RIGHT, set in
-            // init{}), so the x coordinate passed to drawText is where its
-            // RIGHT edge lands - width - paddingX - and a bigger paddingX
-            // pulls that right edge further from the key's actual right edge,
-            // i.e. further left.
-            // Proportional to the key's own textSize (not screen density).
-            // textSize is already the per-device-correct font size for this
-            // key (resolved from sp/dp in the layout), so tying the gap to
-            // it keeps the hint's position relative to the glyph identical
-            // on every device/density automatically - no density guess
-            // needed, and no double-scaling like the old density-multiply
-            // approach caused.
+            // Root cause of the "glued to the letter" bug: paddingY used
+            // to be a constant, so the hint sat at the same fixed height
+            // from the top of the key no matter how tall the PRIMARY glyph
+            // rendered. Shift/Caps letters (and some Sinhala conjuncts)
+            // render taller than plain lowercase, so a constant that
+            // cleared lowercase fine would collide with uppercase.
+            // Fix: measure the primary glyph's real top edge on every
+            // draw (via font metrics - ascent/descent - the same values
+            // Android itself uses to lay the glyph out) and derive the
+            // hint's vertical position FROM that measurement, so it keeps
+            // its clearance automatically for whatever is actually on
+            // screen right now, on any device, at any density.
+            val fm = paint.fontMetrics
+            val primaryGlyphHeight = fm.descent - fm.ascent
+            // text is vertically centered in the key (gravity = CENTER)
+            val primaryTop = height / 2f - primaryGlyphHeight / 2f
+
+            val edgeMargin = secondaryLabelPaint.textSize * 0.35f   // default distance from the key's own top/right edges
+            val requiredGap = secondaryLabelPaint.textSize * 0.28f  // minimum breathing room from the primary glyph
+            val hintDescent = secondaryLabelPaint.fontMetrics.descent
+
+            // Default: sit in the tight top-right corner (matches the look
+            // in the reference screenshot). Only pulled further up if the
+            // primary glyph's measured top edge would otherwise overlap it
+            // - never pulled down/closer, so small glyphs keep the tight
+            // corner look and only tall ones (Shift/Caps) get pushed clear.
+            val cornerBaselineY = secondaryLabelPaint.textSize + edgeMargin
+            val clearanceBaselineY = primaryTop - requiredGap - hintDescent
+            val baselineY = minOf(cornerBaselineY, clearanceBaselineY)
+                .coerceAtLeast(secondaryLabelPaint.textSize * 0.6f) // never push it above the key's own top edge
+
             val paddingX = textSize * 0.28f
-            val paddingY = textSize * 0.2f
-            canvas.drawText(it, width.toFloat() - paddingX, secondaryLabelPaint.textSize + paddingY, secondaryLabelPaint)
+            canvas.drawText(hint, width.toFloat() - paddingX, baselineY, secondaryLabelPaint)
         }
     }
 }
