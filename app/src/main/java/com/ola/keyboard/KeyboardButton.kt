@@ -235,7 +235,7 @@ class KeyboardButton : AppCompatTextView {
             // on every device/density automatically - no density guess
             // needed, and no double-scaling like the old density-multiply
             // approach caused.
-            val paddingX = textSize * 0.5f
+            val paddingX = textSize * 0.28f
             val paddingY = textSize * 0.2f
             canvas.drawText(it, width.toFloat() - paddingX, secondaryLabelPaint.textSize + paddingY, secondaryLabelPaint)
         }
