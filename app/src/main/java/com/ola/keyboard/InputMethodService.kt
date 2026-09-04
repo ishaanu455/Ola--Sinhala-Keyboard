@@ -754,6 +754,17 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         // state it was left in, and regardless of language layout.
         caps = false
         shift = false
+        // BUG FIX: the symbols panel ("#123" row - !@#%&, brackets, etc.) was the one
+        // piece of key-screen state this function forgot to reset. Everything else
+        // above (caps/shift/clipboard/emoji panels) already comes back to normal on
+        // every (re)show, but keyboardSymbolsActive stayed set - so minimizing the
+        // keyboard while the symbols panel was open (or backgrounding the app, since
+        // the IME service instance and its fields survive that) and reopening it kept
+        // showing symbols instead of coming back to the normal letter keys like every
+        // other panel already did. The next updateKeyboard() call (end of
+        // onStartInputView) re-renders the key labels from this flag, so clearing it
+        // here is enough - no separate view-side toggle to flip.
+        keyboardSymbolsActive = false
         if (::keyboardView.isInitialized) {
             keyboardView.closeClipboardPanel()
             keyboardView.closeEmojiPanel()
