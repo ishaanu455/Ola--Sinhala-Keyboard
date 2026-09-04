@@ -132,6 +132,7 @@ jobs:
           echo "Found APK: $APK_PATH -> $APK_NAME"
 
       - name: Create GitHub Release
+        id: create_release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "v${{ steps.bump_version.outputs.new_name }}"
@@ -144,3 +145,40 @@ jobs:
           generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Posts the freshly-built APK straight to the Telegram channel as soon as the
+      # GitHub Release above succeeds, so channel subscribers get the file + a
+      # readable changelog without ever visiting GitHub. Requires two repo secrets
+      # (Settings -> Secrets and variables -> Actions -> New repository secret):
+      #   TELEGRAM_BOT_TOKEN   - the token BotFather gave you for the bot
+      #   TELEGRAM_CHANNEL_ID  - "@yourchannelusername" for a public channel, or the
+      #                          numeric -100... chat id for a private one
+      - name: Notify Telegram channel
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+          APK_PATH: ${{ steps.find_apk.outputs.apk_path }}
+          NEW_VERSION: ${{ steps.bump_version.outputs.new_name }}
+          RELEASE_URL: ${{ steps.create_release.outputs.url }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          # Telegram captions are capped at 1024 chars - truncate defensively so a
+          # long commit message can never make the API call fail outright.
+          SHORT_MSG=$(printf '%s' "$COMMIT_MSG" | cut -c1-600)
+
+          # HTML parse_mode only needs &, <, > escaped (unlike MarkdownV2, which
+          # would choke on a commit message containing *, _, [, ( etc.), so this
+          # stays safe regardless of what the commit message happens to contain.
+          ESCAPED_MSG=$(printf '%s' "$SHORT_MSG" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')
+
+          # Built with $'\n' instead of a heredoc so the YAML block-literal's own
+          # indentation (this whole run: | block) can't be confused with the
+          # message's line breaks - a heredoc body here would need to sit flush
+          # left, which ends the YAML block early and breaks the workflow file.
+          CAPTION="🎹 <b>Ola Keyboard v${NEW_VERSION}</b> is out!"$'\n\n'"📝 <b>What's new:</b>"$'\n'"${ESCAPED_MSG}"$'\n\n'"🔗 <a href=\"${RELEASE_URL}\">Full changelog on GitHub</a>"
+
+          curl -sS -f -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+            -F "chat_id=${TELEGRAM_CHANNEL_ID}" \
+            -F "document=@${APK_PATH}" \
+            -F "caption=${CAPTION}" \
+            -F "parse_mode=HTML"
