@@ -850,6 +850,11 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
 
 
     override fun letterOrSymbolClick(tag: String) {
+        // A letter (or symbols-panel character) breaks the "space after space" streak -
+        // see consecutiveSpacePresses' declaration. Only literal repeated space-bar taps
+        // should hide the suggestion chips; typing anything else in between is a normal
+        // next word starting, so the following single space should show chips again.
+        consecutiveSpacePresses = 0
         when {
             keyboardLayout == KeyboardLayout.SINGLISH && !keyboardSymbolsActive -> {
                 singlishInput(tag)
@@ -958,6 +963,10 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         mComposing = ""
         tComposing = ""
         inputHistory.clear()
+        // Tapping a chip isn't a repeated space-bar press - reset the streak so the
+        // next actual space the user types shows chips instead of being treated as
+        // an (incorrect) 2nd consecutive space.
+        consecutiveSpacePresses = 0
 
         // record acceptance
         serviceScope.launch {
@@ -974,6 +983,13 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     private var lastChar: CHAR? = null
     private var lastLetter: CHAR? = null
     private var positionFlag = ""
+
+    // Counts space-bar taps that land back-to-back with nothing typed in between,
+    // so a 2nd (or later) consecutive space can hide the next-word suggestion chips
+    // and bring the icon row back, instead of just re-showing the same chips again.
+    // Reset to 0 by any other input (a letter, backspace, a suggestion tap, symbols/
+    // comma/dot, etc.) - only literal space-after-space counts as "consecutive".
+    private var consecutiveSpacePresses = 0
 
     // Holds the base consonant when "r" forms a rakaransaya right after a consonant+al-lakuna.
     // If the very next key is "u", we retro-convert that rakar into a gaetta pilla (vocalic-r
@@ -1659,6 +1675,9 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     }
 
     override fun numberClick(tag: String) {
+        // A number tap breaks the "space after space" streak too - see
+        // consecutiveSpacePresses' declaration.
+        consecutiveSpacePresses = 0
         val ic = currentInputConnection
         if (ic != null) {
             try {
@@ -1758,6 +1777,9 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             }
 
             Function.BACKSPACE -> {
+                // Deleting breaks the "space after space" streak too - see
+                // consecutiveSpacePresses' declaration.
+                consecutiveSpacePresses = 0
                 if (ic != null) {
                     val topStep = if (!hasPositionChanged()) inputHistory.removeLastOrNull() else null
                     if (topStep != null) {
@@ -1854,6 +1876,11 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         }
         vibrate()
 
+        // Tracks space-after-space specifically (not comma/dot/etc.) - any other
+        // word-boundary character breaks the streak just like a letter would.
+        val isSpacePress = toCommit == " "
+        consecutiveSpacePresses = if (isSpacePress) consecutiveSpacePresses + 1 else 0
+
         // Any word-boundary character (space, comma, dot, etc. - anything that isn't
         // a letter) ends the word the user was typing, same as pressing space.
         val isWordBoundary = toCommit.isNotEmpty() && toCommit.none { it.isLetter() }
@@ -1869,14 +1896,25 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             lastLetter = null
             positionFlag = ""
             inputHistory.clear()
-            // A word just finished with nothing typed for the next one yet - ask
-            // for next-word predictions (based on justTypedWord) instead of
-            // unconditionally hiding the bar. requestSuggestionsForToken() itself
-            // falls back to showNormal() when suggestions are off/password field/no
-            // predictions found, so this covers those cases too. If there was no
-            // usable previous word at all (e.g. password field, or too short to
-            // learn), just clear the bar like before.
-            if (justTypedWord.isNullOrBlank()) {
+
+            // 2nd+ consecutive space with nothing typed in between: the chips are
+            // already showing (or would just re-show the same thing), so this tap
+            // means "I'm done with suggestions" - hide the chips and bring the icon
+            // row back, same as tapping away. Only a literal space repeat triggers
+            // this; typing a letter (or any other key) resets the counter above, so
+            // the very next single space after that goes back to showing chips.
+            if (isSpacePress && consecutiveSpacePresses >= 2) {
+                topBarController?.showNormal(isNumericField)
+                debouncer?.cancel()
+                suggestionJob?.cancel()
+            } else if (justTypedWord.isNullOrBlank()) {
+                // A word just finished with nothing typed for the next one yet - ask
+                // for next-word predictions (based on justTypedWord) instead of
+                // unconditionally hiding the bar. requestSuggestionsForToken() itself
+                // falls back to showNormal() when suggestions are off/password field/no
+                // predictions found, so this covers those cases too. If there was no
+                // usable previous word at all (e.g. password field, or too short to
+                // learn), just clear the bar like before.
                 topBarController?.showNormal(isNumericField)
                 debouncer?.cancel()
                 suggestionJob?.cancel()
