@@ -10,6 +10,14 @@ on:
       - '.github/ISSUE_TEMPLATE/**'
       - 'docs/**'
       - 'LICENSE*'
+      # BUG FIX: editing this workflow file (or any other .github/workflows/*.yml)
+      # is a CI/tooling change, not an app change - it was still matching the push
+      # trigger above (nothing excluded it) and kicking off a full build+release+
+      # Telegram-notify cycle, which is why a release.yml-only commit produced a
+      # real APK release. Any change under .github/ that isn't app source now
+      # skips the build entirely.
+      - '.github/workflows/**'
+      - '.github/FUNDING.yml'
 
 jobs:
   build:
