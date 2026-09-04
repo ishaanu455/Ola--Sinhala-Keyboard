@@ -50,6 +50,7 @@ import androidx.compose.material.icons.filled.SwipeLeft
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -130,6 +131,19 @@ fun SettingsScreen() {
     // whole app instead of just returning to the Settings home list.
     BackHandler(enabled = currentSection != null) {
         currentSection = null
+    }
+
+    // Once-a-day nudge to join the Telegram channel, shown whenever the user opens
+    // the app / lands on Settings - see shouldShowTelegramPromptAndMarkShown() below
+    // for the "once per 24h" gate (persisted in SharedPreferences so it survives
+    // process death).
+    val context = LocalContext.current
+    var showTelegramPrompt by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        showTelegramPrompt = shouldShowTelegramPromptAndMarkShown(context)
+    }
+    if (showTelegramPrompt) {
+        TelegramJoinDialog(onDismiss = { showTelegramPrompt = false })
     }
 
     AnimatedContent(
@@ -1320,8 +1334,6 @@ private fun AboutSection() {
     // GitHub (source code) + Telegram, centered under the list rows above rather
     // than as their own PreferenceItem rows - these are external/social links, not
     // settings, so they get a lighter "icon row" treatment instead of full cards.
-    // Telegram has no destination yet (onClick left as a no-op) - link goes in
-    // once we have the channel URL.
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Center
@@ -1341,7 +1353,7 @@ private fun AboutSection() {
         SocialIconButton(
             iconRes = R.drawable.ic_telegram,
             contentDescription = "Telegram",
-            onClick = { /* TODO: open Telegram channel once the link is set */ }
+            onClick = { openTelegramChannel(context) }
         )
     }
 
@@ -1387,6 +1399,103 @@ private fun SocialIconButton(
             modifier = Modifier.size(24.dp)
         )
     }
+}
+
+/** Public channel users are pointed to from the Telegram icon and the join-prompt dialog. */
+private const val TELEGRAM_CHANNEL_URL = "https://t.me/olakeyboard_channel"
+
+/**
+ * Opens the Ola Keyboard Telegram channel. A plain https://t.me/... ACTION_VIEW intent
+ * is enough for Android to hand this straight to the Telegram app when it's installed
+ * (Telegram registers t.me as an app link) and fall back to the browser otherwise -
+ * no need to hand-roll a tg:// deep link or check installed packages ourselves.
+ */
+private fun openTelegramChannel(context: Context) {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(TELEGRAM_CHANNEL_URL))
+    context.startActivity(intent)
+}
+
+private const val TELEGRAM_PROMPT_LAST_SHOWN_KEY = "telegram_prompt_last_shown_at"
+private const val TELEGRAM_PROMPT_INTERVAL_MS = 24L * 60 * 60 * 1000
+
+/**
+ * Gate for the once-a-day Telegram join popup. Reads+updates the "last shown" timestamp
+ * in one shot so the dialog only ever fires once per 24h window, no matter how many times
+ * SettingsScreen recomposes/re-enters in that window. Uses the same "prefs" SharedPreferences
+ * file as [com.ola.keyboard.Prefs] so it survives app restarts.
+ */
+private fun shouldShowTelegramPromptAndMarkShown(context: Context): Boolean {
+    val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
+    val lastShown = prefs.getLong(TELEGRAM_PROMPT_LAST_SHOWN_KEY, 0L)
+    val now = System.currentTimeMillis()
+    if (now - lastShown < TELEGRAM_PROMPT_INTERVAL_MS) return false
+    prefs.edit().putLong(TELEGRAM_PROMPT_LAST_SHOWN_KEY, now).apply()
+    return true
+}
+
+/**
+ * Once-a-day popup nudging the user to join the Telegram channel for update news.
+ * Dismissible both via the explicit close (X) icon in the top-right corner and the
+ * usual tap-outside/back-press (onDismissRequest) - "Join Now" opens the channel and
+ * closes the dialog in the same tap.
+ */
+@Composable
+private fun TelegramJoinDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_telegram),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(32.dp)
+            )
+        },
+        title = {
+            Box(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Join our Telegram channel",
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(end = 32.dp),
+                    textAlign = TextAlign.Center
+                )
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "Close",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        },
+        text = {
+            Text(
+                text = "Get the latest updates, new features and downloads by joining " +
+                    "the Ola Keyboard Telegram channel.",
+                textAlign = TextAlign.Center
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    openTelegramChannel(context)
+                    onDismiss()
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Join Now")
+            }
+        }
+    )
 }
 
 /**
