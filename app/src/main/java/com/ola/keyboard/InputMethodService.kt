@@ -2275,7 +2275,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                  updateKeyboard()
              }
              KeyboardLayout.SINGLISH -> {
-                 keyboardView.setLangIndicator("SIN")
+                 keyboardView.setLangIndicator("සිං")
                  updateKeyboard()
              }
          }
