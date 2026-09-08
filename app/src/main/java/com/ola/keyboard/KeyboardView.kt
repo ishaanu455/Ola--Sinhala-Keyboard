@@ -2242,6 +2242,16 @@ class KeyboardView(
     // field never inherits a previous one's override.
     private var manualLetterOverride: Boolean = false
 
+    // Tracks which physical parent n1..n0/backspace/action/dot/comma/blank1/blank2
+    // currently sit in: true = the numeric_row_1..4 grid, false = their normal
+    // key_row_1/3/4/5 homes. setNumericMode() used to be the only place that moved
+    // these views, so it could safely assume the direction; now toggleNumLetterOverride()
+    // also moves them (see moveKeysToLetterRows/moveKeysToNumericGrid below), so both
+    // paths need this flag to know whether a move is actually necessary before doing
+    // one - reparentWeighted() always APPENDS, so calling it on a view that's already
+    // correctly placed silently reshuffles that row's key order instead of no-op'ing.
+    private var borrowedKeysInNumericGrid: Boolean = false
+
     /** Switches between the normal 5-row keyboard and a compact digit-only mode
      *  for OTP/phone-number fields.
      *
@@ -2321,11 +2331,97 @@ class KeyboardView(
             binding.keyboardRows.visibility = View.GONE
             binding.numericKeypad.visibility = View.GONE
         } else if (numericModeActive && !manualLetterOverride) {
+            // n1..n0/backspace/action/dot/comma/blank1/blank2 must physically live in
+            // numeric_row_1..4 before this surface is shown - see moveKeysToNumericGrid().
+            moveKeysToNumericGrid()
             binding.keyboardRows.visibility = View.GONE
             binding.numericKeypad.visibility = View.VISIBLE
         } else {
+            // Either not a numeric field, or the user tapped "ABC": either way
+            // key_row_1/3/4/5 need their borrowed keys back before keyboard_rows
+            // is shown, or backspace/the number row/etc. are simply missing -
+            // see moveKeysToLetterRows().
+            moveKeysToLetterRows()
             binding.keyboardRows.visibility = View.VISIBLE
             binding.numericKeypad.visibility = View.GONE
+        }
+    }
+
+    /** Physically moves n1..n0/backspace/action/dot/comma/blank1/blank2 back into
+     *  their normal key_row_1/3/4/5 homes (see reparentAtWeighted's doc) and restores
+     *  the normal 5-row heights - the exact steps setNumericMode(false) used to run
+     *  inline. Guarded by [borrowedKeysInNumericGrid] so calling this while the keys
+     *  are already home (e.g. every non-numeric field, or a second tap that doesn't
+     *  change anything) is a cheap no-op instead of quietly reshuffling key order. */
+    private fun moveKeysToLetterRows() {
+        if (borrowedKeysInNumericGrid) {
+            reparentAtWeighted(binding.n1, binding.keyRow1, 0, 1f)
+            reparentAtWeighted(binding.n2, binding.keyRow1, 1, 1f)
+            reparentAtWeighted(binding.n3, binding.keyRow1, 2, 1f)
+            reparentAtWeighted(binding.n4, binding.keyRow1, 3, 1f)
+            reparentAtWeighted(binding.n5, binding.keyRow1, 4, 1f)
+            reparentAtWeighted(binding.n6, binding.keyRow1, 5, 1f)
+            reparentAtWeighted(binding.n7, binding.keyRow1, 6, 1f)
+            reparentAtWeighted(binding.n8, binding.keyRow1, 7, 1f)
+            reparentAtWeighted(binding.n9, binding.keyRow1, 8, 1f)
+            reparentAtWeighted(binding.n0, binding.keyRow1, 9, 1f)
+
+            reparentAtWeighted(binding.blank1, binding.keyRow3, 0, 0.5f)
+            reparentAtWeighted(binding.blank2, binding.keyRow3, binding.keyRow3.childCount, 0.5f)
+
+            reparentAtWeighted(binding.backspace, binding.keyRow4, binding.keyRow4.childCount, 1.5f)
+
+            reparentAtWeighted(binding.comma, binding.keyRow5, 3, 1f)
+            reparentAtWeighted(binding.dot, binding.keyRow5, 6, 1f)
+            reparentAtWeighted(binding.action, binding.keyRow5, binding.keyRow5.childCount, 1f)
+
+            borrowedKeysInNumericGrid = false
+        }
+
+        binding.keyRow1.visibility = if (showNumberRow) View.VISIBLE else View.GONE
+        binding.keyRow1.layoutParams.height = numRowHeight(rowHeightPx)
+        binding.keyRow2.layoutParams.height = rowHeightPx
+        binding.keyRow3.layoutParams.height = rowHeightPx
+        binding.keyRow4.layoutParams.height = rowHeightPx
+        binding.keyRow5.layoutParams.height = rowHeightPx
+        updateRecentEmojiRowVisibility()
+    }
+
+    /** Physically moves n1..n0/backspace/action/dot/comma/blank1/blank2 into the
+     *  numeric_row_1..4 grid (see reparentWeighted's doc) and sizes those rows to
+     *  match the full keyboard's current total height - the exact steps
+     *  setNumericMode(true) used to run inline. Guarded by [borrowedKeysInNumericGrid]
+     *  so a re-entrant call (e.g. re-opening the digit pad after "ABC") doesn't
+     *  re-append already-placed keys and scramble the grid's column order. */
+    private fun moveKeysToNumericGrid() {
+        val rowH = (numRowHeight(rowHeightPx) + rowHeightPx * 4) / 4
+        binding.numericRow1.layoutParams.height = rowH
+        binding.numericRow2.layoutParams.height = rowH
+        binding.numericRow3.layoutParams.height = rowH
+        binding.numericRow4.layoutParams.height = rowH
+
+        if (!borrowedKeysInNumericGrid) {
+            reparentWeighted(binding.n1, binding.numericRow1, 1f)
+            reparentWeighted(binding.n2, binding.numericRow1, 1f)
+            reparentWeighted(binding.n3, binding.numericRow1, 1f)
+            reparentWeighted(binding.backspace, binding.numericRow1, 1f)
+
+            reparentWeighted(binding.n4, binding.numericRow2, 1f)
+            reparentWeighted(binding.n5, binding.numericRow2, 1f)
+            reparentWeighted(binding.n6, binding.numericRow2, 1f)
+            reparentWeighted(binding.action, binding.numericRow2, 1f)
+
+            reparentWeighted(binding.n7, binding.numericRow3, 1f)
+            reparentWeighted(binding.n8, binding.numericRow3, 1f)
+            reparentWeighted(binding.n9, binding.numericRow3, 1f)
+            reparentWeighted(binding.dot, binding.numericRow3, 1f)
+
+            reparentWeighted(binding.blank1, binding.numericRow4, 1f)
+            reparentWeighted(binding.n0, binding.numericRow4, 1f)
+            reparentWeighted(binding.comma, binding.numericRow4, 1f)
+            reparentWeighted(binding.blank2, binding.numericRow4, 1f)
+
+            borrowedKeysInNumericGrid = true
         }
     }
 
@@ -2355,6 +2451,12 @@ class KeyboardView(
         manualLetterOverride = !manualLetterOverride
         setBaseKeyboardVisible(true)
         updateNumLetterToggleLabel()
+        // setBaseKeyboardVisible() now moves backspace/numbers/etc. between rows on
+        // every toggle (see moveKeysToLetterRows/moveKeysToNumericGrid), which can
+        // change key_row_1's height - keep the emoji/clipboard/text-select/fonts
+        // panels in sync the same way applyPanelHeights() is called after every
+        // other row-height change (setNumericMode, updateRowHeight, setShowNumberRow).
+        applyPanelHeights()
         requestLayout()
     }
 
@@ -2386,74 +2488,23 @@ class KeyboardView(
                 // Same total height the normal 5-row keyboard currently occupies
                 // (number row + 4 full rows), split evenly across this grid's 4
                 // rows - so nothing above the keyboard jumps when a field switches
-                // in or out of numeric mode.
-                val rowH = (numRowHeight(rowHeightPx) + rowHeightPx * 4) / 4
-                binding.numericRow1.layoutParams.height = rowH
-                binding.numericRow2.layoutParams.height = rowH
-                binding.numericRow3.layoutParams.height = rowH
-                binding.numericRow4.layoutParams.height = rowH
-
-                // Every cell gets the SAME weight (1f) here regardless of what it
-                // carried in its home row, so all 4 rows resolve to one identical
-                // unit column width - see reparentWeighted's doc for why that's
-                // required for a properly-aligned 4-column grid.
-                reparentWeighted(binding.n1, binding.numericRow1, 1f)
-                reparentWeighted(binding.n2, binding.numericRow1, 1f)
-                reparentWeighted(binding.n3, binding.numericRow1, 1f)
-                reparentWeighted(binding.backspace, binding.numericRow1, 1f)
-
-                reparentWeighted(binding.n4, binding.numericRow2, 1f)
-                reparentWeighted(binding.n5, binding.numericRow2, 1f)
-                reparentWeighted(binding.n6, binding.numericRow2, 1f)
-                reparentWeighted(binding.action, binding.numericRow2, 1f)
-
-                reparentWeighted(binding.n7, binding.numericRow3, 1f)
-                reparentWeighted(binding.n8, binding.numericRow3, 1f)
-                reparentWeighted(binding.n9, binding.numericRow3, 1f)
-                reparentWeighted(binding.dot, binding.numericRow3, 1f)
-
-                reparentWeighted(binding.blank1, binding.numericRow4, 1f)
-                reparentWeighted(binding.n0, binding.numericRow4, 1f)
-                reparentWeighted(binding.comma, binding.numericRow4, 1f)
-                reparentWeighted(binding.blank2, binding.numericRow4, 1f)
+                // in or out of numeric mode. Also physically reparents n1..n0/
+                // backspace/action/dot/comma/blank1/blank2 into numeric_row_1..4 -
+                // see moveKeysToNumericGrid(), shared with toggleNumLetterOverride()
+                // so the digit pad always gets these keys back the same way.
+                moveKeysToNumericGrid()
 
                 binding.numericKeypad.visibility = View.VISIBLE
             } else {
                 binding.numericKeypad.visibility = View.GONE
 
-                // Put every borrowed key back at its original index (and original
-                // weight - see reparentAtWeighted doc), in ascending index order -
-                // key_row_1 was left fully empty, key_row_3/4/5 each just had one
-                // or two keys borrowed.
-                reparentAtWeighted(binding.n1, binding.keyRow1, 0, 1f)
-                reparentAtWeighted(binding.n2, binding.keyRow1, 1, 1f)
-                reparentAtWeighted(binding.n3, binding.keyRow1, 2, 1f)
-                reparentAtWeighted(binding.n4, binding.keyRow1, 3, 1f)
-                reparentAtWeighted(binding.n5, binding.keyRow1, 4, 1f)
-                reparentAtWeighted(binding.n6, binding.keyRow1, 5, 1f)
-                reparentAtWeighted(binding.n7, binding.keyRow1, 6, 1f)
-                reparentAtWeighted(binding.n8, binding.keyRow1, 7, 1f)
-                reparentAtWeighted(binding.n9, binding.keyRow1, 8, 1f)
-                reparentAtWeighted(binding.n0, binding.keyRow1, 9, 1f)
-
-                reparentAtWeighted(binding.blank1, binding.keyRow3, 0, 0.5f)
-                reparentAtWeighted(binding.blank2, binding.keyRow3, binding.keyRow3.childCount, 0.5f)
-
-                reparentAtWeighted(binding.backspace, binding.keyRow4, binding.keyRow4.childCount, 1.5f)
-
-                reparentAtWeighted(binding.comma, binding.keyRow5, 3, 1f)
-                reparentAtWeighted(binding.dot, binding.keyRow5, 6, 1f)
-                reparentAtWeighted(binding.action, binding.keyRow5, binding.keyRow5.childCount, 1f)
+                // Put every borrowed key back at its original index/weight and
+                // restore the normal row heights - see moveKeysToLetterRows(),
+                // shared with toggleNumLetterOverride() so the "ABC" surface always
+                // has its backspace/number row/etc. too, not just this path.
+                moveKeysToLetterRows()
 
                 binding.keyboardRows.visibility = View.VISIBLE
-                updateRecentEmojiRowVisibility()
-
-                binding.keyRow1.visibility = if (showNumberRow) View.VISIBLE else View.GONE
-                binding.keyRow1.layoutParams.height = numRowHeight(rowHeightPx)
-                binding.keyRow2.layoutParams.height = rowHeightPx
-                binding.keyRow3.layoutParams.height = rowHeightPx
-                binding.keyRow4.layoutParams.height = rowHeightPx
-                binding.keyRow5.layoutParams.height = rowHeightPx
             }
             // Re-sync the emoji/clipboard/text-select/fonts panel heights for the
             // mode we just switched to - without this, a numeric-mode change that
