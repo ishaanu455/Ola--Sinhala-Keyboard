@@ -29,6 +29,11 @@ class TopBarController(
     // The Settings (gear) icon at the far end of the row - same deal as the icons
     // above: needs to hide while suggestion chips are showing and come back after.
     private val settingsButton: View? = null,
+    // The "ABC"/"123" toggle key, next to btnTextSelect - only ever relevant for a
+    // numeric field (see showNormal(isNumericField)), so it's GONE for every
+    // non-numeric field and also hidden the instant suggestion chips take over the
+    // row, same as textSelectButton/fontsButton above.
+    private val numLetterToggleButton: View? = null,
     // The Ola brand mark, first icon in the row - same deal: hide while suggestion
     // chips are showing, come back after.
     private val olaLogoButton: View? = null,
@@ -116,6 +121,7 @@ class TopBarController(
         textSelectButton?.visibility = if (isNumericField) View.GONE else View.VISIBLE
         olaLogoButton?.visibility = View.VISIBLE
         fontsButton?.visibility = if (isNumericField) View.GONE else View.VISIBLE
+        numLetterToggleButton?.visibility = if (isNumericField) View.VISIBLE else View.GONE
         settingsButton?.visibility = View.VISIBLE
         logoSpacer?.visibility = View.VISIBLE
         // Restore the clipboard icon only if the feature is actually enabled in
@@ -131,6 +137,7 @@ class TopBarController(
         clipboardButton?.visibility = View.GONE
         textSelectButton?.visibility = View.GONE
         fontsButton?.visibility = View.GONE
+        numLetterToggleButton?.visibility = View.GONE
         settingsButton?.visibility = View.GONE
         olaLogoButton?.visibility = View.GONE
         logoSpacer?.visibility = View.GONE

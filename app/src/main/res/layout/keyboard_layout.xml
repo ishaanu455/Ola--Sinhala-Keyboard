@@ -172,6 +172,29 @@
                 android:tint="?attr/foreground"
                 android:contentDescription="@string/text_select_title"/>
 
+            <!-- Numeric field only - lets the user drop into full letters (or back to
+                 the digit pad) without losing the numeric keyboard as default. Shares
+                 the same rounded circle background as every other top-bar icon
+                 (bg_top_bar_icon_circle) so it doesn't look bolted-on. Hidden entirely
+                 for non-numeric fields, same as showNormal(isNumericField) already
+                 does for emoji/textSelect/fonts. Text label ("ABC"/"123") instead of
+                 a glyph since there's no ready-made icon for this - see
+                 KeyboardView.toggleNumLetterOverride(). -->
+            <TextView
+                android:id="@+id/btn_num_letter_toggle"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_top_bar_icon_circle"
+                android:gravity="center"
+                android:text="ABC"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-medium"
+                android:textColor="?attr/foreground"
+                android:visibility="gone"
+                android:contentDescription="@string/numeric_letter_toggle_desc"/>
+
             <!-- Opens the app's Settings screen (MainActivity) - does not
                  toggle an in-keyboard panel like the others. Wrapped in a FrameLayout
                  so a small red dot (bg_update_badge_dot) can be overlaid top-right of

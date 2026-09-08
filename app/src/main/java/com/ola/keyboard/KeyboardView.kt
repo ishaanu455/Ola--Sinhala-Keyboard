@@ -1226,6 +1226,10 @@ class KeyboardView(
 
             this.closeFontStylePanelFn = { toggleFontStyleView(false) }
 
+            // --- Numeric field "ABC"/"123" toggle (fixed, only ever visible while
+            // isNumericField - see TopBarController.showNormal()) ---
+            binding.btnNumLetterToggle.setOnClickListener { toggleNumLetterOverride() }
+
             // --- Settings icon (fixed, far right of the top bar) ---
             // Doesn't toggle an in-keyboard panel like the others - it jumps
             // straight to the app's own Settings screen (MainActivity shows
@@ -1856,6 +1860,7 @@ class KeyboardView(
     val clipboardButtonView: ImageView get() = binding.btnClipboard
     val textSelectButtonView: ImageView get() = binding.btnTextSelect
     val fontsButtonView: ImageView get() = binding.btnFonts
+    val numLetterToggleView: TextView get() = binding.btnNumLetterToggle
     val olaLogoButtonView: ImageView get() = binding.btnOlaLogo
     val logoSpacerView: View get() = binding.logoSpacer
     val topBarIconRowView: LinearLayout get() = binding.topBarIconRow
@@ -2229,6 +2234,14 @@ class KeyboardView(
     // (OTP boxes, mobile-number fields) - see setNumericMode().
     private var numericModeActive: Boolean = false
 
+    // True once the user taps the top-bar "ABC" toggle while numericModeActive,
+    // to drop into the full letter keyboard without losing the numeric field's
+    // digit pad as the default surface - see toggleNumLetterOverride() and
+    // setBaseKeyboardVisible(). Only ever read/set while numericModeActive; reset
+    // the instant the field changes (see setNumericMode()) so a future numeric
+    // field never inherits a previous one's override.
+    private var manualLetterOverride: Boolean = false
+
     /** Switches between the normal 5-row keyboard and a compact digit-only mode
      *  for OTP/phone-number fields.
      *
@@ -2307,7 +2320,7 @@ class KeyboardView(
         if (!visible) {
             binding.keyboardRows.visibility = View.GONE
             binding.numericKeypad.visibility = View.GONE
-        } else if (numericModeActive) {
+        } else if (numericModeActive && !manualLetterOverride) {
             binding.keyboardRows.visibility = View.GONE
             binding.numericKeypad.visibility = View.VISIBLE
         } else {
@@ -2331,7 +2344,37 @@ class KeyboardView(
      *  strip) is hidden for the duration; only the icon bar on top and this grid
      *  are visible, same as the reference numeric keypad.
      */
+    /** Toggles between the numeric field's normal digit pad and the full letter
+     *  keyboard, without touching numericModeActive/the physical reparenting
+     *  setNumericMode() already did - only which of keyboard_rows/numeric_keypad
+     *  is visible changes (see setBaseKeyboardVisible()), same as every other
+     *  panel's base-surface switch. Only ever wired to btnNumLetterToggle, which
+     *  is itself only visible while numericModeActive (see
+     *  TopBarController.showNormal()), so there's no need to guard on that here. */
+    private fun toggleNumLetterOverride() {
+        manualLetterOverride = !manualLetterOverride
+        setBaseKeyboardVisible(true)
+        updateNumLetterToggleLabel()
+        requestLayout()
+    }
+
+    private fun updateNumLetterToggleLabel() {
+        binding.btnNumLetterToggle.text = if (manualLetterOverride) "123" else "ABC"
+    }
+
     fun setNumericMode(active: Boolean) {
+        // Reset any manual "letters" override the instant the field changes, before
+        // the numericModeActive-unchanged early return just below - two consecutive
+        // numeric fields (isNumericField staying true across onStartInputView calls)
+        // would otherwise short-circuit past this and let a stale override leak into
+        // the new field, reproducing the same kind of stale-state bug the emoji/
+        // clipboard panel guards above exist to avoid.
+        if (manualLetterOverride) {
+            manualLetterOverride = false
+            updateNumLetterToggleLabel()
+            setBaseKeyboardVisible(true)
+        }
+
         if (numericModeActive == active) return
         numericModeActive = active
 
