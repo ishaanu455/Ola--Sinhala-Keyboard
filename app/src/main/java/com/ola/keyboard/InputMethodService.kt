@@ -700,7 +700,11 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                     // field is genuinely empty (nothing before the cursor at all),
                     // fall back to the old clear-the-bar behavior.
                     val previousWord = textBefore.trimEnd().takeLastWhile { !it.isWhitespace() }
-                    if (previousWord.isBlank()) {
+                    if (previousWord.isBlank() || suppressNextWordSuggestions) {
+                        // Either nothing to predict from, or the user just double-spaced
+                        // to dismiss the chips (specialClick set the flag below) - either
+                        // way, stay on the normal icon row instead of re-requesting and
+                        // re-showing the same suggestions we were just asked to hide.
                         topBarController?.showNormal(isNumericField)
                     } else {
                         requestSuggestionsForToken("", previousWord)
@@ -778,6 +782,12 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         debouncer?.cancel()
         suggestionJob?.cancel()
         topBarController?.showNormal(isNumericField)
+        // A double-space suppression (or streak count) from the previous field/app
+        // has no business carrying over into a brand-new field - it would wrongly
+        // block next-word suggestions there even though the user never double-spaced
+        // in THIS field.
+        consecutiveSpacePresses = 0
+        suppressNextWordSuggestions = false
         // A cached in-progress word belongs to whatever field/app we were just in -
         // carrying it over to a new field would risk learning it under the wrong
         // context (or not at all, since it's stale) if that new field happens to
@@ -866,6 +876,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         // should hide the suggestion chips; typing anything else in between is a normal
         // next word starting, so the following single space should show chips again.
         consecutiveSpacePresses = 0
+        suppressNextWordSuggestions = false
         when {
             keyboardLayout == KeyboardLayout.SINGLISH && !keyboardSymbolsActive -> {
                 singlishInput(tag)
@@ -978,6 +989,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         // next actual space the user types shows chips instead of being treated as
         // an (incorrect) 2nd consecutive space.
         consecutiveSpacePresses = 0
+        suppressNextWordSuggestions = false
 
         // record acceptance
         serviceScope.launch {
@@ -1001,6 +1013,16 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     // Reset to 0 by any other input (a letter, backspace, a suggestion tap, symbols/
     // comma/dot, etc.) - only literal space-after-space counts as "consecutive".
     private var consecutiveSpacePresses = 0
+
+    // Set true the moment a 2nd+ consecutive space hides the suggestion chips.
+    // onUpdateSelection() fires asynchronously after EVERY committed space (it's
+    // the host app notifying us the cursor/text moved) and, on its own, has no idea
+    // a double-space just asked for the chips to go away - it just re-derives the
+    // previous word and requests suggestions again, instantly bringing the chips
+    // back right after specialClick() hid them. This flag is what onUpdateSelection
+    // checks to stay hidden instead. Cleared everywhere consecutiveSpacePresses is
+    // reset to 0, so the very next real keystroke restores normal suggestion behavior.
+    private var suppressNextWordSuggestions = false
 
     // Holds the base consonant when "r" forms a rakaransaya right after a consonant+al-lakuna.
     // If the very next key is "u", we retro-convert that rakar into a gaetta pilla (vocalic-r
@@ -1689,6 +1711,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         // A number tap breaks the "space after space" streak too - see
         // consecutiveSpacePresses' declaration.
         consecutiveSpacePresses = 0
+        suppressNextWordSuggestions = false
         val ic = currentInputConnection
         if (ic != null) {
             try {
@@ -1791,6 +1814,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 // Deleting breaks the "space after space" streak too - see
                 // consecutiveSpacePresses' declaration.
                 consecutiveSpacePresses = 0
+                suppressNextWordSuggestions = false
                 if (ic != null) {
                     val topStep = if (!hasPositionChanged()) inputHistory.removeLastOrNull() else null
                     if (topStep != null) {
@@ -1915,6 +1939,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             // this; typing a letter (or any other key) resets the counter above, so
             // the very next single space after that goes back to showing chips.
             if (isSpacePress && consecutiveSpacePresses >= 2) {
+                suppressNextWordSuggestions = true
                 topBarController?.showNormal(isNumericField)
                 debouncer?.cancel()
                 suggestionJob?.cancel()
