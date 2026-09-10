@@ -250,6 +250,9 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             return@OnPrimaryClipChangedListener
         }
         if (!Prefs.getClipboardEnabled(this)) return@OnPrimaryClipChangedListener
+        // Paused via the toggle inside the clipboard panel itself (btn_clip_capture) -
+        // the panel/history/icon all stay as-is, only saving of *new* copies stops.
+        if (!Prefs.getClipboardCaptureEnabled(this)) return@OnPrimaryClipChangedListener
         try {
             val clip = systemClipboardManager.primaryClip ?: return@OnPrimaryClipChangedListener
             if (clip.itemCount == 0) return@OnPrimaryClipChangedListener

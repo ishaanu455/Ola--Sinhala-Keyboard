@@ -2,6 +2,7 @@ package ime.suggest
 
 import android.content.Context
 import android.util.Log
+import com.ola.keyboard.Prefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -264,6 +265,11 @@ class SuggestionEngine(private val context: Context) {
      * the bigram model so the next-word prediction has context to work with.
      */
     fun recordAccepted(word: String, lang: LanguageDetector.Language, previousWord: String? = null) {
+        // "Self learning" toggle - when off, typing still gets suggestions from
+        // whatever was already learned/custom-added before, it just stops adding
+        // anything new. Nothing already learned is touched or erased by this.
+        if (!Prefs.getWordLearningEnabled(context)) return
+
         val normalized = if (lang == LanguageDetector.Language.SINHALA) {
             Normalizer.normalize(word, Normalizer.Form.NFC)
         } else {

@@ -39,6 +39,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ola.keyboard.Prefs
+import com.ola.keyboard.ui.components.SwitchPreference
 import ime.suggest.DefaultDictionary
 import ime.suggest.SinhalaCollation
 import ime.suggest.UserDictionary
@@ -135,6 +137,9 @@ fun PredictionManagerScreen(
 
     var showAddDialog by remember { mutableStateOf(false) }
 
+    val prefs = remember { Prefs(context) }
+    var learningEnabled by remember { mutableStateOf(prefs.wordLearningEnabled) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -157,6 +162,23 @@ fun PredictionManagerScreen(
                 .padding(paddingValues)
                 .fillMaxSize()
         ) {
+            // Master switch for on-device learning: when off, the keyboard still
+            // suggests from whatever's already in "My Prediction"/"All Usage", it
+            // just stops adding anything new from future typing. Doesn't clear
+            // either list - see Prefs.wordLearningEnabled / SuggestionEngine.recordAccepted.
+            SwitchPreference(
+                title = "නව වචන ඉගෙනීම",
+                summary = if (learningEnabled)
+                    "ඔබ ටයිප් කරන විට කීබෝඩ් එක අලුත් වචන සහ රටා ඉගෙන ගනී"
+                else
+                    "නවත්වා ඇත. දැනටමත් ඉගෙන ගත් වචන පවතී, නමුත් අලුත් ඒවා ඉගෙන නොගනී",
+                checked = learningEnabled,
+                onCheckedChange = {
+                    learningEnabled = it
+                    prefs.wordLearningEnabled = it
+                }
+            )
+
             TabRow(selectedTabIndex = selectedTab) {
                 Tab(
                     selected = selectedTab == TAB_MY_PREDICTION,

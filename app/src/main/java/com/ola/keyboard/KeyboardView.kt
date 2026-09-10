@@ -1003,6 +1003,16 @@ class KeyboardView(
                 showClipFilterMenu(anchor)
             }
 
+            // Pause/resume auto-capture of NEW copies. Purely a local Prefs flip +
+            // icon swap - unlike btn_clip_clear/filter this needs no IME callback,
+            // and it never touches clips already saved (see InputMethodService's
+            // clipChangedListener, which is the thing actually gated by this flag).
+            binding.btnClipCaptureToggle.setOnClickListener {
+                val nowEnabled = !Prefs.getClipboardCaptureEnabled(context)
+                Prefs.setClipboardCaptureEnabled(context, nowEnabled)
+                updateClipCaptureToggleIcon()
+            }
+
             fun toggleClipboardView(visible: Boolean) {
                 setBaseKeyboardVisible(!visible)
                 binding.clipboardView.root.visibility = if (visible) View.VISIBLE else View.GONE
@@ -1015,6 +1025,8 @@ class KeyboardView(
                 binding.btnClipboard.setImageResource(if (visible) R.drawable.ic_arrow_back else R.drawable.ic_clipboard)
                 binding.btnClipClear.isVisible = visible
                 binding.btnClipFilter.isVisible = visible
+                binding.btnClipCaptureToggle.isVisible = visible
+                if (visible) updateClipCaptureToggleIcon()
                 // The spacer between the fixed back arrow (btn_clipboard) and
                 // btn_clip_clear/btn_clip_filter only shows up while the panel is
                 // open, and the row itself switches to width=0dp/weight=1 at the
@@ -2068,6 +2080,25 @@ class KeyboardView(
             context,
             if (currentClipFilter != ClipFilter.ALL) R.drawable.bg_clip_purple_circle_active
             else R.drawable.bg_clip_purple_circle
+        )
+    }
+
+    /** Swaps btn_clip_capture_toggle's icon/background/description to match whether
+     *  auto-capture of new copies is currently paused - same "active ring" treatment
+     *  as btn_clip_filter uses for a non-default filter, so it reads as "on" here
+     *  rather than "an active filter". Called on panel open and right after every tap. */
+    fun updateClipCaptureToggleIcon() {
+        if (!::binding.isInitialized) return
+        val paused = !Prefs.getClipboardCaptureEnabled(context)
+        binding.btnClipCaptureToggle.setImageResource(
+            if (paused) R.drawable.ic_clip_capture_resume else R.drawable.ic_clip_capture_pause
+        )
+        binding.btnClipCaptureToggle.background = AppCompatResources.getDrawable(
+            context,
+            if (paused) R.drawable.bg_clip_purple_circle_active else R.drawable.bg_clip_purple_circle
+        )
+        binding.btnClipCaptureToggle.contentDescription = context.getString(
+            if (paused) R.string.clip_capture_resume else R.string.clip_capture_pause
         )
     }
 

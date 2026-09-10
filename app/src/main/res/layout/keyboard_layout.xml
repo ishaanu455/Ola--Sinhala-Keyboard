@@ -165,6 +165,21 @@
                 android:visibility="gone"
                 android:contentDescription="@string/clipboard_clear" />
 
+            <!-- Pauses/resumes auto-capture of NEW copies only (Prefs.clipboardCaptureEnabled).
+                 Doesn't touch clipboardEnabled (the whole-feature switch in Settings) or
+                 anything already saved - the panel, history and this icon itself all stay
+                 visible either way. Same purple circular treatment as its siblings; icon
+                 and background swap to the "active"/muted look while paused (see
+                 KeyboardView.kt updateClipCaptureToggleIcon). -->
+            <ImageView
+                android:id="@+id/btn_clip_capture_toggle"
+                style="@style/TopBarIcon"
+                android:background="@drawable/bg_clip_purple_circle"
+                android:src="@drawable/ic_clip_capture_pause"
+                android:tint="@android:color/white"
+                android:visibility="gone"
+                android:contentDescription="@string/clip_capture_pause" />
+
             <ImageView
                 android:id="@+id/btn_text_select"
                 style="@style/TopBarIcon"

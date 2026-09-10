@@ -27,6 +27,8 @@
     <string name="clip_filter_email">Emails</string>
     <string name="clip_filter_link">Links</string>
     <string name="clipboard_empty_filtered">No clips match this filter.</string>
+    <string name="clip_capture_pause">Pause copying new clips</string>
+    <string name="clip_capture_resume">Resume copying new clips</string>
     <string name="settings_clipboard_title">Clipboard manager</string>
     <string name="settings_clipboard_summary">Show a clipboard icon on the keyboard and keep a history of copied text</string>
     <string name="clips_manager_title">Clips Manager</string>

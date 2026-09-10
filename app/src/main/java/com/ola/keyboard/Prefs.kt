@@ -133,6 +133,24 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean("clipboard_enabled", true)
         set(value) = prefs.edit().putBoolean("clipboard_enabled", value).apply()
 
+    /** Whether newly copied text is actually saved into clipboard history. Separate
+     *  from [clipboardEnabled] (which hides the whole feature/button): this only
+     *  pauses new captures via the toggle inside the clipboard panel itself, while
+     *  the panel, icon and existing history stay fully visible/usable. Turning it
+     *  back on resumes saving new copies normally - it never touches clips already
+     *  saved before it was turned off. */
+    var clipboardCaptureEnabled: Boolean
+        get() = prefs.getBoolean("clipboard_capture_enabled", true)
+        set(value) = prefs.edit().putBoolean("clipboard_capture_enabled", value).apply()
+
+    /** Whether the keyboard is allowed to learn new words/word-pairs from what the
+     *  user types (see UserWordFrequency/UserBigramFrequency, fed from
+     *  SuggestionEngine.recordAccepted). Turning this off does not erase anything
+     *  already learned - it only stops new typing from adding to it. */
+    var wordLearningEnabled: Boolean
+        get() = prefs.getBoolean("word_learning_enabled", true)
+        set(value) = prefs.edit().putBoolean("word_learning_enabled", value).apply()
+
     /** The "fancy text" style currently applied to freshly-typed Latin text (see
      *  FontStyleData). Persisted so it survives the keyboard closing/reopening,
      *  same as emojiStyle above. */
@@ -243,6 +261,21 @@ class Prefs(context: Context) {
         fun getClipboardEnabled(context: Context): Boolean {
             val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
             return prefs.getBoolean("clipboard_enabled", true)
+        }
+
+        fun getClipboardCaptureEnabled(context: Context): Boolean {
+            val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
+            return prefs.getBoolean("clipboard_capture_enabled", true)
+        }
+
+        fun setClipboardCaptureEnabled(context: Context, enabled: Boolean) {
+            context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
+                .edit().putBoolean("clipboard_capture_enabled", enabled).apply()
+        }
+
+        fun getWordLearningEnabled(context: Context): Boolean {
+            val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
+            return prefs.getBoolean("word_learning_enabled", true)
         }
 
         /** Whether the suggestion bar (the row of word predictions above the keys)
