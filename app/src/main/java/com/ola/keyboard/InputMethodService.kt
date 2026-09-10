@@ -728,7 +728,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 } else {
                     val previousWord = textBefore.dropLast(token.length).trimEnd().takeLastWhile { !it.isWhitespace() }
                     requestSuggestionsForToken(token, previousWord)
-                    if (!isInPasswordField()) {
+                    if (!isIncognitoField()) {
                         // Keep the in-progress word cached in case the field gets
                         // cleared before any of our own handlers see it - see
                         // learnPendingWordIfFieldWasCleared().
@@ -860,7 +860,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         // settings/fonts icons out for bogus chips like "1155"/"17" on a plain
         // number keyboard. Numeric fields keep the icon row exactly like any other
         // suggestions-off case, same as the password-field guard below.
-        if (!suggestionsEnabled || isInPasswordField() || isNumericField) {
+        if (!suggestionsEnabled || isIncognitoField() || isNumericField) {
             topBarController?.showNormal(isNumericField)
             return
         }
@@ -1038,6 +1038,20 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD ||
                 variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
                 variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD
+    }
+
+    // Broader than isInPasswordField(): also catches fields a host app has
+    // explicitly marked as "don't learn from this" via IME_FLAG_NO_PERSONALIZED_LEARNING
+    // (e.g. OTP fields, which are very often TYPE_CLASS_NUMBER rather than any
+    // password variation, so isInPasswordField() alone misses them) - regardless
+    // of the field's actual inputType. Used to auto-pause self-learning and the
+    // suggestion bar for the duration of that field's focus, without touching the
+    // user's Settings > Self learning toggle: it stays on, this is a per-field,
+    // automatic, temporary skip, not a persisted preference change.
+    private fun isIncognitoField(): Boolean {
+        if (isInPasswordField()) return true
+        val t = currentInputEditorInfo ?: return false
+        return (t.imeOptions and android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0
     }
 
     private fun onSuggestionClicked(suggestion: String) {
@@ -2100,11 +2114,12 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     private var pendingWordPreviousCache: String = ""
 
     private fun learnLastTypedWord(ic: android.view.inputmethod.InputConnection?): String? {
-        // Never learn anything typed in a password field - a single guard here
-        // covers all 4 call sites (space/punctuation, Enter/Send action, symbols
-        // panel, keyboard close) so the password itself can never end up as a
-        // suggestion later in a different field.
-        if (isInPasswordField()) return null
+        // Never learn anything typed in a password field, or a field the host app
+        // marked IME_FLAG_NO_PERSONALIZED_LEARNING (OTP, other sensitive fields) -
+        // a single guard here covers all 4 call sites (space/punctuation, Enter/
+        // Send action, symbols panel, keyboard close) so nothing typed in either
+        // kind of field can ever end up as a suggestion later in a different field.
+        if (isIncognitoField()) return null
         // Whichever trigger got us here, the in-progress word it was tracking is
         // now resolved one way or another - drop the cache so a later field-clear
         // doesn't try to re-learn a word that's already been handled.
@@ -2162,7 +2177,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
      */
     private fun learnPendingWordIfFieldWasCleared(ic: android.view.inputmethod.InputConnection?) {
         if (pendingWordCache.isEmpty()) return
-        if (isInPasswordField()) {
+        if (isIncognitoField()) {
             pendingWordCache = ""
             pendingWordPreviousCache = ""
             return
