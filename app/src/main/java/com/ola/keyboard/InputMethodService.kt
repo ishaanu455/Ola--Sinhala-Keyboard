@@ -812,6 +812,27 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         return false
     }
 
+    // Suggestions come back lowercase (dictionaries/learned data are stored
+    // case-normalized - see SuggestionEngine.recordAccepted), so without this
+    // both the chip text shown in the suggestion bar AND a tapped-suggestion
+    // commit would be lowercase even at a sentence start or with Shift/caps-lock
+    // active, unlike typing the same word key-by-key (which already cases each
+    // letter from [caps]/[shift] as it's tapped). Match that: caps-lock (shift)
+    // uppercases the whole word, a one-shot caps just the first letter, same as
+    // a normal keystroke would. Sinhala has no letter case, so it's left
+    // untouched either way. Used both to render the chips and, on tap, to
+    // re-derive what to commit - so the chip the user sees is exactly what gets
+    // typed.
+    private fun applyCurrentCaseForDisplay(suggestion: String): String {
+        val lang = LanguageDetector.detectLanguage(suggestion)
+        return when {
+            lang == LanguageDetector.Language.SINHALA -> suggestion
+            shift -> suggestion.uppercase()
+            caps -> suggestion.replaceFirstChar { it.uppercase() }
+            else -> suggestion
+        }
+    }
+
     // Helper to request suggestions for a token. previousWord is the word right
     // before the one being typed (if any) — feeds the bigram next-word boost.
     private fun requestSuggestionsForToken(token: String, previousWord: String = "") {
@@ -864,7 +885,12 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                             // suggestion chips didn't. Setting it here, right before every
                             // render, closes that gap the same way.
                             topBarController?.setEmojiStyle(Prefs.getEmojiStyle(this@InputMethodService))
-                            topBarController?.showSuggestions(sList, suggestionTextViews) { suggestion ->
+                            // Case the chips for display the same way a tap on them will be
+                            // committed (see applyCurrentCaseForDisplay) - otherwise the bar
+                            // shows the raw lowercase dictionary form even when caps/shift is
+                            // active, even though tapping it already committed the right case.
+                            val displayList = sList.map { applyCurrentCaseForDisplay(it) }
+                            topBarController?.showSuggestions(displayList, suggestionTextViews) { suggestion ->
                                 onSuggestionClicked(suggestion)
                             }
                         }
@@ -1021,21 +1047,13 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         for (i in 0 until token.codePointCount(0, token.length)) {
             ic.deleteSurroundingTextInCodePoints(1, 0)
         }
-        // Suggestions come back lowercase (dictionaries/learned data are stored
-        // case-normalized - see SuggestionEngine.recordAccepted), so without this
-        // a suggestion tap always inserted lowercase text even at a sentence start
-        // or with Shift/caps-lock active, unlike typing the same word key-by-key
-        // (which already cases each letter from [caps]/[shift] as it's tapped).
-        // Match that: caps-lock (shift) uppercases the whole word, a one-shot
-        // caps just the first letter, same as a normal keystroke would. Sinhala
-        // has no letter case, so it's left untouched either way.
+        // "suggestion" here is already the cased text the chip displayed (see
+        // applyCurrentCaseForDisplay at the call site in requestSuggestionsForToken),
+        // so this just re-derives it for the commit - harmless/idempotent if caps/
+        // shift hasn't changed since the chip was rendered, and correct even if it
+        // has (e.g. user toggled Shift after the chip appeared but before tapping it).
         val lang = LanguageDetector.detectLanguage(suggestion)
-        val casedSuggestion = when {
-            lang == LanguageDetector.Language.SINHALA -> suggestion
-            shift -> suggestion.uppercase()
-            caps -> suggestion.replaceFirstChar { it.uppercase() }
-            else -> suggestion
-        }
+        val casedSuggestion = applyCurrentCaseForDisplay(suggestion)
         // commit suggestion, followed by a single space so the user can keep typing the next word
         commitStyled(ic, "$casedSuggestion ")
 
