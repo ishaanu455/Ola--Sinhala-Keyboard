@@ -823,12 +823,29 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     // untouched either way. Used both to render the chips and, on tap, to
     // re-derive what to commit - so the chip the user sees is exactly what gets
     // typed.
-    private fun applyCurrentCaseForDisplay(suggestion: String): String {
+    // token: what's actually been typed so far for the word being completed (e.g.
+    // "Goo" while typing "Good"). When present, this - not [caps]/[shift] - is
+    // the source of truth for how the chip should be cased: [caps] is a
+    // ONE-SHOT flag that [checkAutoUnshift] already flips back off the instant
+    // the first letter is typed, so by the time there's a token to suggest
+    // against, caps/shift no longer reflect the capital the user actually typed.
+    // Without looking at the token itself, a chip for "Good" (typed with a real
+    // capital G) rendered as lowercase "good", even though the letter-by-letter
+    // text in the field was correctly capitalized. Only fall back to [caps]/
+    // [shift] when there's no token yet to read the case from (e.g. next-word
+    // prediction right after a space, before anything's been typed for it).
+    private fun applyCurrentCaseForDisplay(suggestion: String, token: String = ""): String {
         val lang = LanguageDetector.detectLanguage(suggestion)
+        if (lang == LanguageDetector.Language.SINHALA) return suggestion
+        val (useShiftAll, useCapsFirst) = if (token.isNotEmpty()) {
+            val allCaps = token.length > 1 && token.none { it.isLetter() && it.isLowerCase() }
+            allCaps to (!allCaps && token.first().isUpperCase())
+        } else {
+            shift to caps
+        }
         return when {
-            lang == LanguageDetector.Language.SINHALA -> suggestion
-            shift -> suggestion.uppercase()
-            caps -> suggestion.replaceFirstChar { it.uppercase() }
+            useShiftAll -> suggestion.uppercase()
+            useCapsFirst -> suggestion.replaceFirstChar { it.uppercase() }
             else -> suggestion
         }
     }
@@ -886,10 +903,11 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                             // render, closes that gap the same way.
                             topBarController?.setEmojiStyle(Prefs.getEmojiStyle(this@InputMethodService))
                             // Case the chips for display the same way a tap on them will be
-                            // committed (see applyCurrentCaseForDisplay) - otherwise the bar
-                            // shows the raw lowercase dictionary form even when caps/shift is
-                            // active, even though tapping it already committed the right case.
-                            val displayList = sList.map { applyCurrentCaseForDisplay(it) }
+                            // committed (see applyCurrentCaseForDisplay) - pass the actual
+                            // token typed so far (t) so the chip matches a capital the user
+                            // already typed, not just the one-shot caps/shift flags (which
+                            // reset right after that first letter).
+                            val displayList = sList.map { applyCurrentCaseForDisplay(it, t) }
                             topBarController?.showSuggestions(displayList, suggestionTextViews) { suggestion ->
                                 onSuggestionClicked(suggestion)
                             }
@@ -1047,13 +1065,14 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         for (i in 0 until token.codePointCount(0, token.length)) {
             ic.deleteSurroundingTextInCodePoints(1, 0)
         }
-        // "suggestion" here is already the cased text the chip displayed (see
-        // applyCurrentCaseForDisplay at the call site in requestSuggestionsForToken),
-        // so this just re-derives it for the commit - harmless/idempotent if caps/
-        // shift hasn't changed since the chip was rendered, and correct even if it
-        // has (e.g. user toggled Shift after the chip appeared but before tapping it).
+        // Re-derive casing from the actual token that was just typed (read above,
+        // before it was deleted) rather than the chip's already-displayed text -
+        // same reasoning as applyCurrentCaseForDisplay's token param: caps/shift
+        // alone can't tell us the user typed a capital "G", since [caps] auto-
+        // unshifts right after that first letter. This keeps tap-to-commit correct
+        // even if caps/shift changed between the chip rendering and the tap.
         val lang = LanguageDetector.detectLanguage(suggestion)
-        val casedSuggestion = applyCurrentCaseForDisplay(suggestion)
+        val casedSuggestion = applyCurrentCaseForDisplay(suggestion, token)
         // commit suggestion, followed by a single space so the user can keep typing the next word
         commitStyled(ic, "$casedSuggestion ")
 
