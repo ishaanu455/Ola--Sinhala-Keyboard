@@ -634,6 +634,12 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         } catch (t: Throwable) {
             Log.e("IME", "updateKeyboard failed in onStartInputView", t)
         }
+
+        // Fresh field/session - capitalize the first letter if it opens at a
+        // sentence boundary (e.g. empty field). Runs after resetKeyboardState()
+        // (which just set caps=false) and after the layout is finalized above, so
+        // it correctly no-ops on non-English layouts/password/numeric fields.
+        checkAutoCapitalize()
     }
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
@@ -942,6 +948,41 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         }
     }
 
+    /** Auto-capitalizes the next letter at a sentence boundary - very start of the
+     *  field, right after ". "/"! "/"? " (sentence-ending punctuation followed by
+     *  space), or right after a newline - English layout only, since the other
+     *  layouts have no letter case. Sets [caps] as a one-shot, exactly like a
+     *  single Shift tap: [checkAutoUnshift] already turns it back off right after
+     *  the next letter is typed, so this never behaves like caps-lock. Only ever
+     *  turns capitalization ON - never overrides a caps/shift state the user (or
+     *  caps-lock) already set. */
+    private fun checkAutoCapitalize() {
+        if (keyboardLayout != KeyboardLayout.ENGLISH) return
+        if (!Prefs.getAutoCapitalizeEnabled(this)) return
+        if (caps) return
+        if (isInPasswordField() || isNumericField) return
+
+        val textBefore = try {
+            currentInputConnection?.getTextBeforeCursor(20, 0)?.toString()
+        } catch (t: Throwable) {
+            null
+        } ?: return
+
+        val endsWithNewline = textBefore.isNotEmpty() && textBefore.last() == '\n'
+        val withoutTrailingSpaces = textBefore.trimEnd(' ')
+        val hadTrailingSpace = withoutTrailingSpaces.length < textBefore.length
+        val afterSentencePunctuation = hadTrailingSpace &&
+            withoutTrailingSpaces.isNotEmpty() &&
+            withoutTrailingSpaces.last() in ".!?"
+
+        val atSentenceStart = textBefore.isEmpty() || endsWithNewline || afterSentencePunctuation
+        if (atSentenceStart) {
+            caps = true
+            shift = false
+            updateKeyboard()
+        }
+    }
+
     private fun isInPasswordField(): Boolean {
         val t = currentInputEditorInfo ?: return false
         // Compare against the full variation field (not just AND-with-itself against
@@ -980,8 +1021,23 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         for (i in 0 until token.codePointCount(0, token.length)) {
             ic.deleteSurroundingTextInCodePoints(1, 0)
         }
+        // Suggestions come back lowercase (dictionaries/learned data are stored
+        // case-normalized - see SuggestionEngine.recordAccepted), so without this
+        // a suggestion tap always inserted lowercase text even at a sentence start
+        // or with Shift/caps-lock active, unlike typing the same word key-by-key
+        // (which already cases each letter from [caps]/[shift] as it's tapped).
+        // Match that: caps-lock (shift) uppercases the whole word, a one-shot
+        // caps just the first letter, same as a normal keystroke would. Sinhala
+        // has no letter case, so it's left untouched either way.
+        val lang = LanguageDetector.detectLanguage(suggestion)
+        val casedSuggestion = when {
+            lang == LanguageDetector.Language.SINHALA -> suggestion
+            shift -> suggestion.uppercase()
+            caps -> suggestion.replaceFirstChar { it.uppercase() }
+            else -> suggestion
+        }
         // commit suggestion, followed by a single space so the user can keep typing the next word
-        commitStyled(ic, "$suggestion ")
+        commitStyled(ic, "$casedSuggestion ")
 
         // Mirror the normal space-bar bookkeeping, since we just committed a space too.
         lastChar = null
@@ -998,7 +1054,6 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
 
         // record acceptance
         serviceScope.launch {
-            val lang = LanguageDetector.detectLanguage(suggestion)
             suggestionEngine?.recordAccepted(suggestion, lang, previousWordForBigram)
         }
 
@@ -1006,6 +1061,11 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         topBarController?.showNormal(isNumericField)
         debouncer?.cancel()
         suggestionJob?.cancel()
+        // Same bookkeeping a normal space-bar press does: turn off a one-shot caps
+        // now that it's been used, and check whether the word just committed (if
+        // it happened to end the suggestion's sentence somehow) starts a new one.
+        checkAutoUnshift()
+        checkAutoCapitalize()
     }
 
     private var lastChar: CHAR? = null
@@ -1765,6 +1825,10 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 topBarController?.showNormal(isNumericField)
                 debouncer?.cancel()
                 suggestionJob?.cancel()
+                // Covers both a multi-line field's actual newline and a message
+                // field that just cleared itself back to empty on send - either
+                // way the next letter typed is a fresh sentence start.
+                checkAutoCapitalize()
             }
 
             Function.SHIFT -> {
@@ -1964,6 +2028,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             }
         }
         checkAutoUnshift()
+        checkAutoCapitalize()
     }
 
     /**

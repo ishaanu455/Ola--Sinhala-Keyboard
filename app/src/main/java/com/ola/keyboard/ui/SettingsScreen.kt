@@ -47,6 +47,7 @@ import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.SwipeLeft
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.AlertDialog
@@ -1229,6 +1230,15 @@ private fun TypingSection() {
         icon = Icons.Filled.SwipeLeft,
         checked = swipeToMoveCursor.value,
         onCheckedChange = { swipeToMoveCursor.value = it }
+    )
+
+    val autoCapitalize = rememberBooleanPreference(context, "auto_capitalize_enabled", true)
+    SwitchPreference(
+        title = "Auto-Capitalize",
+        summary = "Capitalize the first letter of each sentence - English layout only",
+        icon = Icons.Filled.TextFields,
+        checked = autoCapitalize.value,
+        onCheckedChange = { autoCapitalize.value = it }
     )
 }
 

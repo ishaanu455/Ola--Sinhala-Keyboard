@@ -151,6 +151,13 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean("word_learning_enabled", true)
         set(value) = prefs.edit().putBoolean("word_learning_enabled", value).apply()
 
+    /** Auto-capitalizes the first letter of a sentence (start of field, or right
+     *  after ". "/"! "/"? ") - English layout only, since Sinhala/Wijesekara/
+     *  Singlish have no letter case. See InputMethodService.checkAutoCapitalize(). */
+    var autoCapitalizeEnabled: Boolean
+        get() = prefs.getBoolean("auto_capitalize_enabled", true)
+        set(value) = prefs.edit().putBoolean("auto_capitalize_enabled", value).apply()
+
     /** The "fancy text" style currently applied to freshly-typed Latin text (see
      *  FontStyleData). Persisted so it survives the keyboard closing/reopening,
      *  same as emojiStyle above. */
@@ -276,6 +283,11 @@ class Prefs(context: Context) {
         fun getWordLearningEnabled(context: Context): Boolean {
             val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
             return prefs.getBoolean("word_learning_enabled", true)
+        }
+
+        fun getAutoCapitalizeEnabled(context: Context): Boolean {
+            val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
+            return prefs.getBoolean("auto_capitalize_enabled", true)
         }
 
         /** Whether the suggestion bar (the row of word predictions above the keys)
