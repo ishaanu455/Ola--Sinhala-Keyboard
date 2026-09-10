@@ -1291,6 +1291,23 @@ private fun ClipboardSection() {
         onCheckedChange = { clipboardEnabled.value = it }
     )
 
+    // Same flag as the pause/resume icon inside the keyboard's clipboard panel
+    // itself (btn_clip_capture_toggle) - either one flips "clipboard_capture_enabled"
+    // and the other picks it up immediately. Only makes sense while the clipboard
+    // manager above is on, so it's hidden otherwise rather than shown disabled.
+    if (clipboardEnabled.value) {
+        val captureEnabled = rememberBooleanPreference(context, "clipboard_capture_enabled", true)
+        SwitchPreference(
+            title = "Capture New Copies",
+            summary = if (captureEnabled.value)
+                "Newly copied text is saved to clipboard history"
+            else
+                "Paused. Existing clips are kept, but new copies won't be saved",
+            checked = captureEnabled.value,
+            onCheckedChange = { captureEnabled.value = it }
+        )
+    }
+
     PreferenceItem(
         title = "Clips Manager",
         summary = "Browse, pin, add or delete your saved clips",
@@ -1312,6 +1329,21 @@ private fun DictionarySection() {
             "still learned in the background either way - this only hides the bar.",
         checked = showSuggestionBar.value,
         onCheckedChange = { showSuggestionBar.value = it }
+    )
+
+    // Separate from the toggle above: this one actually controls whether new
+    // words/word-pairs get learned at all (see SuggestionEngine.recordAccepted).
+    // Turning it off doesn't clear anything already learned - Prediction Manager
+    // still shows and lets you manage everything picked up before this was off.
+    val wordLearningEnabled = rememberBooleanPreference(context, "word_learning_enabled", true)
+    SwitchPreference(
+        title = "Learn New Words",
+        summary = if (wordLearningEnabled.value)
+            "The keyboard learns new words and patterns as you type"
+        else
+            "Paused. Already-learned words are kept, but nothing new is learned",
+        checked = wordLearningEnabled.value,
+        onCheckedChange = { wordLearningEnabled.value = it }
     )
 
     PreferenceItem(

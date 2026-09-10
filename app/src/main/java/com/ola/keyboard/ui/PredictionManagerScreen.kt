@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,8 +40,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ola.keyboard.Prefs
-import com.ola.keyboard.ui.components.SwitchPreference
 import ime.suggest.DefaultDictionary
 import ime.suggest.SinhalaCollation
 import ime.suggest.UserDictionary
@@ -70,6 +69,15 @@ private data class AllUsageEntry(
     val count: Int?,
     val isDefault: Boolean
 )
+
+/** Narrows the "All Usage" tab down to just what the user themselves has typed
+ *  (learned into [UserWordFrequency]) or just the shipped bundled dictionary,
+ *  instead of always showing both mixed together. */
+private enum class AllUsageFilter(val label: String) {
+    ALL("All"),
+    LEARNED("Learned by you"),
+    BUILTIN("Built-in dictionary")
+}
 
 /**
  * Lets the user browse and manage the two word lists that feed keyboard
@@ -136,9 +144,15 @@ fun PredictionManagerScreen(
     }
 
     var showAddDialog by remember { mutableStateOf(false) }
+    var allUsageFilter by remember { mutableStateOf(AllUsageFilter.ALL) }
 
-    val prefs = remember { Prefs(context) }
-    var learningEnabled by remember { mutableStateOf(prefs.wordLearningEnabled) }
+    val filteredAllUsageWords = remember(allUsageWords, allUsageFilter) {
+        when (allUsageFilter) {
+            AllUsageFilter.ALL -> allUsageWords
+            AllUsageFilter.LEARNED -> allUsageWords.filter { !it.isDefault }
+            AllUsageFilter.BUILTIN -> allUsageWords.filter { it.isDefault }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -162,23 +176,6 @@ fun PredictionManagerScreen(
                 .padding(paddingValues)
                 .fillMaxSize()
         ) {
-            // Master switch for on-device learning: when off, the keyboard still
-            // suggests from whatever's already in "My Prediction"/"All Usage", it
-            // just stops adding anything new from future typing. Doesn't clear
-            // either list - see Prefs.wordLearningEnabled / SuggestionEngine.recordAccepted.
-            SwitchPreference(
-                title = "නව වචන ඉගෙනීම",
-                summary = if (learningEnabled)
-                    "ඔබ ටයිප් කරන විට කීබෝඩ් එක අලුත් වචන සහ රටා ඉගෙන ගනී"
-                else
-                    "නවත්වා ඇත. දැනටමත් ඉගෙන ගත් වචන පවතී, නමුත් අලුත් ඒවා ඉගෙන නොගනී",
-                checked = learningEnabled,
-                onCheckedChange = {
-                    learningEnabled = it
-                    prefs.wordLearningEnabled = it
-                }
-            )
-
             TabRow(selectedTabIndex = selectedTab) {
                 Tab(
                     selected = selectedTab == TAB_MY_PREDICTION,
@@ -190,6 +187,26 @@ fun PredictionManagerScreen(
                     onClick = { selectedTab = TAB_ALL_USAGE },
                     text = { Text("All Usage") }
                 )
+            }
+
+            // Only relevant on "All Usage" - lets the user see just what they've
+            // personally taught the keyboard, or just what shipped with it,
+            // instead of the two always being mixed together.
+            if (selectedTab == TAB_ALL_USAGE) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AllUsageFilter.entries.forEach { filter ->
+                        FilterChip(
+                            selected = allUsageFilter == filter,
+                            onClick = { allUsageFilter = filter },
+                            label = { Text(filter.label) }
+                        )
+                    }
+                }
             }
 
             when (selectedTab) {
@@ -206,7 +223,8 @@ fun PredictionManagerScreen(
                     }
                 )
                 else -> AllUsageList(
-                    entries = allUsageWords,
+                    entries = filteredAllUsageWords,
+                    isFiltered = allUsageFilter != AllUsageFilter.ALL,
                     onDelete = { entry ->
                         // Only learned words can be removed - the bundled
                         // dictionary is a shipped asset, not user data.
@@ -263,11 +281,15 @@ private fun MyPredictionList(
 @Composable
 private fun AllUsageList(
     entries: List<AllUsageEntry>,
+    isFiltered: Boolean,
     onDelete: (AllUsageEntry) -> Unit
 ) {
     if (entries.isEmpty()) {
         EmptyState(
-            message = "ඔබ තවම කිසිදු වචනයක් ටයිප් කර නැත."
+            message = if (isFiltered)
+                "No words match this filter."
+            else
+                "ඔබ තවම කිසිදු වචනයක් ටයිප් කර නැත."
         )
         return
     }
