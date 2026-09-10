@@ -860,7 +860,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         // settings/fonts icons out for bogus chips like "1155"/"17" on a plain
         // number keyboard. Numeric fields keep the icon row exactly like any other
         // suggestions-off case, same as the password-field guard below.
-        if (!suggestionsEnabled || isIncognitoField() || isNumericField) {
+        if (!suggestionsEnabled || isInPasswordField() || isNumericField) {
             topBarController?.showNormal(isNumericField)
             return
         }
@@ -1044,10 +1044,17 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     // explicitly marked as "don't learn from this" via IME_FLAG_NO_PERSONALIZED_LEARNING
     // (e.g. OTP fields, which are very often TYPE_CLASS_NUMBER rather than any
     // password variation, so isInPasswordField() alone misses them) - regardless
-    // of the field's actual inputType. Used to auto-pause self-learning and the
-    // suggestion bar for the duration of that field's focus, without touching the
-    // user's Settings > Self learning toggle: it stays on, this is a per-field,
-    // automatic, temporary skip, not a persisted preference change.
+    // of the field's actual inputType. Used ONLY to auto-pause self-learning for
+    // the duration of that field's focus - deliberately NOT used to hide the
+    // suggestion bar (see requestSuggestionsForToken, which still checks the
+    // narrower isInPasswordField()): plenty of ordinary, non-sensitive fields set
+    // this flag too (browser address/search bars are a common example - Chrome and
+    // others set it there specifically so typed URLs/queries aren't learned), and
+    // those should keep showing suggestions from the existing dictionary - nothing
+    // new gets learned from them either way, so there's no privacy reason to hide
+    // the bar. Doesn't touch the user's Settings > Self learning toggle: it stays
+    // on, this is a per-field, automatic, temporary skip, not a persisted
+    // preference change.
     private fun isIncognitoField(): Boolean {
         if (isInPasswordField()) return true
         val t = currentInputEditorInfo ?: return false
