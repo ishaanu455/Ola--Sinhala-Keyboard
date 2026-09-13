@@ -2280,7 +2280,7 @@ class KeyboardView(
     // field never inherits a previous one's override.
     private var manualLetterOverride: Boolean = false
 
-    // Tracks which physical parent n1..n0/backspace/action/dot/comma
+    // Tracks which physical parent n1..n0/backspace/action/dot/comma/blank1/blank2
     // currently sit in: true = the numeric_row_1..4 grid, false = their normal
     // key_row_1/3/4/5 homes. setNumericMode() used to be the only place that moved
     // these views, so it could safely assume the direction; now toggleNumLetterOverride()
@@ -2369,7 +2369,7 @@ class KeyboardView(
             binding.keyboardRows.visibility = View.GONE
             binding.numericKeypad.visibility = View.GONE
         } else if (numericModeActive && !manualLetterOverride) {
-            // n1..n0/backspace/action/dot/comma must physically live in
+            // n1..n0/backspace/action/dot/comma/blank1/blank2 must physically live in
             // numeric_row_1..4 before this surface is shown - see moveKeysToNumericGrid().
             moveKeysToNumericGrid()
             binding.keyboardRows.visibility = View.GONE
@@ -2385,7 +2385,7 @@ class KeyboardView(
         }
     }
 
-    /** Physically moves n1..n0/backspace/action/dot/comma back into
+    /** Physically moves n1..n0/backspace/action/dot/comma/blank1/blank2 back into
      *  their normal key_row_1/3/4/5 homes (see reparentAtWeighted's doc) and restores
      *  the normal 5-row heights - the exact steps setNumericMode(false) used to run
      *  inline. Guarded by [borrowedKeysInNumericGrid] so calling this while the keys
@@ -2404,8 +2404,8 @@ class KeyboardView(
             reparentAtWeighted(binding.n9, binding.keyRow1, 8, 1f)
             reparentAtWeighted(binding.n0, binding.keyRow1, 9, 1f)
 
-            // blank_1/blank_2 never leave key_row_3 now (see moveKeysToNumericGrid),
-            // so there's nothing to restore for them here.
+            reparentAtWeighted(binding.blank1, binding.keyRow3, 0, 0.5f)
+            reparentAtWeighted(binding.blank2, binding.keyRow3, binding.keyRow3.childCount, 0.5f)
 
             reparentAtWeighted(binding.backspace, binding.keyRow4, binding.keyRow4.childCount, 1.5f)
 
@@ -2425,7 +2425,7 @@ class KeyboardView(
         updateRecentEmojiRowVisibility()
     }
 
-    /** Physically moves n1..n0/backspace/action/dot/comma into the
+    /** Physically moves n1..n0/backspace/action/dot/comma/blank1/blank2 into the
      *  numeric_row_1..4 grid (see reparentWeighted's doc) and sizes those rows to
      *  match the full keyboard's current total height - the exact steps
      *  setNumericMode(true) used to run inline. Guarded by [borrowedKeysInNumericGrid]
@@ -2452,16 +2452,18 @@ class KeyboardView(
             reparentWeighted(binding.n7, binding.numericRow3, 1f)
             reparentWeighted(binding.n8, binding.numericRow3, 1f)
             reparentWeighted(binding.n9, binding.numericRow3, 1f)
-            reparentWeighted(binding.dot, binding.numericRow3, 1f)
+            reparentWeighted(binding.blank1, binding.numericRow3, 1f)
 
-            // blank_1/blank_2 are deliberately left out of this grid - they're
-            // plain non-functional Views borrowed from key_row_3's QWERTY edge
-            // padding, and reparenting them here used to leave two dead-looking
-            // empty cells flanking "0"/"," on the bottom row. Instead "0" takes a
-            // double weight, giving it the wide-zero look of a real phone/PIN
-            // keypad with no empty cells anywhere in the grid.
+            // "0" sits directly under "8" (comma/dot flanking it, mirroring 7/9
+            // above) - a standard phone/PIN-pad bottom row. blank1/blank2 fill the
+            // column under backspace/action so every row still lines up to the
+            // same 4-column width; they're plain, background-less Views (see
+            // keyboard_layout.xml) so the column just reads as empty space, not a
+            // visible box - nothing is drawn there on purpose.
             reparentWeighted(binding.comma, binding.numericRow4, 1f)
-            reparentWeighted(binding.n0, binding.numericRow4, 2f)
+            reparentWeighted(binding.n0, binding.numericRow4, 1f)
+            reparentWeighted(binding.dot, binding.numericRow4, 1f)
+            reparentWeighted(binding.blank2, binding.numericRow4, 1f)
 
             borrowedKeysInNumericGrid = true
         }
@@ -2531,7 +2533,7 @@ class KeyboardView(
                 // (number row + 4 full rows), split evenly across this grid's 4
                 // rows - so nothing above the keyboard jumps when a field switches
                 // in or out of numeric mode. Also physically reparents n1..n0/
-                // backspace/action/dot/comma into numeric_row_1..4 -
+                // backspace/action/dot/comma/blank1/blank2 into numeric_row_1..4 -
                 // see moveKeysToNumericGrid(), shared with toggleNumLetterOverride()
                 // so the digit pad always gets these keys back the same way.
                 moveKeysToNumericGrid()

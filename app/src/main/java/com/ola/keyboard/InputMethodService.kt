@@ -1882,7 +1882,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         vibrate()
         Toast.makeText(
             this,
-            if (isNumericField) "අංක යතුරු පුවරුව ON" else "අංක යතුරු පුවරුව OFF",
+            if (isNumericField) "Number pad ON" else "Number pad OFF",
             Toast.LENGTH_SHORT
         ).show()
     }
@@ -1922,7 +1922,16 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 if (!caps) {
                     caps = true
                     shift = false
-                } else if (!shift) {
+                } else if (!shift && keyboardLayout == KeyboardLayout.ENGLISH) {
+                    // Caps-LOCK (stays shifted for every letter until tapped again) -
+                    // only makes sense for English, where shift = uppercase and typing
+                    // a whole sentence in caps is a real, common thing users want.
+                    // For SINGLISH/WIJESEKARA, shift picks a DIFFERENT Sinhala
+                    // character per key (e.g. "a" -> අ, "A" -> ආ), not a case change -
+                    // locking it on would silently swap every letter in the sentence
+                    // to its shifted variant, which is never what the user wants. So
+                    // those two layouts skip straight to the branch below and just
+                    // cancel the one-shot instead of locking.
                     shift = true
                 } else {
                     caps = false
