@@ -34,6 +34,7 @@ import ime.suggest.LanguageDetector
 import ime.imeui.DebouncedInputHandler
 import ime.imeui.TopBarController
 import android.widget.TextView
+import android.widget.Toast
 import androidx.compose.ui.semantics.text
 import java.text.Normalizer
 import androidx.lifecycle.Lifecycle
@@ -51,12 +52,17 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     private lateinit var keyboardView: KeyboardView
     private lateinit var keyboardLayout: KeyboardLayout
 
-    // True while the focused field is TYPE_CLASS_NUMBER or TYPE_CLASS_PHONE (OTP
-    // boxes, mobile-number fields in a browser/WhatsApp/etc.) - drives the compact
-    // digit-only keyboard (see KeyboardView.setNumericMode()). Kept as a field
+    // True while the compact digit-only keyboard (see KeyboardView.setNumericMode())
+    // should be showing for the current field - either because the field is
+    // TYPE_CLASS_NUMBER/TYPE_CLASS_PHONE (OTP boxes, mobile-number fields in a
+    // browser/WhatsApp/etc., see computeIsNumericField()), or because the user
+    // force-toggled it on via panelLongPress() for a field whose EditorInfo
+    // doesn't report either type (some OEM dialer/USSD screens). Kept as a field
     // (not a local val) so rebuildKeyboardViewForAppearanceChange() - which builds
     // a brand new KeyboardView instance with numericModeActive reset to false -
-    // knows whether to reapply it.
+    // knows whether to reapply it. Always reassigned from computeIsNumericField()
+    // on the next onStartInputView/onStartInput, so a forced value never leaks
+    // into a field the user switches to next.
     private var isNumericField: Boolean = false
 
     /** [info]'s field is a plain number/phone field - the password-variation check
@@ -1857,6 +1863,29 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         checkAutoUnshift()
     }
 
+
+    /** Long-press on the "#" panel key - forces the compact numeric keypad on/off
+     *  for the current field, regardless of what computeIsNumericField() decided.
+     *  Safety net for OEM dialer/USSD screens whose EditorInfo doesn't report
+     *  TYPE_CLASS_NUMBER/TYPE_CLASS_PHONE, so auto-detect never kicks in and the
+     *  full letter keyboard shows up instead of a number pad. Directly flips
+     *  isNumericField itself (rather than a separate override flag) so every
+     *  existing call site that reads it - setNumericMode(), showNormal(), the
+     *  suggestion-bar/auto-capitalize guards, etc. - treats a forced field
+     *  exactly like a real one, with zero extra plumbing. The short-press "#"
+     *  behaviour (symbols panel) is completely untouched - see
+     *  KeyboardButton.onLongPress for why the two never compete. */
+    override fun panelLongPress() {
+        isNumericField = !isNumericField
+        if (::keyboardView.isInitialized) keyboardView.setNumericMode(isNumericField)
+        topBarController?.showNormal(isNumericField)
+        vibrate()
+        Toast.makeText(
+            this,
+            if (isNumericField) "අංක යතුරු පුවරුව ON" else "අංක යතුරු පුවරුව OFF",
+            Toast.LENGTH_SHORT
+        ).show()
+    }
 
     override fun functionClick(type: Function) {
         val ic = currentInputConnection

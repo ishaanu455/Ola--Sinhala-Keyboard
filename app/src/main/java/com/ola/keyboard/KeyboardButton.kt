@@ -28,6 +28,15 @@ class KeyboardButton : AppCompatTextView {
 
     // Long-press popup support
     var longPressListener: ((String) -> Unit)? = null
+
+    // Generic long-press action for function keys that don't insert a character
+    // (e.g. the "#" panel key's long-press to force the numeric keypad on/off -
+    // see InputMethodService.panelLongPress()). Deliberately separate from
+    // longPressListener above: that one shows a popup and commits a char on
+    // release, this one just fires once when the hold threshold elapses, like a
+    // normal Android long-click. Only ever set on keys with no longPressChar/
+    // secondaryLabel, so the two mechanisms never compete for the same key.
+    var onLongPress: (() -> Unit)? = null
     private var popup: PopupWindow? = null
     private val longPressHandler = Handler(Looper.getMainLooper())
     private var longPressTriggered = false
@@ -78,6 +87,13 @@ class KeyboardButton : AppCompatTextView {
                             longPressTriggered = true
                             showPopup(longPressTarget)
                         }, LONG_PRESS_DELAY_MS)
+                    } else if (onLongPress != null) {
+                        // Generic long-press (no char popup) - fires once when the
+                        // hold threshold elapses, same delay as the popup path above.
+                        longPressHandler.postDelayed({
+                            longPressTriggered = true
+                            onLongPress?.invoke()
+                        }, LONG_PRESS_DELAY_MS)
                     } else {
                         // Normal tap — commit immediately on down (existing behaviour)
                         val visible = text?.toString()?.takeIf { it.isNotEmpty() }
@@ -91,13 +107,23 @@ class KeyboardButton : AppCompatTextView {
                     longPressHandler.removeCallbacksAndMessages(null)
                     view.isPressed = false
                     if (longPressTriggered) {
-                        // Finger lifted while popup was showing → commit the long-press char
-                        dismissPopup()
+                        // Finger lifted after the hold threshold: for the char-popup
+                        // path, commit the long-press char now. For the generic
+                        // onLongPress path, the action already fired inside the
+                        // postDelayed callback above - nothing left to do on release.
                         if (longPressTarget != null) {
+                            dismissPopup()
                             longPressListener?.invoke(longPressTarget)
                         }
                     } else if (longPressTarget != null && longPressListener != null) {
                         // Short tap (released before long-press threshold) → commit primary
+                        val visible = text?.toString()?.takeIf { it.isNotEmpty() }
+                        val rawTag = tag?.toString()?.takeIf { it.isNotEmpty() } ?: ""
+                        val tagString = visible ?: convertTagToText(rawTag)
+                        clickListener.invoke(tagString)
+                    } else if (onLongPress != null) {
+                        // Short tap on a key that has onLongPress registered but was
+                        // released early → falls back to the normal click.
                         val visible = text?.toString()?.takeIf { it.isNotEmpty() }
                         val rawTag = tag?.toString()?.takeIf { it.isNotEmpty() } ?: ""
                         val tagString = visible ?: convertTagToText(rawTag)
