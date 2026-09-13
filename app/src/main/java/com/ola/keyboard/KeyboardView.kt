@@ -235,19 +235,25 @@ class KeyboardView(
         while (true) {
             val currentTimeMillis = System.currentTimeMillis()
             val timeSinceLastDown = currentTimeMillis - lastBackspaceDownTime
+            // Past ~1.5s of holding (beyond the char-ramp's fastest useful tier),
+            // switch from character-by-character to whole-word deletes - matches
+            // Gboard/most keyboards' "keep holding = jump to word deletes"
+            // behavior, so clearing a long sentence doesn't mean waiting through
+            // every single character. A fixed, deliberately slower 150ms tick
+            // here (vs the char ramp's fastest 20ms) keeps it controllable
+            // instead of erasing a whole paragraph before the finger lifts.
+            val wordDeleteMode = timeSinceLastDown > 1500L
             delay(
-                when {
+                if (wordDeleteMode) {
+                    150L
+                } else when {
                     // Repeat speed curve — tuned to feel like Gboard:
                     //   initial delay 300 ms (was 500) so first repeat fires sooner,
-                    //   ramps up to max speed after ~2 s of holding.
-                    timeSinceLastDown > 5000 -> 20L
-                    timeSinceLastDown > 4000 -> 24L
-                    timeSinceLastDown > 3000 -> 32L
-                    timeSinceLastDown > 2000 -> 48L
-                    timeSinceLastDown > 1000 -> 72L
-                    timeSinceLastDown > 500  -> 110L
-                    timeSinceLastDown > 300  -> 200L
-                    else                     -> 300L
+                    //   ramps up until wordDeleteMode takes over above.
+                    timeSinceLastDown > 1000L -> 72L
+                    timeSinceLastDown > 500L  -> 110L
+                    timeSinceLastDown > 300L  -> 200L
+                    else                      -> 300L
                 }
             )
             // clickListener.functionClick() touches the InputConnection and the
@@ -257,7 +263,7 @@ class KeyboardView(
             // that mismatch was the root cause of backspace feeling laggy/unresponsive
             // the longer it was held (deletes silently failing under the hood).
             withContext(Dispatchers.Main) {
-                clickListener.functionClick(Function.BACKSPACE)
+                clickListener.functionClick(if (wordDeleteMode) Function.BACKSPACE_WORD else Function.BACKSPACE)
             }
         }
     }

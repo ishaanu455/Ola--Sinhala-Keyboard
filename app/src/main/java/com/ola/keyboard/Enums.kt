@@ -1,6 +1,6 @@
 package com.ola.keyboard
 
-enum class Function { ACTION, SHIFT, LANG, IME, BACKSPACE, PANEL }
+enum class Function { ACTION, SHIFT, LANG, IME, BACKSPACE, BACKSPACE_WORD, PANEL }
 enum class KeyboardLayout { ENGLISH, WIJESEKARA, SINGLISH }
 enum class CharType { SWARA, WYANJANA, PILI, LAKUNU, UNKNOWN }
 

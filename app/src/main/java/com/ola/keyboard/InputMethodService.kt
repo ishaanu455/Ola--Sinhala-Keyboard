@@ -109,6 +109,35 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     private val inputHistory = ArrayDeque<InputStep>()
 
     /**
+     * Deletes the whole word immediately before the cursor, plus any whitespace
+     * between it and the cursor - used by the BACKSPACE_WORD repeater tick (see
+     * KeyboardView.backspaceRepeater) once backspace has been held long enough
+     * to jump from character-by-character to word-by-word, same as ctrl+backspace
+     * in a desktop editor or Gboard's own hold-to-accelerate behavior.
+     */
+    private fun deleteWordBackward(ic: android.view.inputmethod.InputConnection) {
+        try {
+            ic.finishComposingText()
+            val before = ic.getTextBeforeCursor(100, 0)?.toString()
+            if (before.isNullOrEmpty()) return
+            var i = before.length
+            // Skip trailing whitespace first, so "word " deletes the trailing
+            // space along with the word itself.
+            while (i > 0 && before[i - 1].isWhitespace()) i--
+            // Then skip back through the word's own characters.
+            while (i > 0 && !before[i - 1].isWhitespace()) i--
+            val deleteCount = before.length - i
+            ic.deleteSurroundingText(
+                if (deleteCount > 0) deleteCount else 1,
+                0
+            )
+        } catch (t: Throwable) {
+            Log.e("IME", "deleteWordBackward failed", t)
+        }
+    }
+
+
+    /**
      * Deletes one grapheme cluster backwards from the cursor, without any step-by-step
      * history. Used when there's no usable [inputHistory] entry to revert to: plain
      * English text, the cursor moved, a field/app switch, or a conjunct wide enough
@@ -2033,6 +2062,28 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                     Log.w("IME", "currentInputConnection is null in BACKSPACE")
                 }
             }
+            Function.BACKSPACE_WORD -> {
+                // Fired by the backspace repeater once it's been held past ~1.5s -
+                // see KeyboardView.backspaceRepeater. Deliberately bypasses the
+                // Sinhala step-by-step revert history entirely (inputHistory/
+                // lastChar/lastLetter/mComposing): those exist to undo ONE
+                // grapheme cluster at a time, which makes no sense once we're
+                // deleting whole words per tick, so the state is just cleared
+                // here exactly like performRawBackspaceDelete's callers already
+                // do for any non-steppable delete.
+                consecutiveSpacePresses = 0
+                suppressNextWordSuggestions = false
+                if (ic != null) {
+                    deleteWordBackward(ic)
+                    lastChar = null
+                    lastLetter = null
+                    positionFlag = ""
+                    mComposing = ""
+                    inputHistory.clear()
+                } else {
+                    Log.w("IME", "currentInputConnection is null in BACKSPACE_WORD")
+                }
+            }
             Function.PANEL -> {
 
                 keyboardSymbolsActive = !keyboardSymbolsActive
@@ -2040,6 +2091,38 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             }
         }
         vibrate()
+    }
+
+    /** Gboard/iOS-style shortcut: typing space twice in a row right after a word
+     *  replaces "<word>  " (two spaces) with "<word>. " - saves reaching for the
+     *  "." key on the most common sentence-ending punctuation. Only fires on the
+     *  exact 2nd consecutive space (specialClick resets consecutiveSpacePresses
+     *  to 0 right after a successful conversion, so a 3rd/4th repeat never
+     *  re-triggers it) and only when a real letter/digit sits right before the
+     *  two spaces - so "Hi!  " (already punctuation) or "  " (nothing typed)
+     *  never turn into "Hi!." or "..". Skipped for numeric/password fields. */
+    private fun tryConvertDoubleSpaceToPeriod(ic: android.view.inputmethod.InputConnection?): Boolean {
+        if (ic == null || isNumericField || isInPasswordField()) return false
+        val before = ic.getTextBeforeCursor(3, 0)?.toString() ?: return false
+        if (before.length < 3) return false
+        val wordChar = before[before.length - 3]
+        val firstSpace = before[before.length - 2]
+        val secondSpace = before[before.length - 1]
+        if (firstSpace != ' ' || secondSpace != ' ') return false
+        if (!wordChar.isLetterOrDigit()) return false
+        return try {
+            ic.beginBatchEdit()
+            try {
+                ic.deleteSurroundingText(2, 0)
+                ic.commitText(". ", 1)
+            } finally {
+                ic.endBatchEdit()
+            }
+            true
+        } catch (t: Throwable) {
+            Log.e("IME", "tryConvertDoubleSpaceToPeriod failed", t)
+            false
+        }
     }
 
     override fun specialClick(tag: String) {
@@ -2104,10 +2187,17 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
             // this; typing a letter (or any other key) resets the counter above, so
             // the very next single space after that goes back to showing chips.
             if (isSpacePress && consecutiveSpacePresses >= 2) {
-                suppressNextWordSuggestions = true
-                topBarController?.showNormal(isNumericField)
-                debouncer?.cancel()
-                suggestionJob?.cancel()
+                if (consecutiveSpacePresses == 2 && tryConvertDoubleSpaceToPeriod(ic)) {
+                    // Converted "word  " -> "word. " - reset the streak so a 3rd/4th
+                    // repeat falls through to plain space handling instead of trying
+                    // (and correctly failing) to convert again.
+                    consecutiveSpacePresses = 0
+                } else {
+                    suppressNextWordSuggestions = true
+                    topBarController?.showNormal(isNumericField)
+                    debouncer?.cancel()
+                    suggestionJob?.cancel()
+                }
             } else if (justTypedWord.isNullOrBlank()) {
                 // A word just finished with nothing typed for the next one yet - ask
                 // for next-word predictions (based on justTypedWord) instead of
