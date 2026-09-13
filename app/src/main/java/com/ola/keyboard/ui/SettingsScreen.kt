@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.SpaceBar
 import androidx.compose.material.icons.filled.SwipeLeft
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Translate
@@ -1239,6 +1240,15 @@ private fun TypingSection() {
         icon = Icons.Filled.TextFields,
         checked = autoCapitalize.value,
         onCheckedChange = { autoCapitalize.value = it }
+    )
+
+    val doubleSpacePeriod = rememberBooleanPreference(context, "double_space_period_enabled", true)
+    SwitchPreference(
+        title = "Double-Space for Period",
+        summary = "Tap space twice to insert \". \"",
+        icon = Icons.Filled.SpaceBar,
+        checked = doubleSpacePeriod.value,
+        onCheckedChange = { doubleSpacePeriod.value = it }
     )
 }
 

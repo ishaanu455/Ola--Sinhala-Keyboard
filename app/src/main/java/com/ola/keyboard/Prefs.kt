@@ -158,6 +158,12 @@ class Prefs(context: Context) {
         get() = prefs.getBoolean("auto_capitalize_enabled", true)
         set(value) = prefs.edit().putBoolean("auto_capitalize_enabled", value).apply()
 
+    /** Whether double-tapping space replaces "word  " (two spaces) with "word. "
+     *  (period + single space). See InputMethodService.tryConvertDoubleSpaceToPeriod(). */
+    var doubleSpacePeriodEnabled: Boolean
+        get() = prefs.getBoolean("double_space_period_enabled", true)
+        set(value) = prefs.edit().putBoolean("double_space_period_enabled", value).apply()
+
     /** The "fancy text" style currently applied to freshly-typed Latin text (see
      *  FontStyleData). Persisted so it survives the keyboard closing/reopening,
      *  same as emojiStyle above. */

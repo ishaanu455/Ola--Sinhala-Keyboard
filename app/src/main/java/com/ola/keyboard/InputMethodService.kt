@@ -1977,8 +1977,25 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                     val enabled = Prefs.getEnabledLayouts(this)
                     val currentIndex = enabled.indexOf(keyboardLayout).let { if (it < 0) 0 else it }
                     val next = enabled[(currentIndex + 1) % enabled.size]
-                    setKeyboardLayout(next)
 
+                    // `caps` means something different per layout: in English it's
+                    // "uppercase", but in Singlish/Wijesekara it's "give me the
+                    // shifted Sinhala variant for this key" (see updateKeyboard()'s
+                    // "if (caps) ... Shifted" branches). If English left caps=true -
+                    // e.g. auto-capitalize firing at a sentence start when the
+                    // keyboard opened, or caps-lock being on - it used to carry
+                    // straight over into Singlish/Wijesekara and silently type the
+                    // shifted variant of every key instead of the normal one.
+                    // Always start the new layout unshifted, then let
+                    // checkAutoCapitalize() below re-derive it for English fresh
+                    // rather than trusting whatever the previous layout left behind.
+                    caps = false
+                    shift = false
+
+                    setKeyboardLayout(next)
+                    if (next == KeyboardLayout.ENGLISH) {
+                        checkAutoCapitalize()
+                    }
 
                     mComposing = ""
                 } catch (t: Throwable) {
@@ -2100,9 +2117,14 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
      *  to 0 right after a successful conversion, so a 3rd/4th repeat never
      *  re-triggers it) and only when a real letter/digit sits right before the
      *  two spaces - so "Hi!  " (already punctuation) or "  " (nothing typed)
-     *  never turn into "Hi!." or "..". Skipped for numeric/password fields. */
+     *  never turn into "Hi!." or "..". Skipped for numeric/password fields, and
+     *  can be turned off entirely via Prefs.doubleSpacePeriodEnabled (Settings ->
+     *  Typing). When disabled, the 2nd consecutive space falls through to the
+     *  normal "hide suggestion chips" handling in specialClick(), same as before
+     *  this setting existed. */
     private fun tryConvertDoubleSpaceToPeriod(ic: android.view.inputmethod.InputConnection?): Boolean {
         if (ic == null || isNumericField || isInPasswordField()) return false
+        if (!Prefs(this).doubleSpacePeriodEnabled) return false
         val before = ic.getTextBeforeCursor(3, 0)?.toString() ?: return false
         if (before.length < 3) return false
         val wordChar = before[before.length - 3]
