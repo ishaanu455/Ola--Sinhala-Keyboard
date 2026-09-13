@@ -1209,8 +1209,19 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     // ට් + h -> ත්, බ් + h -> භ්). Same flicker as the vowels above, and same fix:
     // keep the freshly-typed consonant+al-lakuna as an open composing region so the
     // "h" can swap it directly instead of erase(2)+commit.
+    //
+    // Originally only had the first 3 codes below - the other h-convertible pairs
+    // handled in the Function.HAYANNA branch (ප්->ඵ්, ග්->ඝ්, etc.) still used
+    // erase(2)+commit and hit the same visible jump/flicker. Extending this set to
+    // cover every h-convertible base consonant (and switching each of their HAYANNA
+    // branches from erasePreviousChars=2 to composable=true, same as the first 3
+    // already did) closes that gap using the exact same proven mechanism.
     private val hConvertibleConsonantCodes = setOf(
-        CHAR.ALPAPRAANA_TTAYANNA.code, CHAR.ALPAPRAANA_BAYANNA.code, CHAR.DANTAJA_SAYANNA.code
+        CHAR.ALPAPRAANA_TTAYANNA.code, CHAR.ALPAPRAANA_BAYANNA.code, CHAR.DANTAJA_SAYANNA.code,
+        CHAR.MAHAAPRAANA_TTAYANNA.code, CHAR.ALPAPRAANA_DDAYANNA.code, CHAR.MAHAAPRAANA_DDAYANNA.code,
+        CHAR.ALPAPRAANA_KAYANNA.code, CHAR.ALPAPRAANA_GAYANNA.code, CHAR.ALPAPRAANA_JAYANNA.code,
+        CHAR.ALPAPRAANA_TAYANNA.code, CHAR.ALPAPRAANA_DAYANNA.code, CHAR.ALPAPRAANA_PAYANNA.code,
+        CHAR.SANYAKA_DDAYANNA.code, CHAR.MUURDHAJA_SAYANNA.code
     )
 
     private fun singlishInput(input: String) {
@@ -1342,43 +1353,50 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                                     }
 
                                     CHAR.MAHAAPRAANA_TTAYANNA.code -> {
+                                        // Composing region already holds the base consonant+al-lakuna
+                                        // (2 units) - swap it directly, no erase needed. Same fix as
+                                        // ට්->ත් and බ්->භ් above (see hConvertibleConsonantCodes).
                                         output =
                                             CHAR.MAHAAPRAANA_TAYANNA.text + CHAR.SIGN_AL_LAKUNA.text
-                                        erasePreviousChars = 2
                                         tLastLetter = CHAR.MAHAAPRAANA_TAYANNA
                                         tLastChar = CHAR.SIGN_AL_LAKUNA
+                                        composable = true
                                     }
 
                                     CHAR.ALPAPRAANA_DDAYANNA.code -> {
+                                        // Same swap-not-erase fix as above (hConvertibleConsonantCodes).
                                         output =
                                             CHAR.ALPAPRAANA_DAYANNA.text + CHAR.SIGN_AL_LAKUNA.text
-                                        erasePreviousChars = 2
                                         tLastLetter = CHAR.ALPAPRAANA_DAYANNA
                                         tLastChar = CHAR.SIGN_AL_LAKUNA
+                                        composable = true
                                     }
 
                                     CHAR.MAHAAPRAANA_DDAYANNA.code -> {
+                                        // Same swap-not-erase fix as above (hConvertibleConsonantCodes).
                                         output =
                                             CHAR.MAHAAPRAANA_DAYANNA.text + CHAR.SIGN_AL_LAKUNA.text
-                                        erasePreviousChars = 2
                                         tLastLetter = CHAR.MAHAAPRAANA_DAYANNA
                                         tLastChar = CHAR.SIGN_AL_LAKUNA
+                                        composable = true
                                     }
 
                                     CHAR.ALPAPRAANA_KAYANNA.code -> {
+                                        // Same swap-not-erase fix as above (hConvertibleConsonantCodes).
                                         output =
                                             CHAR.MAHAAPRAANA_KAYANNA.text + CHAR.SIGN_AL_LAKUNA.text
-                                        erasePreviousChars = 2
                                         tLastLetter = CHAR.MAHAAPRAANA_KAYANNA
                                         tLastChar = CHAR.SIGN_AL_LAKUNA
+                                        composable = true
                                     }
 
                                     CHAR.ALPAPRAANA_GAYANNA.code -> {
+                                        // Same swap-not-erase fix as above (hConvertibleConsonantCodes).
                                         output =
                                             CHAR.MAHAAPRAANA_GAYANNA.text + CHAR.SIGN_AL_LAKUNA.text
-                                        erasePreviousChars = 2
                                         tLastLetter = CHAR.MAHAAPRAANA_GAYANNA
                                         tLastChar = CHAR.SIGN_AL_LAKUNA
+                                        composable = true
                                     }
 
                                     CHAR.ALPAPRAANA_CAYANNA.code -> {
@@ -1394,35 +1412,40 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                                     }
 
                                     CHAR.ALPAPRAANA_JAYANNA.code -> {
+                                        // Same swap-not-erase fix as above (hConvertibleConsonantCodes).
                                         output =
                                             CHAR.MAHAAPRAANA_JAYANNA.text + CHAR.SIGN_AL_LAKUNA.text
-                                        erasePreviousChars = 2
                                         tLastLetter = CHAR.MAHAAPRAANA_JAYANNA
                                         tLastChar = CHAR.SIGN_AL_LAKUNA
+                                        composable = true
                                     }
 
                                     CHAR.ALPAPRAANA_TAYANNA.code -> {
+                                        // Same swap-not-erase fix as above (hConvertibleConsonantCodes).
                                         output =
                                             CHAR.MAHAAPRAANA_TAYANNA.text + CHAR.SIGN_AL_LAKUNA.text
-                                        erasePreviousChars = 2
                                         tLastLetter = CHAR.MAHAAPRAANA_TAYANNA
                                         tLastChar = CHAR.SIGN_AL_LAKUNA
+                                        composable = true
                                     }
 
                                     CHAR.ALPAPRAANA_DAYANNA.code -> {
+                                        // Same swap-not-erase fix as above (hConvertibleConsonantCodes).
                                         output =
                                             CHAR.MAHAAPRAANA_DAYANNA.text + CHAR.SIGN_AL_LAKUNA.text
-                                        erasePreviousChars = 2
                                         tLastLetter = CHAR.MAHAAPRAANA_DAYANNA
                                         tLastChar = CHAR.SIGN_AL_LAKUNA
+                                        composable = true
                                     }
 
                                     CHAR.ALPAPRAANA_PAYANNA.code -> {
+                                        // ප් + h -> ඵ්. Same swap-not-erase fix as above
+                                        // (hConvertibleConsonantCodes).
                                         output =
                                             CHAR.MAHAAPRAANA_PAYANNA.text + CHAR.SIGN_AL_LAKUNA.text
-                                        erasePreviousChars = 2
                                         tLastLetter = CHAR.MAHAAPRAANA_PAYANNA
                                         tLastChar = CHAR.SIGN_AL_LAKUNA
+                                        composable = true
                                     }
 
                                     CHAR.ALPAPRAANA_BAYANNA.code -> {
@@ -1448,19 +1471,21 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                                     }
 
                                     CHAR.SANYAKA_DDAYANNA.code -> {
+                                        // Same swap-not-erase fix as above (hConvertibleConsonantCodes).
                                         output =
                                             CHAR.SANYAKA_DAYANNA.text + CHAR.SIGN_AL_LAKUNA.text
-                                        erasePreviousChars = 2
                                         tLastLetter = CHAR.SANYAKA_DAYANNA
                                         tLastChar = CHAR.SIGN_AL_LAKUNA
+                                        composable = true
                                     }
 
                                     CHAR.MUURDHAJA_SAYANNA.code -> {
+                                        // Same swap-not-erase fix as above (hConvertibleConsonantCodes).
                                         output =
                                             CHAR.MUURDHAJA_SAYANNA.text + CHAR.SIGN_AL_LAKUNA.text
-                                        erasePreviousChars = 2
                                         tLastLetter = CHAR.MUURDHAJA_SAYANNA
                                         tLastChar = CHAR.SIGN_AL_LAKUNA
+                                        composable = true
                                     }
 
                                     else -> newLetter()
