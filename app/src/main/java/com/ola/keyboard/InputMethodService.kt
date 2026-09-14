@@ -103,7 +103,16 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         val restoreText: String,       // what to put back in myOutput's place on undo
         val restoreLastChar: CHAR?,
         val restoreLastLetter: CHAR?,
-        val restorePendingGaettaBase: CHAR?
+        val restorePendingGaettaBase: CHAR?,
+        // True only for a "region-swap" step (this step replaced an already-open
+        // composing region wholesale, e.g. o -> oo) - meaning restoreText is exactly
+        // what that region held right before this step, and that region was itself
+        // still open at the time. BACKSPACE uses this to re-open restoreText as a
+        // composing region again instead of committing it as plain final text, so a
+        // doubling key typed right after an undo (e.g. undo කෝ -> කො, then "o" again)
+        // can swap it in place instead of being appended next to already-final text
+        // (which produced malformed කොෝ instead of කෝ).
+        val restoreWasComposable: Boolean = false
     )
 
     private val inputHistory = ArrayDeque<InputStep>()
@@ -1270,6 +1279,20 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         // nothing was actually left open.
         var freshComposable = false
 
+        // Set below only by the rakaransaya->gaetta-pilla branch (pendingGaettaBase),
+        // whose erasePreviousChars=4 reaches back across TWO previous tracked
+        // keystrokes (1 unit of the base consonant's al-lakuna, plus all 3 units of
+        // the rakar the previous keystroke appended) - more than the generic
+        // "erase within the immediately previous step's own output" history logic
+        // below can reconstruct on its own, which used to make it give up and wipe
+        // inputHistory entirely (see the erasePreviousChars > previousTop.myOutput
+        // .length case below). Since exactly what those 4 erased units were is
+        // fully known and constant here, this lets that keystroke get a real,
+        // individually-revertible history entry instead of losing every step
+        // before it too - fixes BACKSPACE on ක්‍ර/කෘ jumping straight to ක instead
+        // of stepping back through ක්‍ර first.
+        var explicitRestoreText: String? = null
+
         if (!hasPositionChanged()) {
             mLastChar = lastChar
             mLastLetter = lastLetter
@@ -1328,6 +1351,12 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                     erasePreviousChars = 4
                     tLastLetter = pendingGaettaBase
                     tLastChar = CHAR.GAETTA_PILLA
+                    // Exactly what's being erased - the base consonant's trailing
+                    // al-lakuna, plus the whole ZWJ+RAYANNA+al-lakuna rakar appended
+                    // after it - so BACKSPACE can restore ක්‍ර in one step (see
+                    // explicitRestoreText above).
+                    explicitRestoreText = CHAR.SIGN_AL_LAKUNA.text + CHAR.ZERO_WIDTH_JOINER.text +
+                        CHAR.RAYANNA.text + CHAR.SIGN_AL_LAKUNA.text
                     // Leave කෘ open as a composing region (erasePreviousChars and composable
                     // aren't mutually exclusive - see the render block below: the erase still
                     // happens, but the freshly-placed output is opened instead of finalized)
@@ -1772,6 +1801,14 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                 // through it step by step instead of just deleting raw codepoints.
                 val previousTop = inputHistory.lastOrNull()
                 val historyEntry: InputStep? = when {
+                    explicitRestoreText != null ->
+                        // A keystroke above (currently only the rakaransaya->gaetta-pilla
+                        // one) already worked out exactly what erasePreviousChars erased,
+                        // spanning further back than the generic cases below can infer from
+                        // previousTop alone - use that directly instead of falling through
+                        // to the "give up and wipe everything" case.
+                        InputStep(output, composable, explicitRestoreText, mLastChar, mLastLetter, pendingGaettaBase)
+
                     erasePreviousChars == 0 && composable && !freshComposable && previousTop != null && previousTop.myWasComposable ->
                         // This step replaced the still-open region from the previous
                         // keystroke wholesale (e.g. o -> oo) with no erase at all - it must
@@ -1788,7 +1825,12 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                         // region (e.g. a new ට/බ-style open after a DIFFERENT region like
                         // ු was just finalized) isn't a replace either - it's an append
                         // after already-finalized text, same as the plain branch below.
-                        InputStep(output, composable, previousTop.myOutput, mLastChar, mLastLetter, pendingGaettaBase)
+                        InputStep(
+                            output, composable, previousTop.myOutput, mLastChar, mLastLetter, pendingGaettaBase,
+                            // Undoing this step lands back on exactly the region previousTop
+                            // opened, which was itself still open - see restoreWasComposable.
+                            restoreWasComposable = true
+                        )
 
                     erasePreviousChars == 0 ->
                         // Fresh append with nothing replaced - either after an already-
@@ -2108,7 +2150,24 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                             try {
                                 ic.finishComposingText()
                                 ic.deleteSurroundingText(topStep.myOutput.length, 0)
-                                if (topStep.restoreText.isNotEmpty()) ic.commitText(topStep.restoreText, 1)
+                                if (topStep.restoreText.isNotEmpty()) {
+                                    if (topStep.restoreWasComposable) {
+                                        // Restoring to a state that was itself an open composing
+                                        // region (e.g. undoing කෝ -> කො, where කො was still open
+                                        // right before the doubling "o" replaced it) - reopen it
+                                        // the same way, so a following "o" can swap it again
+                                        // instead of appending next to now-final text (which
+                                        // produced malformed කොෝ instead of කෝ). This is safe -
+                                        // unlike the old bug above, there's no ambiguity about
+                                        // prior region state here: finishComposingText() and the
+                                        // delete just above guarantee nothing is open right now,
+                                        // so setComposingText() can only insert fresh, not
+                                        // silently replace something unexpected.
+                                        ic.setComposingText(topStep.restoreText, 1)
+                                    } else {
+                                        ic.commitText(topStep.restoreText, 1)
+                                    }
+                                }
                             } finally {
                                 ic.endBatchEdit()
                             }
