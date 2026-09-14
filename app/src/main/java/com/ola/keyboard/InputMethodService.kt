@@ -1099,55 +1099,76 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
     private fun onSuggestionClicked(suggestion: String) {
         val ic = currentInputConnection ?: return
 
-        // finishComposingText() FIRST, before we read the surrounding text or try
-        // to delete anything. The current token is very often still an open
-        // composing region (e.g. mid-way through the Singlish transliteration for
-        // a matra like ඇ) - deleteSurroundingTextInCodePoints() on some apps'
-        // input connections (e.g. Telegram) does not reliably remove text that's
-        // still part of an open composing span, since the composing span is
-        // handled as a special, not-yet-final edit. Committing it first turns it
-        // into plain text, so the delete below actually removes it instead of
-        // leaving it in place and appending the suggestion right after it.
-        ic.finishComposingText()
+        // Wrap the whole replace-token-with-suggestion sequence (finish composing,
+        // delete, commit) in one batch edit. Without this, each InputConnection
+        // call below is its own separate round-trip that the host app can process
+        // independently. Some apps' custom text inputs (e.g. Facebook/Instagram's
+        // comment box, which is not a plain Android EditText) don't keep their
+        // internal cursor/selection bookkeeping perfectly in sync between rapid,
+        // unbatched calls - a delete call landing before the app has settled from
+        // the previous one can operate on a stale position and remove far more
+        // than intended, up to the whole field going blank. beginBatchEdit/
+        // endBatchEdit tells a well-behaved host to treat everything in between as
+        // one atomic edit instead of several independent ones.
+        ic.beginBatchEdit()
+        try {
+            // finishComposingText() FIRST, before we read the surrounding text or try
+            // to delete anything. The current token is very often still an open
+            // composing region (e.g. mid-way through the Singlish transliteration for
+            // a matra like ඇ) - deleteSurroundingTextInCodePoints() on some apps'
+            // input connections (e.g. Telegram) does not reliably remove text that's
+            // still part of an open composing span, since the composing span is
+            // handled as a special, not-yet-final edit. Committing it first turns it
+            // into plain text, so the delete below actually removes it instead of
+            // leaving it in place and appending the suggestion right after it.
+            ic.finishComposingText()
 
-        // Replace current token with suggestion
-        val before = ic.getTextBeforeCursor(100, 0)?.toString() ?: ""
-        val after = ic.getTextAfterCursor(100, 0)?.toString() ?: ""
-        val tokenStart = before.lastIndexOfAny(charArrayOf(' ', '\n', '\t')).let { if (it < 0) 0 else it + 1 }
-        val token = before.substring(tokenStart)
-        // Word before the one being replaced — feeds the bigram model below.
-        val previousWordForBigram = before.substring(0, tokenStart).trimEnd().takeLastWhile { !it.isWhitespace() }
-        // delete token
-        for (i in 0 until token.codePointCount(0, token.length)) {
-            ic.deleteSurroundingTextInCodePoints(1, 0)
-        }
-        // Re-derive casing from the actual token that was just typed (read above,
-        // before it was deleted) rather than the chip's already-displayed text -
-        // same reasoning as applyCurrentCaseForDisplay's token param: caps/shift
-        // alone can't tell us the user typed a capital "G", since [caps] auto-
-        // unshifts right after that first letter. This keeps tap-to-commit correct
-        // even if caps/shift changed between the chip rendering and the tap.
-        val lang = LanguageDetector.detectLanguage(suggestion)
-        val casedSuggestion = applyCurrentCaseForDisplay(suggestion, token)
-        // commit suggestion, followed by a single space so the user can keep typing the next word
-        commitStyled(ic, "$casedSuggestion ")
+            // Replace current token with suggestion
+            val before = ic.getTextBeforeCursor(100, 0)?.toString() ?: ""
+            val after = ic.getTextAfterCursor(100, 0)?.toString() ?: ""
+            val tokenStart = before.lastIndexOfAny(charArrayOf(' ', '\n', '\t')).let { if (it < 0) 0 else it + 1 }
+            val token = before.substring(tokenStart)
+            // Word before the one being replaced — feeds the bigram model below.
+            val previousWordForBigram = before.substring(0, tokenStart).trimEnd().takeLastWhile { !it.isWhitespace() }
+            // Delete the whole token in a single call instead of looping one
+            // codepoint at a time - fewer round-trips, and it removes the token
+            // as one atomic edit rather than N separate ones (same reasoning as
+            // the batch-edit wrap above: fewer, larger InputConnection calls are
+            // both faster and safer on apps with less robust custom text inputs).
+            val tokenCodePointCount = token.codePointCount(0, token.length)
+            if (tokenCodePointCount > 0) {
+                ic.deleteSurroundingTextInCodePoints(tokenCodePointCount, 0)
+            }
+            // Re-derive casing from the actual token that was just typed (read above,
+            // before it was deleted) rather than the chip's already-displayed text -
+            // same reasoning as applyCurrentCaseForDisplay's token param: caps/shift
+            // alone can't tell us the user typed a capital "G", since [caps] auto-
+            // unshifts right after that first letter. This keeps tap-to-commit correct
+            // even if caps/shift changed between the chip rendering and the tap.
+            val lang = LanguageDetector.detectLanguage(suggestion)
+            val casedSuggestion = applyCurrentCaseForDisplay(suggestion, token)
+            // commit suggestion, followed by a single space so the user can keep typing the next word
+            commitStyled(ic, "$casedSuggestion ")
 
-        // Mirror the normal space-bar bookkeeping, since we just committed a space too.
-        lastChar = null
-        lastLetter = null
-        positionFlag = ""
-        mComposing = ""
-        tComposing = ""
-        inputHistory.clear()
-        // Tapping a chip isn't a repeated space-bar press - reset the streak so the
-        // next actual space the user types shows chips instead of being treated as
-        // an (incorrect) 2nd consecutive space.
-        consecutiveSpacePresses = 0
-        suppressNextWordSuggestions = false
+            // Mirror the normal space-bar bookkeeping, since we just committed a space too.
+            lastChar = null
+            lastLetter = null
+            positionFlag = ""
+            mComposing = ""
+            tComposing = ""
+            inputHistory.clear()
+            // Tapping a chip isn't a repeated space-bar press - reset the streak so the
+            // next actual space the user types shows chips instead of being treated as
+            // an (incorrect) 2nd consecutive space.
+            consecutiveSpacePresses = 0
+            suppressNextWordSuggestions = false
 
-        // record acceptance
-        serviceScope.launch {
-            suggestionEngine?.recordAccepted(suggestion, lang, previousWordForBigram)
+            // record acceptance
+            serviceScope.launch {
+                suggestionEngine?.recordAccepted(suggestion, lang, previousWordForBigram)
+            }
+        } finally {
+            ic.endBatchEdit()
         }
 
         // Hide suggestions now that the word is complete (word + space), same as pressing space.
