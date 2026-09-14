@@ -50,7 +50,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ola.keyboard.R
@@ -272,9 +271,7 @@ private fun ClipRow(
             }
             Text(
                 text = clip.text,
-                fontSize = 13.sp,
-                maxLines = 6,
-                overflow = TextOverflow.Ellipsis,
+                fontSize = 11.sp,
                 // Explicit full-contrast color instead of the Card's auto-picked
                 // content color: unselected cards use surfaceVariant as their
                 // container, which pairs with onSurfaceVariant (a deliberately
@@ -285,11 +282,12 @@ private fun ClipRow(
                 modifier = Modifier.weight(1f)
             )
             if (!selectionMode) {
-                IconButton(onClick = onTogglePin) {
+                IconButton(onClick = onTogglePin, modifier = Modifier.size(28.dp)) {
                     Icon(
                         imageVector = if (clip.pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
                         contentDescription = stringResource(if (clip.pinned) R.string.clip_unpin else R.string.clip_pin),
-                        tint = if (clip.pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = if (clip.pinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
