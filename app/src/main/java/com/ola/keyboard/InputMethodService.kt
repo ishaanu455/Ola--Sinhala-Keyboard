@@ -1222,7 +1222,7 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
         CHAR.KETTI_AEDA_PILLA.code, CHAR.KETTI_IS_PILLA.code, CHAR.KETTI_PAA_PILLA.code,
         CHAR.KOMBUVA.code, CHAR.KOMBUVA_HAA_AELA_PILLA.code,
         CHAR.AYANNA.code, CHAR.AEYANNA.code, CHAR.IYANNA.code, CHAR.UYANNA.code,
-        CHAR.EYANNA.code, CHAR.OYANNA.code
+        CHAR.EYANNA.code, CHAR.OYANNA.code, CHAR.IRUYANNA.code
     )
 
     // Consonants whose bare (al-lakuna) form can still be swapped for a different
@@ -1328,6 +1328,16 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                     erasePreviousChars = 4
                     tLastLetter = pendingGaettaBase
                     tLastChar = CHAR.GAETTA_PILLA
+                    // Leave කෘ open as a composing region (erasePreviousChars and composable
+                    // aren't mutually exclusive - see the render block below: the erase still
+                    // happens, but the freshly-placed output is opened instead of finalized)
+                    // rather than finalizing it outright. This doesn't remove the erase(4)
+                    // itself (that's a separate, bigger fix - see the two branches below that
+                    // depend on this one), but it means a following "i"/"u" that lengthens
+                    // කෘ -> කෲ can swap this region's content directly in one call instead of
+                    // ALSO needing its own erase - see the GAETTA_PILLA+IYANNA/UYANNA branches.
+                    composable = true
+                    freshComposable = true
                 }
 
                 mLastChar.type == CharType.WYANJANA ->
@@ -1566,11 +1576,13 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                         }
 
                         mLastChar.code == CHAR.GAETTA_PILLA.code && singlishChar.code == CHAR.IYANNA.code -> {
-                            // Vocalic-r lengthening (කෘ -> කෲ) is out of scope for the
-                            // composing-text fix for now - keeps the original erase+commit path.
+                            // කෘ -> කෲ. Now that the rakaransaya->gaetta-pilla branch above
+                            // leaves කෘ open as a composing region, this can swap it directly
+                            // (one call) instead of erase(1)+commit (two calls) - same fix as
+                            // the doublable vowels/h-convertible consonants elsewhere.
                             output = CHAR.DIGA_GAETTA_PILLA.text
-                            erasePreviousChars = 1
                             tLastChar = CHAR.DIGA_GAETTA_PILLA
+                            composable = true
                         }
 
                         mLastChar.code == CHAR.KOMBUVA.code && singlishChar.code == CHAR.EYANNA.code -> {
@@ -1587,9 +1599,10 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
 
                         mLastChar.code == CHAR.GAETTA_PILLA.code && singlishChar.code == CHAR.UYANNA.code -> {
                             // Second "u" lengthens the gaetta pilla, e.g. "kru" + "u" -> කෲ.
+                            // Same swap-not-erase fix as the IYANNA branch above.
                             output = CHAR.DIGA_GAETTA_PILLA.text
-                            erasePreviousChars = 1
                             tLastChar = CHAR.DIGA_GAETTA_PILLA
+                            composable = true
                         }
 
                         else -> newLetter()
@@ -1661,12 +1674,13 @@ class InputMethodService : android.inputmethodservice.InputMethodService(),
                             }
 
                             CHAR.IRUYANNA -> {
-                                // Vocalic-r lengthening is out of scope for the composing-text
-                                // fix for now - keeps the original erase+commit path.
+                                // ඍ -> ඎ. IRUYANNA is now in doublableVowelCodes, so the fresh
+                                // letter is already left open as a composing region - same
+                                // swap-not-erase fix as its siblings above/below.
                                 if (singlishChar.code == CHAR.IYANNA.code) {
                                     output = CHAR.IRUUYANNA.text
-                                    erasePreviousChars = 1
                                     tLastLetter = CHAR.IRUUYANNA
+                                    composable = true
                                 } else newLetter()
                             }
 
